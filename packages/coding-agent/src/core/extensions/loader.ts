@@ -109,7 +109,7 @@ export function createExtensionRuntime(): ExtensionRuntime {
 		throw new Error("Extension runtime not initialized. Action methods cannot be called during extension loading.");
 	};
 
-	return {
+	const runtime: ExtensionRuntime = {
 		sendMessage: notInitialized,
 		sendUserMessage: notInitialized,
 		appendEntry: notInitialized,
@@ -125,7 +125,18 @@ export function createExtensionRuntime(): ExtensionRuntime {
 		setThinkingLevel: notInitialized,
 		flagValues: new Map(),
 		pendingProviderRegistrations: [],
+		// Pre-bind: queue registrations so bindCore() can flush them once the
+		// model registry is available. bindCore() replaces both with direct calls.
+		registerProvider: (name, config) => {
+			runtime.pendingProviderRegistrations.push({ name, config });
+		},
+		unregisterProvider: (name) => {
+			const idx = runtime.pendingProviderRegistrations.findIndex((r) => r.name === name);
+			if (idx !== -1) runtime.pendingProviderRegistrations.splice(idx, 1);
+		},
 	};
+
+	return runtime;
 }
 
 /**
@@ -246,7 +257,11 @@ function createExtensionAPI(
 		},
 
 		registerProvider(name: string, config: ProviderConfig) {
-			runtime.pendingProviderRegistrations.push({ name, config });
+			runtime.registerProvider(name, config);
+		},
+
+		unregisterProvider(name: string) {
+			runtime.unregisterProvider(name);
 		},
 
 		events: eventBus,

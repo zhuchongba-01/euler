@@ -1161,6 +1161,8 @@ pi.events.emit("my:event", { ... });
 
 Register or override a model provider dynamically. Useful for proxies, custom endpoints, or team-wide model configurations.
 
+Calls made during the extension factory function are queued and applied once the runner initialises. Calls made after that — for example from a command handler following a user setup flow — take effect immediately without requiring a `/reload`.
+
 ```typescript
 // Register a new provider with custom models
 pi.registerProvider("my-proxy", {
@@ -1220,6 +1222,21 @@ pi.registerProvider("corporate-ai", {
 - `streamSimple` - Custom streaming implementation for non-standard APIs.
 
 See [custom-provider.md](custom-provider.md) for advanced topics: custom streaming APIs, OAuth details, model definition reference.
+
+### pi.unregisterProvider(name)
+
+Remove a previously registered provider and its models. Built-in models that were overridden by the provider are restored. Has no effect if the provider was not registered.
+
+Like `registerProvider`, this takes effect immediately when called after the initial load phase, so a `/reload` is not required.
+
+```typescript
+pi.registerCommand("my-setup-teardown", {
+  description: "Remove the custom proxy provider",
+  handler: async (_args, _ctx) => {
+    pi.unregisterProvider("my-proxy");
+  },
+});
+```
 
 ## State Management
 

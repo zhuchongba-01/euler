@@ -540,6 +540,20 @@ export class ModelRegistry {
 		this.applyProviderConfig(providerName, config);
 	}
 
+	/**
+	 * Unregister a previously registered provider.
+	 *
+	 * Removes the provider from the registry and reloads models from disk so that
+	 * built-in models overridden by this provider are restored to their original state.
+	 * Has no effect if the provider was never registered.
+	 */
+	unregisterProvider(providerName: string): void {
+		if (!this.registeredProviders.has(providerName)) return;
+		this.registeredProviders.delete(providerName);
+		this.customProviderApiKeys.delete(providerName);
+		this.refresh();
+	}
+
 	private applyProviderConfig(providerName: string, config: ProviderConfigInput): void {
 		// Register OAuth provider if provided
 		if (config.oauth) {

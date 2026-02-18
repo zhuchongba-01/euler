@@ -1071,6 +1071,11 @@ export interface ExtensionAPI {
 	 * If `oauth` is provided: registers OAuth provider for /login support.
 	 * If `streamSimple` is provided: registers a custom API stream handler.
 	 *
+	 * During initial extension load this call is queued and applied once the
+	 * runner has bound its context. After that it takes effect immediately, so
+	 * it is safe to call from command handlers or event callbacks without
+	 * requiring a `/reload`.
+	 *
 	 * @example
 	 * // Register a new provider with custom models
 	 * pi.registerProvider("my-proxy", {
@@ -1111,6 +1116,21 @@ export interface ExtensionAPI {
 	 * });
 	 */
 	registerProvider(name: string, config: ProviderConfig): void;
+
+	/**
+	 * Unregister a previously registered provider.
+	 *
+	 * Removes all models belonging to the named provider and restores any
+	 * built-in models that were overridden by it. Has no effect if the provider
+	 * was not registered by this extension API.
+	 *
+	 * Like `registerProvider`, this takes effect immediately when called after
+	 * the initial load phase.
+	 *
+	 * @example
+	 * pi.unregisterProvider("my-proxy");
+	 */
+	unregisterProvider(name: string): void;
 
 	/** Shared event bus for extension communication. */
 	events: EventBus;
@@ -1247,6 +1267,14 @@ export interface ExtensionRuntimeState {
 	flagValues: Map<string, boolean | string>;
 	/** Provider registrations queued during extension loading, processed when runner binds */
 	pendingProviderRegistrations: Array<{ name: string; config: ProviderConfig }>;
+	/**
+	 * Register or unregister a provider.
+	 *
+	 * Before bindCore(): queues registrations / removes from queue.
+	 * After bindCore(): calls ModelRegistry directly for immediate effect.
+	 */
+	registerProvider: (name: string, config: ProviderConfig) => void;
+	unregisterProvider: (name: string) => void;
 }
 
 /**
