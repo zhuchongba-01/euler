@@ -25,6 +25,9 @@ import { truncateToVisualLines } from "./visual-truncate.js";
 
 // Preview line limit for bash when not expanded
 const BASH_PREVIEW_LINES = 5;
+// During partial write tool-call streaming, re-highlight the first N lines fully
+// to keep multiline tokenization mostly correct without re-highlighting the full file.
+const WRITE_PARTIAL_FULL_HIGHLIGHT_LINES = 50;
 
 /**
  * Convert absolute path to tilde notation if it's in home directory
@@ -56,6 +59,14 @@ export interface ToolExecutionOptions {
 	showImages?: boolean; // default: true (only used if terminal supports images)
 }
 
+type WriteHighlightCache = {
+	rawPath: string | null;
+	lang: string;
+	rawContent: string;
+	normalizedLines: string[];
+	highlightedLines: string[];
+};
+
 /**
  * Component that renders a tool call with its result (updateable)
  */
@@ -82,6 +93,8 @@ export class ToolExecutionComponent extends Container {
 	private editDiffArgsKey?: string; // Track which args the preview is for
 	// Cached converted images for Kitty protocol (which requires PNG), keyed by index
 	private convertedImages: Map<number, { data: string; mimeType: string }> = new Map();
+	// Incremental syntax highlighting cache for write tool call args
+	private writeHighlightCache?: WriteHighlightCache;
 
 	constructor(
 		toolName: string,
@@ -129,7 +142,100 @@ export class ToolExecutionComponent extends Container {
 
 	updateArgs(args: any): void {
 		this.args = args;
+		if (this.toolName === "write" && this.isPartial) {
+			this.updateWriteHighlightCacheIncremental();
+		}
 		this.updateDisplay();
+	}
+
+	private highlightSingleLine(line: string, lang: string): string {
+		const highlighted = highlightCode(line, lang);
+		return highlighted[0] ?? "";
+	}
+
+	private refreshWriteHighlightPrefix(cache: WriteHighlightCache): void {
+		const prefixCount = Math.min(WRITE_PARTIAL_FULL_HIGHLIGHT_LINES, cache.normalizedLines.length);
+		if (prefixCount === 0) return;
+
+		const prefixSource = cache.normalizedLines.slice(0, prefixCount).join("\n");
+		const prefixHighlighted = highlightCode(prefixSource, cache.lang);
+		for (let i = 0; i < prefixCount; i++) {
+			cache.highlightedLines[i] =
+				prefixHighlighted[i] ?? this.highlightSingleLine(cache.normalizedLines[i] ?? "", cache.lang);
+		}
+	}
+
+	private rebuildWriteHighlightCacheFull(rawPath: string | null, fileContent: string): void {
+		const lang = rawPath ? getLanguageFromPath(rawPath) : undefined;
+		if (!lang) {
+			this.writeHighlightCache = undefined;
+			return;
+		}
+
+		const normalized = replaceTabs(fileContent);
+		this.writeHighlightCache = {
+			rawPath,
+			lang,
+			rawContent: fileContent,
+			normalizedLines: normalized.split("\n"),
+			highlightedLines: highlightCode(normalized, lang),
+		};
+	}
+
+	private updateWriteHighlightCacheIncremental(): void {
+		const rawPath = str(this.args?.file_path ?? this.args?.path);
+		const fileContent = str(this.args?.content);
+		if (rawPath === null || fileContent === null) {
+			this.writeHighlightCache = undefined;
+			return;
+		}
+
+		const lang = rawPath ? getLanguageFromPath(rawPath) : undefined;
+		if (!lang) {
+			this.writeHighlightCache = undefined;
+			return;
+		}
+
+		if (!this.writeHighlightCache) {
+			this.rebuildWriteHighlightCacheFull(rawPath, fileContent);
+			return;
+		}
+
+		const cache = this.writeHighlightCache;
+		if (cache.lang !== lang || cache.rawPath !== rawPath) {
+			this.rebuildWriteHighlightCacheFull(rawPath, fileContent);
+			return;
+		}
+
+		if (!fileContent.startsWith(cache.rawContent)) {
+			this.rebuildWriteHighlightCacheFull(rawPath, fileContent);
+			return;
+		}
+
+		if (fileContent.length === cache.rawContent.length) {
+			return;
+		}
+
+		const deltaRaw = fileContent.slice(cache.rawContent.length);
+		const deltaNormalized = replaceTabs(deltaRaw);
+		cache.rawContent = fileContent;
+
+		if (cache.normalizedLines.length === 0) {
+			cache.normalizedLines.push("");
+			cache.highlightedLines.push("");
+		}
+
+		const segments = deltaNormalized.split("\n");
+		const lastIndex = cache.normalizedLines.length - 1;
+		cache.normalizedLines[lastIndex] += segments[0];
+		cache.highlightedLines[lastIndex] = this.highlightSingleLine(cache.normalizedLines[lastIndex], cache.lang);
+
+		for (let i = 1; i < segments.length; i++) {
+			cache.normalizedLines.push(segments[i]);
+			cache.highlightedLines.push(this.highlightSingleLine(segments[i], cache.lang));
+		}
+
+		this.refreshWriteHighlightPrefix(cache);
 	}
 
 	/**
@@ -137,6 +243,13 @@ export class ToolExecutionComponent extends Container {
 	 * This triggers diff computation for edit tool.
 	 */
 	setArgsComplete(): void {
+		if (this.toolName === "write") {
+			const rawPath = str(this.args?.file_path ?? this.args?.path);
+			const fileContent = str(this.args?.content);
+			if (rawPath !== null && fileContent !== null) {
+				this.rebuildWriteHighlightCacheFull(rawPath, fileContent);
+			}
+		}
 		this.maybeComputeEditDiff();
 	}
 
@@ -183,6 +296,13 @@ export class ToolExecutionComponent extends Container {
 	): void {
 		this.result = result;
 		this.isPartial = isPartial;
+		if (this.toolName === "write" && !isPartial) {
+			const rawPath = str(this.args?.file_path ?? this.args?.path);
+			const fileContent = str(this.args?.content);
+			if (rawPath !== null && fileContent !== null) {
+				this.rebuildWriteHighlightCacheFull(rawPath, fileContent);
+			}
+		}
 		this.updateDisplay();
 		// Convert non-PNG images to PNG for Kitty protocol (async)
 		this.maybeConvertImagesForKitty();
@@ -532,7 +652,28 @@ export class ToolExecutionComponent extends Container {
 				text += `\n\n${theme.fg("error", "[invalid content arg - expected string]")}`;
 			} else if (fileContent) {
 				const lang = rawPath ? getLanguageFromPath(rawPath) : undefined;
-				const lines = lang ? highlightCode(replaceTabs(fileContent), lang) : fileContent.split("\n");
+
+				let lines: string[];
+				if (lang) {
+					const cache = this.writeHighlightCache;
+					if (cache && cache.lang === lang && cache.rawPath === rawPath && cache.rawContent === fileContent) {
+						lines = cache.highlightedLines;
+					} else {
+						const normalized = replaceTabs(fileContent);
+						lines = highlightCode(normalized, lang);
+						this.writeHighlightCache = {
+							rawPath,
+							lang,
+							rawContent: fileContent,
+							normalizedLines: normalized.split("\n"),
+							highlightedLines: lines,
+						};
+					}
+				} else {
+					lines = fileContent.split("\n");
+					this.writeHighlightCache = undefined;
+				}
+
 				const totalLines = lines.length;
 				const maxLines = this.expanded ? lines.length : 10;
 				const displayLines = lines.slice(0, maxLines);
@@ -540,9 +681,7 @@ export class ToolExecutionComponent extends Container {
 
 				text +=
 					"\n\n" +
-					displayLines
-						.map((line: string) => (lang ? replaceTabs(line) : theme.fg("toolOutput", replaceTabs(line))))
-						.join("\n");
+					displayLines.map((line: string) => (lang ? line : theme.fg("toolOutput", replaceTabs(line)))).join("\n");
 				if (remaining > 0) {
 					text +=
 						theme.fg("muted", `\n... (${remaining} more lines, ${totalLines} total,`) +
