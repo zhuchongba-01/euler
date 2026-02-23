@@ -10338,7 +10338,7 @@ export const MODELS = {
 				cacheWrite: 3.75,
 			},
 			contextWindow: 200000,
-			maxTokens: 64000,
+			maxTokens: 8192,
 		} satisfies Model<"anthropic-messages">,
 		"anthropic/claude-haiku-4.5": {
 			id: "anthropic/claude-haiku-4.5",
