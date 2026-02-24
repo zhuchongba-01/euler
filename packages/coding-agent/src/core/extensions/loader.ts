@@ -173,7 +173,7 @@ function createExtensionAPI(
 			options: { description?: string; type: "boolean" | "string"; default?: boolean | string },
 		): void {
 			extension.flags.set(name, { name, extensionPath: extension.path, ...options });
-			if (options.default !== undefined) {
+			if (options.default !== undefined && !runtime.flagValues.has(name)) {
 				runtime.flagValues.set(name, options.default);
 			}
 		},
@@ -486,13 +486,13 @@ export async function discoverAndLoadExtensions(
 		}
 	};
 
-	// 1. Global extensions: agentDir/extensions/
-	const globalExtDir = path.join(agentDir, "extensions");
-	addPaths(discoverExtensionsInDir(globalExtDir));
-
-	// 2. Project-local extensions: cwd/.pi/extensions/
+	// 1. Project-local extensions: cwd/.pi/extensions/
 	const localExtDir = path.join(cwd, ".pi", "extensions");
 	addPaths(discoverExtensionsInDir(localExtDir));
+
+	// 2. Global extensions: agentDir/extensions/
+	const globalExtDir = path.join(agentDir, "extensions");
+	addPaths(discoverExtensionsInDir(globalExtDir));
 
 	// 3. Explicitly configured paths
 	for (const p of configuredPaths) {

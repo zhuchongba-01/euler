@@ -729,7 +729,7 @@ export class InteractiveMode {
 			}
 		}
 
-		return [groups.user, groups.project, groups.path].filter(
+		return [groups.project, groups.user, groups.path].filter(
 			(group) => group.paths.length > 0 || group.packages.size > 0,
 		);
 	}
