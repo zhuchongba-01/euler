@@ -60,7 +60,7 @@ function getAliases(): Record<string, string> {
 	const packageIndex = path.resolve(__dirname, "../..", "index.js");
 
 	const typeboxEntry = require.resolve("@sinclair/typebox");
-	const typeboxRoot = typeboxEntry.replace(/\/build\/cjs\/index\.js$/, "");
+	const typeboxRoot = typeboxEntry.replace(/[\\/]build[\\/]cjs[\\/]index\.js$/, "");
 
 	_aliases = {
 		"@mariozechner/pi-coding-agent": packageIndex,
