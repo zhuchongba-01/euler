@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Changed the default image paste keybinding on Windows to `alt+v` to avoid `ctrl+v` conflicts with terminal paste behavior ([#1682](https://github.com/badlogic/pi-mono/pull/1682) by [@mrexodia](https://github.com/mrexodia)).
+
 ## [0.55.2] - 2026-02-27
 
 ### New Features
