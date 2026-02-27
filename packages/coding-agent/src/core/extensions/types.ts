@@ -1122,7 +1122,7 @@ export interface ExtensionAPI {
 	 *
 	 * Removes all models belonging to the named provider and restores any
 	 * built-in models that were overridden by it. Has no effect if the provider
-	 * was not registered by this extension API.
+	 * is not currently registered.
 	 *
 	 * Like `registerProvider`, this takes effect immediately when called after
 	 * the initial load phase.

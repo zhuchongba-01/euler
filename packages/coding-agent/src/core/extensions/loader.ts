@@ -131,8 +131,7 @@ export function createExtensionRuntime(): ExtensionRuntime {
 			runtime.pendingProviderRegistrations.push({ name, config });
 		},
 		unregisterProvider: (name) => {
-			const idx = runtime.pendingProviderRegistrations.findIndex((r) => r.name === name);
-			if (idx !== -1) runtime.pendingProviderRegistrations.splice(idx, 1);
+			runtime.pendingProviderRegistrations = runtime.pendingProviderRegistrations.filter((r) => r.name !== name);
 		},
 	};
 

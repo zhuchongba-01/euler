@@ -4,11 +4,11 @@
 
 ### Added
 
-- `pi.unregisterProvider(name)` removes a dynamically registered provider and its models from the registry without requiring `/reload`. Built-in models that were overridden by the provider are restored.
+- `pi.unregisterProvider(name)` removes a dynamically registered provider and its models from the registry without requiring `/reload`. Built-in models that were overridden by the provider are restored ([#1669](https://github.com/badlogic/pi-mono/pull/1669) by [@aliou](https://github.com/aliou)).
 
 ### Fixed
 
-- `pi.registerProvider()` now takes effect immediately when called after the initial extension load phase (e.g. from a command handler). Previously the registration sat in a pending queue that was never flushed until the next `/reload`.
+- `pi.registerProvider()` now takes effect immediately when called after the initial extension load phase (e.g. from a command handler). Previously the registration sat in a pending queue that was never flushed until the next `/reload` ([#1669](https://github.com/badlogic/pi-mono/pull/1669) by [@aliou](https://github.com/aliou)).
 
 ## [0.53.0] - 2026-02-17
 
