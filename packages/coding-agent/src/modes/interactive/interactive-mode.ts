@@ -2612,8 +2612,14 @@ export class InteractiveMode {
 	}
 
 	private handleCtrlZ(): void {
+		// Ignore SIGINT while suspended so Ctrl+C in the terminal does not
+		// kill the backgrounded process. The handler is removed on resume.
+		const ignoreSigint = () => {};
+		process.on("SIGINT", ignoreSigint);
+
 		// Set up handler to restore TUI when resumed
 		process.once("SIGCONT", () => {
+			process.removeListener("SIGINT", ignoreSigint);
 			this.ui.start();
 			this.ui.requestRender(true);
 		});
