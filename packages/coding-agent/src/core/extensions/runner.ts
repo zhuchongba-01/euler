@@ -259,11 +259,16 @@ export class ExtensionRunner {
 		this.compactFn = contextActions.compact;
 		this.getSystemPromptFn = contextActions.getSystemPrompt;
 
-		// Process provider registrations queued during extension loading
+		// Flush provider registrations queued during extension loading
 		for (const { name, config } of this.runtime.pendingProviderRegistrations) {
 			this.modelRegistry.registerProvider(name, config);
 		}
 		this.runtime.pendingProviderRegistrations = [];
+
+		// From this point on, provider registration/unregistration takes effect immediately
+		// without requiring a /reload.
+		this.runtime.registerProvider = (name, config) => this.modelRegistry.registerProvider(name, config);
+		this.runtime.unregisterProvider = (name) => this.modelRegistry.unregisterProvider(name);
 	}
 
 	bindCommandContext(actions?: ExtensionCommandContextActions): void {
