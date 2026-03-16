@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed steering messages to wait until the current assistant message's tool-call batch fully finishes instead of skipping pending tool calls.
+
 ## [0.58.3] - 2026-03-15
 
 ## [0.58.2] - 2026-03-15
