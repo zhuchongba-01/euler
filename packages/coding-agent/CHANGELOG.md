@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fixed `ctrl+z` suspend and `fg` resume reliability by keeping the process alive until the `SIGCONT` handler restores the TUI, avoiding immediate process exit in environments with no other live event-loop handles ([#2454](https://github.com/badlogic/pi-mono/issues/2454))
+- Fixed `createAgentSession({ agentDir })` to derive the default persisted session path from the provided `agentDir`, keeping session storage aligned with settings, auth, models, and resource loading ([#2457](https://github.com/badlogic/pi-mono/issues/2457))
 
 ## [0.61.0] - 2026-03-20
 
