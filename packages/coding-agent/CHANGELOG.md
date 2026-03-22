@@ -14,6 +14,7 @@
 ### Fixed
 
 - Fixed `pi update` for git packages to skip destructive reset, clean, and reinstall steps when the fetched target already matches the local checkout ([#2503](https://github.com/badlogic/pi-mono/issues/2503))
+- Fixed print and JSON mode to take over stdout during non-interactive startup, keeping package-manager and other incidental chatter off protocol/output stdout ([#2482](https://github.com/badlogic/pi-mono/issues/2482))
 
 ## [0.61.1] - 2026-03-20
 
