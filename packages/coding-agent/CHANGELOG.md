@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed RPC `get_session_stats` to expose `contextUsage`, so headless clients can read actual current context-window usage instead of deriving it from token totals ([#2550](https://github.com/badlogic/pi-mono/issues/2550))
+
 ## [0.62.0] - 2026-03-23
 
 ### New Features
