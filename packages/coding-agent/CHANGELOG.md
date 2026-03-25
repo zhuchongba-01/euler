@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `sessionDir` setting support in global and project `settings.json` so session storage can be configured without passing `--session-dir` on every invocation ([#2598](https://github.com/badlogic/pi-mono/pull/2598) by [@smcllns](https://github.com/smcllns))
+
 ### Fixed
 
 - Added missing `ajv` direct dependency; previously relied on transitive install via `@mariozechner/pi-ai` which broke standalone installs ([#2252](https://github.com/badlogic/pi-mono/issues/2252))
