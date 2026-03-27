@@ -6,6 +6,8 @@
 
 - Fixed repeated compactions dropping messages that were kept by an earlier compaction by re-summarizing from the previous kept boundary and recalculating `tokensBefore` from the rebuilt session context ([#2608](https://github.com/badlogic/pi-mono/issues/2608))
 - Fixed interactive compaction UI updates so `ctx.compact()` rebuilds the chat through unified compaction events, manual compaction no longer duplicates the summary block, and the `trigger-compact` example only fires when context usage crosses its threshold ([#2617](https://github.com/badlogic/pi-mono/issues/2617))
+- Fixed skill discovery to stop recursing once a directory contains `SKILL.md`, and to ignore root `*.md` files in `.agents/skills` while keeping root markdown skill files supported in `~/.pi/agent/skills`, `.pi/skills`, and package `skills/` directories ([#2603](https://github.com/badlogic/pi-mono/issues/2603))
+- Fixed edit tool diff rendering for multi-edit operations with large unchanged gaps so distant edits collapse intermediate context instead of dumping the full unchanged middle block
 - Fixed auto-compaction overflow recovery for Ollama models when the backend returns explicit `prompt too long; exceeded max context length ...` errors instead of silently truncating input ([#2626](https://github.com/badlogic/pi-mono/issues/2626))
 - Fixed built-in tool overrides that reuse built-in parameter schemas to still honor custom `renderCall` and `renderResult` renderers in the interactive TUI, restoring the `minimal-mode` example ([#2595](https://github.com/badlogic/pi-mono/issues/2595))
 
