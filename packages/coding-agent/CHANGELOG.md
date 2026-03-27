@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fixed auto-compaction overflow recovery for Ollama models when the backend returns explicit `prompt too long; exceeded max context length ...` errors instead of silently truncating input ([#2626](https://github.com/badlogic/pi-mono/issues/2626))
+- Fixed built-in tool overrides that reuse built-in parameter schemas to still honor custom `renderCall` and `renderResult` renderers in the interactive TUI, restoring the `minimal-mode` example ([#2595](https://github.com/badlogic/pi-mono/issues/2595))
 
 ## [0.63.0] - 2026-03-27
 
