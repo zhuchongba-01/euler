@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed context overflow detection to recognize Ollama error responses like `prompt too long; exceeded max context length ...`, so callers can trigger compaction and retry instead of surfacing the raw overflow error ([#2626](https://github.com/badlogic/pi-mono/issues/2626))
+
 ## [0.63.0] - 2026-03-27
 
 ### Breaking Changes
