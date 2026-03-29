@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed extension-queued user messages to refresh the interactive pending-message list while preserving `input` event source semantics for `pi.sendUserMessage()` ([#2674](https://github.com/badlogic/pi-mono/pull/2674) by [@mrexodia](https://github.com/mrexodia))
+
 ## [0.63.2] - 2026-03-29
 
 ### New Features
