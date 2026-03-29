@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `ToolDefinition.prepareArguments` hook to prepare raw tool call arguments before schema validation, enabling compatibility shims for resumed sessions with outdated tool schemas
+- Built-in `edit` tool now uses `prepareArguments` to silently fold legacy top-level `oldText`/`newText` into `edits[]` when resuming old sessions
+
 ### Fixed
 
 - Fixed extension-queued user messages to refresh the interactive pending-message list while preserving `input` event source semantics for `pi.sendUserMessage()` ([#2674](https://github.com/badlogic/pi-mono/pull/2674) by [@mrexodia](https://github.com/mrexodia))
