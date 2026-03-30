@@ -28,6 +28,11 @@
   - `agent.getSteeringMode()` -> `agent.steeringMode`
   - `agent.setFollowUpMode(mode)` -> `agent.followUpMode = mode`
   - `agent.getFollowUpMode()` -> `agent.followUpMode`
+- `Agent.subscribe()` listeners are now awaited and receive the active `AbortSignal`:
+  - `agent.subscribe((event) => { ... })` -> `agent.subscribe(async (event, signal) => { ... })`
+  - `agent_end` is now the final emitted event for a run, but not the idle boundary
+  - `agent.waitForIdle()`, `agent.prompt(...)`, and `agent.continue()` now settle only after awaited `agent_end` listeners finish
+  - `agent.state.isStreaming` remains `true` until that settlement completes
 
 ## [0.64.0] - 2026-03-29
 
