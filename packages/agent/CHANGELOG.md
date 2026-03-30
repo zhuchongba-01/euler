@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- `AgentState` has been reshaped:
+  - `streamMessage` was renamed to `streamingMessage`
+  - `error` was renamed to `errorMessage`
+  - `isStreaming`, `streamingMessage`, `pendingToolCalls`, and `errorMessage` are now readonly in the public API
+  - `pendingToolCalls` is now typed as `ReadonlySet<string>`
+  - `tools` and `messages` are now accessor properties, and assigning either field copies the provided top-level array instead of preserving array identity
+- `AgentOptions.initialState` no longer accepts runtime-owned fields. Remove `isStreaming`, `streamingMessage`, `pendingToolCalls`, and `errorMessage` from `initialState` values.
+- Removed `Agent` mutator methods in favor of direct property access:
+  - `agent.setSystemPrompt(value)` -> `agent.state.systemPrompt = value`
+  - `agent.setModel(model)` -> `agent.state.model = model`
+  - `agent.setThinkingLevel(level)` -> `agent.state.thinkingLevel = level`
+  - `agent.setTools(tools)` -> `agent.state.tools = tools`
+  - `agent.replaceMessages(messages)` -> `agent.state.messages = messages`
+  - `agent.appendMessage(message)` -> `agent.state.messages.push(message)`
+  - `agent.clearMessages()` -> `agent.state.messages = []`
+  - `agent.setToolExecution(mode)` -> `agent.toolExecution = mode`
+  - `agent.setBeforeToolCall(fn)` -> `agent.beforeToolCall = fn`
+  - `agent.setAfterToolCall(fn)` -> `agent.afterToolCall = fn`
+  - `agent.setTransport(transport)` -> `agent.transport = transport`
+- Removed queue mode getter/setter methods in favor of properties:
+  - `agent.setSteeringMode(mode)` -> `agent.steeringMode = mode`
+  - `agent.getSteeringMode()` -> `agent.steeringMode`
+  - `agent.setFollowUpMode(mode)` -> `agent.followUpMode = mode`
+  - `agent.getFollowUpMode()` -> `agent.followUpMode`
+
 ## [0.64.0] - 2026-03-29
 
 ### Added
