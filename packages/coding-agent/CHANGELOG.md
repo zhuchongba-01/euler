@@ -73,6 +73,8 @@ After runtime replacement, use `runtimeHost.session` as the new live session and
 
 - Added public SDK runtime-host exports `createAgentSessionRuntime()` and `AgentSessionRuntimeHost` for apps that need runtime-backed session replacement and mode-style session switching
 
+- Added `defineTool()` so standalone and array-based custom tool definitions keep inferred parameter types without manual casts ([#2746](https://github.com/badlogic/pi-mono/issues/2746))
+
 - Added label timestamps to the session tree with a `Shift+T` toggle in `/tree`, smart date formatting, and timestamp preservation through branching ([#2691](https://github.com/badlogic/pi-mono/pull/2691) by [@w-winter](https://github.com/w-winter))
 
 ### Fixed
