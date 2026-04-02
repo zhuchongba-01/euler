@@ -79,6 +79,7 @@ After runtime replacement, use `runtimeHost.session` as the new live session and
 
 ### Fixed
 
+- Fixed startup resource loading to reuse the initial `ResourceLoader` for the first runtime, so extensions are not loaded twice before session startup and `session_start` handlers still fire for singleton-style extensions ([#2766](https://github.com/badlogic/pi-mono/issues/2766))
 - Fixed theme `export` colors to resolve theme variables the same way as `colors`, so `/export` HTML backgrounds now honor entries like `pageBg: "base"` instead of requiring inline hex values ([#2707](https://github.com/badlogic/pi-mono/issues/2707))
 
 ## [0.64.0] - 2026-03-29
