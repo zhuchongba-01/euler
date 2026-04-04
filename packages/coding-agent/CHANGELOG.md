@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- RpcClient now forwards subprocess stderr to parent process in real-time ([#2805](https://github.com/badlogic/pi-mono/issues/2805))
+
 ## [0.65.0] - 2026-04-03
 
 ### New Features
