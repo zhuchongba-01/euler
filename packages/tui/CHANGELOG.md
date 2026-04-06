@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed render scheduling under heavy streaming output by coalescing `requestRender()` calls to a 16ms frame budget while preserving immediate `requestRender(true)` behavior.
+
 ## [0.65.1] - 2026-04-05
 
 ## [0.65.0] - 2026-04-03
