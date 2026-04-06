@@ -36,3 +36,4 @@ packages/coding-agent/binaries/
 todo.md
 plans/
 .pi/hf-sessions/
+collect.sh
