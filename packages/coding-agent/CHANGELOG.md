@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Changed the Earendil announcement from an automatic startup notice to the hidden `/dementedelves` slash command.
+
 ## [0.66.0] - 2026-04-08
 
 ### New Features
