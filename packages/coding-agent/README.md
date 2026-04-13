@@ -271,6 +271,8 @@ Use `/settings` to modify common options, or edit JSON files directly:
 
 See [docs/settings.md](docs/settings.md) for all options.
 
+To opt out of anonymous install/update telemetry tied to changelog detection, set `enableInstallTelemetry` to `false` in `settings.json`, or set `PI_TELEMETRY=0`.
+
 ---
 
 ## Context Files
@@ -594,6 +596,7 @@ pi --thinking high "Solve this complex problem"
 | `PI_CODING_AGENT_DIR` | Override config directory (default: `~/.pi/agent`) |
 | `PI_PACKAGE_DIR` | Override package directory (useful for Nix/Guix where store paths tokenize poorly) |
 | `PI_SKIP_VERSION_CHECK` | Skip version check at startup |
+| `PI_TELEMETRY` | Override install telemetry. Use `1`/`true`/`yes` to enable or `0`/`false`/`no` to disable |
 | `PI_CACHE_RETENTION` | Set to `long` for extended prompt cache (Anthropic: 1h, OpenAI: 24h) |
 | `VISUAL`, `EDITOR` | External editor for Ctrl+G |
 

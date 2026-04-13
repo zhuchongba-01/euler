@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+## Telemetry
+
+Interactive mode now sends a lightweight anonymous install/update telemetry ping to `https://pi.dev/install?version=x.y.z` after it writes `lastChangelogVersion` in `settings.json`.
+
+Why this exists:
+- Pi needs a reliable per-version usage signal to understand whether releases are being adopted and to help justify funding continued development.
+- npm download counts are not a reliable proxy for actual Pi usage.
+
+How it works:
+- It only runs in interactive mode.
+- It does not run in RPC mode, print mode, JSON mode, or SDK mode.
+- On a fresh interactive install, Pi writes `lastChangelogVersion`, then sends the ping.
+- On later interactive startups, if the local changelog contains entries newer than the previously stored `lastChangelogVersion`, Pi writes the new `lastChangelogVersion`, then sends the ping.
+- The request is fire-and-forget. Startup does not wait for it, and any errors are ignored.
+
+What data is collected:
+- Only the Pi version in the request path, for example `https://pi.dev/install?version=0.66.1`.
+- The server stores only aggregate per-version counters such as `{ "0.66.1": 3 }`.
+- It does not store IP addresses, client identifiers, prompts, paths, models, auth state, or any other per-user data. It literally only increments a counter for that version.
+
+How to disable it:
+- `/settings` → disable `Install telemetry`
+- `settings.json` → set `enableInstallTelemetry` to `false`
+- `PI_OFFLINE=1`
+- `PI_TELEMETRY=0`
+
 ### New Features
 
 - Full `openRouterRouting` support in `models.json`, including fallbacks, parameter requirements, data collection, ZDR, ignore lists, quantizations, provider sorting, max price, and preferred throughput and latency constraints. See [docs/models.md](docs/models.md).
