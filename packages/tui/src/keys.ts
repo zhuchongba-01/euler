@@ -1139,7 +1139,6 @@ export function matchesKey(data: string, keyId: KeyId): boolean {
 			// modifyOtherKeys sequences from tmux can still be recognized.
 			if (data === `\x1b${rawCtrl}`) return true;
 		}
-		}
 
 		if (modifier === MODIFIERS.alt && !_kittyProtocolActive && (isLetter || isDigit)) {
 			// Legacy: alt+letter/digit is ESC followed by the key
