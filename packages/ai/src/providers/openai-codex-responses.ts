@@ -950,6 +950,7 @@ function buildSSEHeaders(
 
 	if (sessionId) {
 		headers.set("session_id", sessionId);
+		headers.set("x-client-request-id", sessionId);
 	}
 
 	return headers;

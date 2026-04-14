@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed direct OpenAI Responses requests to send aligned `prompt_cache_key`, `session_id`, and `x-client-request-id` values when `sessionId` is provided, improving prompt cache affinity for append-only sessions ([#3018](https://github.com/badlogic/pi-mono/pull/3018) by [@steipete](https://github.com/steipete))
+
 ## [0.67.1] - 2026-04-13
 
 ## [0.67.0] - 2026-04-13
