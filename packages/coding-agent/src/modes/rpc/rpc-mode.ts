@@ -357,7 +357,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 	registerSignalHandlers();
 
 	// Handle a single command
-	const handleCommand = async (command: RpcCommand): Promise<RpcResponse> => {
+	const handleCommand = async (command: RpcCommand): Promise<RpcResponse | undefined> => {
 		const id = command.id;
 
 		switch (command.type) {
@@ -366,17 +366,27 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 			// =================================================================
 
 			case "prompt": {
-				// Don't await - events will stream
-				// Extension commands are executed immediately, file prompt templates are expanded
-				// If streaming and streamingBehavior specified, queues via steer/followUp
-				session
+				// Start prompt handling immediately, but emit the authoritative response only after
+				// prompt preflight succeeds. Queued and immediately handled prompts also count as success.
+				let preflightSucceeded = false;
+				void session
 					.prompt(command.message, {
 						images: command.images,
 						streamingBehavior: command.streamingBehavior,
 						source: "rpc",
+						preflightResult: (didSucceed) => {
+							if (didSucceed) {
+								preflightSucceeded = true;
+								output(success(id, "prompt"));
+							}
+						},
 					})
-					.catch((e) => output(error(id, "prompt", e.message)));
-				return success(id, "prompt");
+					.catch((e) => {
+						if (!preflightSucceeded) {
+							output(error(id, "prompt", e.message));
+						}
+					});
+				return undefined;
 			}
 
 			case "steer": {
@@ -686,7 +696,9 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 		const command = parsed as RpcCommand;
 		try {
 			const response = await handleCommand(command);
-			output(response);
+			if (response) {
+				output(response);
+			}
 			await checkShutdownRequested();
 		} catch (commandError: unknown) {
 			output(
