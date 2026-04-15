@@ -37,6 +37,25 @@ async function waitForRender(): Promise<void> {
 	await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+async function waitForRenderedText(
+	getRender: () => string,
+	expectedText: string,
+	onRetry?: () => void,
+	timeoutMs = 2000,
+): Promise<string> {
+	const deadline = Date.now() + timeoutMs;
+	let lastRender = "";
+	while (Date.now() < deadline) {
+		onRetry?.();
+		await waitForRender();
+		lastRender = getRender();
+		if (lastRender.includes(expectedText)) {
+			return lastRender;
+		}
+	}
+	throw new Error(`Timed out waiting for render to include "${expectedText}". Last render:\n${lastRender}`);
+}
+
 function createLargeEdits(lines: string[]): Edit[] {
 	const targets = [50, 150, 250, 350, 450, 550, 650, 750, 850, 950];
 	return targets.map((lineNumber) => ({
@@ -99,9 +118,12 @@ describe("edit tool TUI rendering", () => {
 		await waitForRender();
 		await waitForRender();
 
-		const callOnlyRender = component.render(80).join("\n");
+		const callOnlyRender = await waitForRenderedText(
+			() => component.render(80).join("\n"),
+			"line 50 changed",
+			() => tui.requestRender(true),
+		);
 		expect(callOnlyRender).toContain("edit");
-		expect(callOnlyRender).toContain("line 50 changed");
 		expect(callOnlyRender).toContain("line 950 changed");
 
 		const redrawsBeforeResult = tui.fullRedraws;
@@ -201,8 +223,11 @@ describe("edit tool TUI rendering", () => {
 		await waitForRender();
 		await waitForRender();
 
-		const rendered = component.render(80).join("\n");
-		expect(rendered).toContain("Could not find");
+		const rendered = await waitForRenderedText(
+			() => component.render(80).join("\n"),
+			"Could not find",
+			() => tui.requestRender(true),
+		);
 		expect(rendered).not.toContain("+1 ");
 		expect(rendered).not.toContain("-1 ");
 	});
