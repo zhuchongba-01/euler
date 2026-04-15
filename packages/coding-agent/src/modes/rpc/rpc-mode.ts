@@ -19,6 +19,7 @@ import type {
 	ExtensionWidgetOptions,
 } from "../../core/extensions/index.js";
 import { takeOverStdout, writeRawStdout } from "../../core/output-guard.js";
+import { killTrackedDetachedChildren } from "../../utils/shell.js";
 import { type Theme, theme } from "../interactive/theme/theme.js";
 import { attachJsonlLineReader, serializeJsonLine } from "./jsonl.js";
 import type {
@@ -346,6 +347,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
 		for (const signal of signals) {
 			const handler = () => {
+				killTrackedDetachedChildren();
 				void shutdown(signal === "SIGHUP" ? 129 : 143);
 			};
 			process.on(signal, handler);

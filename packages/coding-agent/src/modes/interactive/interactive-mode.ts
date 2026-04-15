@@ -70,6 +70,7 @@ import { getChangelogPath, getNewEntries, parseChangelog } from "../../utils/cha
 import { copyToClipboard } from "../../utils/clipboard.js";
 import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipboard-image.js";
 import { parseGitUrl } from "../../utils/git.js";
+import { killTrackedDetachedChildren } from "../../utils/shell.js";
 import { ensureTool } from "../../utils/tools-manager.js";
 import { ArminComponent } from "./components/armin.js";
 import { AssistantMessageComponent } from "./components/assistant-message.js";
@@ -2941,6 +2942,7 @@ export class InteractiveMode {
 
 		for (const signal of signals) {
 			const handler = () => {
+				killTrackedDetachedChildren();
 				void this.shutdown();
 			};
 			process.on(signal, handler);
