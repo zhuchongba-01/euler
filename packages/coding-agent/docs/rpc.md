@@ -464,13 +464,13 @@ The `bash` command executes immediately and returns a `BashResult`. Internally, 
 
 When the next `prompt` command is sent, all messages (including `BashExecutionMessage`) are transformed before being sent to the LLM. The `BashExecutionMessage` is converted to a `UserMessage` with this format:
 
-```
+````
 Ran `ls -la`
-\`\`\`
+```
 total 48
 drwxr-xr-x ...
-\`\`\`
 ```
+````
 
 This means:
 1. Bash output is included in the LLM context on the **next prompt**, not immediately
