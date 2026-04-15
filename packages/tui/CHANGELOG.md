@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Alt keybindings inside Zellij by skipping the Kitty keyboard protocol query there and enabling xterm `modifyOtherKeys` mode 2 directly ([#3163](https://github.com/badlogic/pi-mono/issues/3163))
+
 ## [0.67.2] - 2026-04-14
 
 ### Added
