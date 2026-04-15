@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed screenshot path parsing to handle lower case am/pm in macOS screenshot filenames ([#3194](https://github.com/badlogic/pi-mono/pull/3194) by [@jay-aye-see-kay](https://github.com/jay-aye-see-kay))
 - Fixed interactive auto-retry status updates to show a live countdown during backoff instead of a static retry delay message ([#3187](https://github.com/badlogic/pi-mono/issues/3187))
 
 ## [0.67.2] - 2026-04-14
