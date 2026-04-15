@@ -216,7 +216,9 @@ describe("RPC prompt response semantics", () => {
 					type: "response",
 					command: "prompt",
 					success: false,
-					error: "No API key found for fake-provider.\n\nUse /login or set an API key environment variable. See /Users/badlogic/workspaces/pi-mono-2/packages/coding-agent/docs/providers.md",
+					error: expect.stringContaining(
+						"No API key found for fake-provider.\n\nUse /login or set an API key environment variable. See ",
+					),
 				});
 			});
 		} finally {
