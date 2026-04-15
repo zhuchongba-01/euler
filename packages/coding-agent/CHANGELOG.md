@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed the `plan-mode` example extension to allow `eza` in the read-only bash allowlist instead of the deprecated `exa` command ([#3160](https://github.com/badlogic/pi-mono/issues/3160))
 - Fixed Alt keybindings inside Zellij by skipping the Kitty keyboard protocol query there and enabling xterm `modifyOtherKeys` mode 2 directly ([#3163](https://github.com/badlogic/pi-mono/issues/3163))
 - Fixed `/scoped-models` reordering to propagate into the `/model` scoped tab, preserving the user-defined scoped model order instead of re-sorting it ([#3217](https://github.com/badlogic/pi-mono/issues/3217))
 - Fixed `session_shutdown` to fire on `SIGHUP` and `SIGTERM` in interactive, print, and RPC modes so extensions can run shutdown cleanup on those signal-driven exits ([#3212](https://github.com/badlogic/pi-mono/issues/3212))
