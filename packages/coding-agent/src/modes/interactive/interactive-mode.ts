@@ -3673,35 +3673,25 @@ export class InteractiveMode {
 		const hasSessionScope = sessionScopedModels.length > 0;
 
 		// Build enabled model IDs from session state or settings
-		const enabledModelIds = new Set<string>();
-		let hasFilter = false;
+		let currentEnabledIds: string[] | null = null;
 
 		if (hasSessionScope) {
 			// Use current session's scoped models
-			for (const sm of sessionScopedModels) {
-				enabledModelIds.add(`${sm.model.provider}/${sm.model.id}`);
-			}
-			hasFilter = true;
+			currentEnabledIds = sessionScopedModels.map((scoped) => `${scoped.model.provider}/${scoped.model.id}`);
 		} else {
 			// Fall back to settings
 			const patterns = this.settingsManager.getEnabledModels();
 			if (patterns !== undefined && patterns.length > 0) {
-				hasFilter = true;
 				const scopedModels = await resolveModelScope(patterns, this.session.modelRegistry);
-				for (const sm of scopedModels) {
-					enabledModelIds.add(`${sm.model.provider}/${sm.model.id}`);
-				}
+				currentEnabledIds = scopedModels.map((scoped) => `${scoped.model.provider}/${scoped.model.id}`);
 			}
 		}
 
-		// Track current enabled state (session-only until persisted)
-		const currentEnabledIds = new Set(enabledModelIds);
-		let currentHasFilter = hasFilter;
-
 		// Helper to update session's scoped models (session-only, no persist)
-		const updateSessionModels = async (enabledIds: Set<string>) => {
-			if (enabledIds.size > 0 && enabledIds.size < allModels.length) {
-				const newScopedModels = await resolveModelScope(Array.from(enabledIds), this.session.modelRegistry);
+		const updateSessionModels = async (enabledIds: string[] | null) => {
+			currentEnabledIds = enabledIds === null ? null : [...enabledIds];
+			if (enabledIds && enabledIds.length > 0 && enabledIds.length < allModels.length) {
+				const newScopedModels = await resolveModelScope(enabledIds, this.session.modelRegistry);
 				this.session.setScopedModels(
 					newScopedModels.map((sm) => ({
 						model: sm.model,
@@ -3721,49 +3711,18 @@ export class InteractiveMode {
 				{
 					allModels,
 					enabledModelIds: currentEnabledIds,
-					hasEnabledModelsFilter: currentHasFilter,
 				},
 				{
-					onModelToggle: async (modelId, enabled) => {
-						if (enabled) {
-							currentEnabledIds.add(modelId);
-						} else {
-							currentEnabledIds.delete(modelId);
-						}
-						currentHasFilter = true;
-						await updateSessionModels(currentEnabledIds);
-					},
-					onEnableAll: async (allModelIds) => {
-						currentEnabledIds.clear();
-						for (const id of allModelIds) {
-							currentEnabledIds.add(id);
-						}
-						currentHasFilter = false;
-						await updateSessionModels(currentEnabledIds);
-					},
-					onClearAll: async () => {
-						currentEnabledIds.clear();
-						currentHasFilter = true;
-						await updateSessionModels(currentEnabledIds);
-					},
-					onToggleProvider: async (_provider, modelIds, enabled) => {
-						for (const id of modelIds) {
-							if (enabled) {
-								currentEnabledIds.add(id);
-							} else {
-								currentEnabledIds.delete(id);
-							}
-						}
-						currentHasFilter = true;
-						await updateSessionModels(currentEnabledIds);
+					onChange: async (enabledIds) => {
+						await updateSessionModels(enabledIds);
 					},
 					onPersist: (enabledIds) => {
 						// Persist to settings
 						const newPatterns =
-							enabledIds.length === allModels.length
+							enabledIds === null || enabledIds.length === allModels.length
 								? undefined // All enabled = clear filter
 								: enabledIds;
-						this.settingsManager.setEnabledModels(newPatterns);
+						this.settingsManager.setEnabledModels(newPatterns ? [...newPatterns] : undefined);
 						this.showStatus("Model selection saved to settings");
 					},
 					onCancel: () => {
