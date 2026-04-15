@@ -283,7 +283,7 @@ user sends another prompt ◄─────────────────
 /model or Ctrl+P (model selection/cycling)
   └─► model_select
 
-exit (Ctrl+C, Ctrl+D)
+exit (Ctrl+C, Ctrl+D, SIGHUP, SIGTERM)
   └─► session_shutdown
 ```
 
@@ -403,7 +403,7 @@ pi.on("session_tree", async (event, ctx) => {
 
 #### session_shutdown
 
-Fired on exit (Ctrl+C, Ctrl+D, SIGTERM).
+Fired on exit (Ctrl+C, Ctrl+D, SIGHUP, SIGTERM).
 
 ```typescript
 pi.on("session_shutdown", async (_event, ctx) => {

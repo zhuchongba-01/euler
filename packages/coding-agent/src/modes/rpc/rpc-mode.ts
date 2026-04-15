@@ -75,6 +75,8 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
 	// Shutdown request flag
 	let shutdownRequested = false;
+	let shuttingDown = false;
+	const signalCleanupHandlers: Array<() => void> = [];
 
 	/** Helper for dialog methods with signal/timeout support */
 	function createDialogPromise<T>(
@@ -336,7 +338,23 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 		});
 	};
 
+	const registerSignalHandlers = (): void => {
+		const signals: NodeJS.Signals[] = ["SIGTERM"];
+		if (process.platform !== "win32") {
+			signals.push("SIGHUP");
+		}
+
+		for (const signal of signals) {
+			const handler = () => {
+				void shutdown(signal === "SIGHUP" ? 129 : 143);
+			};
+			process.on(signal, handler);
+			signalCleanupHandlers.push(() => process.off(signal, handler));
+		}
+	};
+
 	await rebindSession();
+	registerSignalHandlers();
 
 	// Handle a single command
 	const handleCommand = async (command: RpcCommand): Promise<RpcResponse> => {
@@ -614,12 +632,19 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 	 */
 	let detachInput = () => {};
 
-	async function shutdown(): Promise<never> {
+	async function shutdown(exitCode = 0): Promise<never> {
+		if (shuttingDown) {
+			process.exit(exitCode);
+		}
+		shuttingDown = true;
+		for (const cleanup of signalCleanupHandlers) {
+			cleanup();
+		}
 		unsubscribe?.();
 		await runtimeHost.dispose();
 		detachInput();
 		process.stdin.pause();
-		process.exit(0);
+		process.exit(exitCode);
 	}
 
 	async function checkShutdownRequested(): Promise<void> {

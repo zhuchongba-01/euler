@@ -479,7 +479,7 @@ export interface SessionCompactEvent {
 	fromExtension: boolean;
 }
 
-/** Fired on process exit */
+/** Fired on graceful process shutdown paths such as Ctrl+C, Ctrl+D, SIGHUP, and SIGTERM. */
 export interface SessionShutdownEvent {
 	type: "session_shutdown";
 }

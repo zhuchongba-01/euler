@@ -212,6 +212,7 @@ export class InteractiveMode {
 
 	// Agent subscription unsubscribe function
 	private unsubscribe?: () => void;
+	private signalCleanupHandlers: Array<() => void> = [];
 
 	// Track if editor is in bash mode (text starts with !)
 	private isBashMode = false;
@@ -476,6 +477,8 @@ export class InteractiveMode {
 
 	async init(): Promise<void> {
 		if (this.isInitialized) return;
+
+		this.registerSignalHandlers();
 
 		// Load changelog (only show new entries, skip for resumed sessions)
 		this.changelogMarkdown = this.getChangelogForDisplay();
@@ -2905,6 +2908,7 @@ export class InteractiveMode {
 	private async shutdown(): Promise<void> {
 		if (this.isShuttingDown) return;
 		this.isShuttingDown = true;
+		this.unregisterSignalHandlers();
 		await this.runtimeHost.dispose();
 
 		// Wait for any pending renders to complete
@@ -2925,6 +2929,30 @@ export class InteractiveMode {
 	private async checkShutdownRequested(): Promise<void> {
 		if (!this.shutdownRequested) return;
 		await this.shutdown();
+	}
+
+	private registerSignalHandlers(): void {
+		this.unregisterSignalHandlers();
+
+		const signals: NodeJS.Signals[] = ["SIGTERM"];
+		if (process.platform !== "win32") {
+			signals.push("SIGHUP");
+		}
+
+		for (const signal of signals) {
+			const handler = () => {
+				void this.shutdown();
+			};
+			process.on(signal, handler);
+			this.signalCleanupHandlers.push(() => process.off(signal, handler));
+		}
+	}
+
+	private unregisterSignalHandlers(): void {
+		for (const cleanup of this.signalCleanupHandlers) {
+			cleanup();
+		}
+		this.signalCleanupHandlers = [];
 	}
 
 	private handleCtrlZ(): void {
@@ -4785,6 +4813,7 @@ export class InteractiveMode {
 	}
 
 	stop(): void {
+		this.unregisterSignalHandlers();
 		if (this.loadingAnimation) {
 			this.loadingAnimation.stop();
 			this.loadingAnimation = undefined;
