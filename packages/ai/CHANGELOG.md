@@ -7,6 +7,10 @@
 - Added `onResponse` to `StreamOptions` so callers can inspect provider HTTP status and headers after each response arrives and before the response stream is consumed ([#3128](https://github.com/badlogic/pi-mono/issues/3128))
 - Added `thinkingDisplay` (`"summarized" | "omitted"`) to `AnthropicOptions` and `BedrockOptions`, wiring it through to the Anthropic/Bedrock `thinking` config. Defaults to `"summarized"` so Claude Opus 4.7 and Mythos Preview keep returning thinking text; set it to `"omitted"` to skip thinking streaming for faster time-to-first-text-token.
 
+### Fixed
+
+- Fixed OpenAI Responses prompt caching for non-`api.openai.com` base URLs (OpenAI-compatible proxies such as litellm, theclawbay) by sending the `session_id` and `x-client-request-id` cache-affinity headers unconditionally when a `sessionId` is provided, matching the official Codex CLI behavior ([#3264](https://github.com/badlogic/pi-mono/pull/3264) by [@vegarsti](https://github.com/vegarsti))
+
 ## [0.67.5] - 2026-04-16
 
 ### Fixed
