@@ -156,6 +156,8 @@ function convertContentBlocks(content: (TextContent | ImageContent)[]):
 
 export type AnthropicEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
+export type AnthropicThinkingDisplay = "summarized" | "omitted";
+
 export interface AnthropicOptions extends StreamOptions {
 	/**
 	 * Enable extended thinking.
@@ -179,6 +181,18 @@ export interface AnthropicOptions extends StreamOptions {
 	 * Ignored for older models.
 	 */
 	effort?: AnthropicEffort;
+	/**
+	 * Controls how thinking content is returned in API responses.
+	 * - "summarized": Thinking blocks contain summarized thinking text (default here).
+	 * - "omitted": Thinking blocks return an empty thinking field; the encrypted
+	 *   signature still travels back for multi-turn continuity. Use for faster
+	 *   time-to-first-text-token when your UI does not surface thinking.
+	 *
+	 * Note: Anthropic's API default for Claude Opus 4.7 and Claude Mythos Preview
+	 * is "omitted". We default to "summarized" here to keep behavior consistent
+	 * with older Claude 4 models. Set this explicitly to "omitted" to opt in.
+	 */
+	thinkingDisplay?: AnthropicThinkingDisplay;
 	interleavedThinking?: boolean;
 	toolChoice?: "auto" | "any" | "none" | { type: "tool"; name: string };
 	/**
@@ -678,11 +692,14 @@ function buildParams(
 	// budget-based (older models), or explicitly disabled.
 	if (model.reasoning) {
 		if (options?.thinkingEnabled) {
+			// Default to "summarized" so Opus 4.7 and Mythos Preview behave like
+			// older Claude 4 models (whose API default is also "summarized").
+			const display: AnthropicThinkingDisplay = options.thinkingDisplay ?? "summarized";
 			if (supportsAdaptiveThinking(model.id)) {
 				// Adaptive thinking: Claude decides when and how much to think.
-				// The Anthropic SDK types can lag newly supported effort values such as "xhigh".
-				params.thinking = { type: "adaptive" };
+				params.thinking = { type: "adaptive", display };
 				if (options.effort) {
+					// The Anthropic SDK types can lag newly supported effort values such as "xhigh".
 					params.output_config =
 						options.effort === "xhigh"
 							? ({ effort: options.effort } as unknown as NonNullable<
@@ -695,6 +712,7 @@ function buildParams(
 				params.thinking = {
 					type: "enabled",
 					budget_tokens: options.thinkingBudgetTokens || 1024,
+					display,
 				};
 			}
 		} else if (options?.thinkingEnabled === false) {

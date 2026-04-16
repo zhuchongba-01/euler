@@ -46,6 +46,8 @@ import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
 import { adjustMaxTokensForThinking, buildBaseOptions, clampReasoning } from "./simple-options.js";
 import { transformMessages } from "./transform-messages.js";
 
+export type BedrockThinkingDisplay = "summarized" | "omitted";
+
 export interface BedrockOptions extends StreamOptions {
 	region?: string;
 	profile?: string;
@@ -56,6 +58,17 @@ export interface BedrockOptions extends StreamOptions {
 	thinkingBudgets?: ThinkingBudgets;
 	/* Only supported by Claude 4.x models, see https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-extended-thinking.html#claude-messages-extended-thinking-tool-use-interleaved */
 	interleavedThinking?: boolean;
+	/**
+	 * Controls how Claude's thinking content is returned in responses.
+	 * - "summarized": Thinking blocks contain summarized thinking text (default here).
+	 * - "omitted": Thinking content is redacted but the signature still travels back
+	 *   for multi-turn continuity, reducing time-to-first-text-token.
+	 *
+	 * Note: Anthropic's API default for Claude Opus 4.7 and Mythos Preview is
+	 * "omitted". We default to "summarized" here to keep behavior consistent with
+	 * older Claude 4 models. Only applies to Claude models on Bedrock.
+	 */
+	thinkingDisplay?: BedrockThinkingDisplay;
 	/** Key-value pairs attached to the inference request for cost allocation tagging.
 	 * Keys: max 64 chars, no `aws:` prefix. Values: max 256 chars. Max 50 pairs.
 	 * Tags appear in AWS Cost Explorer split cost allocation data.
@@ -759,9 +772,12 @@ function buildAdditionalModelRequestFields(
 	}
 
 	if (model.id.includes("anthropic.claude") || model.id.includes("anthropic/claude")) {
+		// Default to "summarized" so Opus 4.7 and Mythos Preview behave like
+		// older Claude 4 models (whose API default is also "summarized").
+		const display: BedrockThinkingDisplay = options.thinkingDisplay ?? "summarized";
 		const result: Record<string, any> = supportsAdaptiveThinking(model.id)
 			? {
-					thinking: { type: "adaptive" },
+					thinking: { type: "adaptive", display },
 					output_config: { effort: mapThinkingLevelToEffort(options.reasoning, model.id) },
 				}
 			: (() => {
@@ -781,6 +797,7 @@ function buildAdditionalModelRequestFields(
 						thinking: {
 							type: "enabled",
 							budget_tokens: budget,
+							display,
 						},
 					};
 				})();
