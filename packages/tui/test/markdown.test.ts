@@ -1061,6 +1061,31 @@ bar`,
 		});
 	});
 
+	describe("Strikethrough syntax", () => {
+		it("should render ~~text~~ as strikethrough", () => {
+			const markdown = new Markdown("Use ~~strikethrough~~ here", 0, 0, defaultMarkdownTheme);
+
+			const lines = markdown.render(80);
+			const joinedOutput = lines.join("\n");
+			const joinedPlain = lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "")).join(" ");
+
+			assert.ok(joinedOutput.includes("\x1b[9m"), "Should apply strikethrough styling");
+			assert.ok(joinedPlain.includes("strikethrough"), "Should include struck text content");
+			assert.ok(!joinedPlain.includes("~~strikethrough~~"), "Should not render delimiters as text");
+		});
+
+		it("should keep ~text~ as plain text", () => {
+			const markdown = new Markdown("Use ~strikethrough~ literally", 0, 0, defaultMarkdownTheme);
+
+			const lines = markdown.render(80);
+			const joinedOutput = lines.join("\n");
+			const joinedPlain = lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "")).join(" ");
+
+			assert.ok(joinedPlain.includes("~strikethrough~"), "Single-tilde delimiters should remain visible");
+			assert.ok(!joinedOutput.includes("\x1b[9m"), "Single-tilde text should not use strikethrough styling");
+		});
+	});
+
 	describe("Links", () => {
 		it("should not duplicate URL for autolinked emails", () => {
 			const markdown = new Markdown("Contact user@example.com for help", 0, 0, defaultMarkdownTheme);
