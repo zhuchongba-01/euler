@@ -47,7 +47,7 @@ import {
 	VERSION,
 } from "../../config.js";
 import { type AgentSession, type AgentSessionEvent, parseSkillBlock } from "../../core/agent-session.js";
-import { type AgentSessionRuntime, SessionImportFileNotFoundError } from "../../core/agent-session-runtime.js";
+import type { AgentSessionRuntime } from "../../core/agent-session-runtime.js";
 import type {
 	ExtensionContext,
 	ExtensionRunner,
@@ -225,6 +225,9 @@ export class InteractiveMode {
 
 	// Tool execution tracking: toolCallId -> component
 	private pendingTools = new Map<string, ToolExecutionComponent>();
+
+	// Track first user message to avoid leading spacer at top of chat
+	private isFirstUserMessage = true;
 
 	// Tool output expansion state
 	private toolOutputExpanded = false;
@@ -2841,10 +2844,12 @@ export class InteractiveMode {
 			case "user": {
 				const textContent = this.getUserMessageText(message);
 				if (textContent) {
+					if (!this.isFirstUserMessage) {
+						this.chatContainer.addChild(new Spacer(1));
+					}
 					const skillBlock = parseSkillBlock(textContent);
 					if (skillBlock) {
 						// Render skill block (collapsible)
-						this.chatContainer.addChild(new Spacer(1));
 						const component = new SkillInvocationMessageComponent(
 							skillBlock,
 							this.getMarkdownThemeWithSettings(),
@@ -2863,6 +2868,7 @@ export class InteractiveMode {
 						const userComponent = new UserMessageComponent(textContent, this.getMarkdownThemeWithSettings());
 						this.chatContainer.addChild(userComponent);
 					}
+					this.isFirstUserMessage = false;
 					if (options?.populateHistory) {
 						this.editor.addToHistory?.(textContent);
 					}
@@ -2900,6 +2906,7 @@ export class InteractiveMode {
 		options: { updateFooter?: boolean; populateHistory?: boolean } = {},
 	): void {
 		this.pendingTools.clear();
+		this.isFirstUserMessage = true;
 
 		if (options.updateFooter) {
 			this.footer.invalidate();
@@ -4410,6 +4417,20 @@ export class InteractiveMode {
 			return;
 		}
 
+		const handleImportResult = async (result: "ok" | "cancelled" | "not_found"): Promise<void> => {
+			if (result === "cancelled") {
+				this.showStatus("Import cancelled");
+				return;
+			}
+			if (result === "not_found") {
+				this.showError(`Failed to import session: File not found: ${path.resolve(inputPath)}`);
+				return;
+			}
+			await this.handleRuntimeSessionChange();
+			this.renderCurrentSessionState();
+			this.showStatus(`Session imported from: ${inputPath}`);
+		};
+
 		try {
 			if (this.loadingAnimation) {
 				this.loadingAnimation.stop();
@@ -4417,13 +4438,7 @@ export class InteractiveMode {
 			}
 			this.statusContainer.clear();
 			const result = await this.runtimeHost.importFromJsonl(inputPath);
-			if (result.cancelled) {
-				this.showStatus("Import cancelled");
-				return;
-			}
-			await this.handleRuntimeSessionChange();
-			this.renderCurrentSessionState();
-			this.showStatus(`Session imported from: ${inputPath}`);
+			await handleImportResult(result);
 		} catch (error: unknown) {
 			if (error instanceof MissingSessionCwdError) {
 				const selectedCwd = await this.promptForMissingSessionCwd(error);
@@ -4432,17 +4447,7 @@ export class InteractiveMode {
 					return;
 				}
 				const result = await this.runtimeHost.importFromJsonl(inputPath, selectedCwd);
-				if (result.cancelled) {
-					this.showStatus("Import cancelled");
-					return;
-				}
-				await this.handleRuntimeSessionChange();
-				this.renderCurrentSessionState();
-				this.showStatus(`Session imported from: ${inputPath}`);
-				return;
-			}
-			if (error instanceof SessionImportFileNotFoundError) {
-				this.showError(`Failed to import session: ${error.message}`);
+				await handleImportResult(result);
 				return;
 			}
 			await this.handleFatalRuntimeError("Failed to import session", error);
