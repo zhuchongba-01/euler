@@ -58,7 +58,7 @@ import type {
 import { FooterDataProvider, type ReadonlyFooterDataProvider } from "../../core/footer-data-provider.js";
 import { type AppKeybinding, KeybindingsManager } from "../../core/keybindings.js";
 import { createCompactionSummaryMessage } from "../../core/messages.js";
-import { findExactModelReferenceMatch, resolveModelScope } from "../../core/model-resolver.js";
+import { defaultModelPerProvider, findExactModelReferenceMatch, resolveModelScope } from "../../core/model-resolver.js";
 import { DefaultPackageManager } from "../../core/package-manager.js";
 import type { ResourceDiagnostic } from "../../core/resource-loader.js";
 import { formatMissingSessionCwdPrompt, MissingSessionCwdError } from "../../core/session-cwd.js";
@@ -157,6 +157,14 @@ function isAnthropicSubscriptionAuthKey(apiKey: string | undefined): boolean {
 function isTruthyEnvFlag(value: string | undefined): boolean {
 	if (!value) return false;
 	return value === "1" || value.toLowerCase() === "true" || value.toLowerCase() === "yes";
+}
+
+function isUnknownModel(model: Model<any> | undefined): boolean {
+	return !!model && model.provider === "unknown" && model.id === "unknown" && model.api === "unknown";
+}
+
+function hasDefaultModelProvider(providerId: string): providerId is keyof typeof defaultModelPerProvider {
+	return providerId in defaultModelPerProvider;
 }
 
 /**
@@ -554,7 +562,7 @@ export class InteractiveMode {
 			this.builtInHeader = new ExpandableText(
 				() => `${logo}\n${compactInstructions}\n${compactOnboarding}\n\n${onboarding}`,
 				() => `${logo}\n${expandedInstructions}\n\n${onboarding}`,
-				this.toolOutputExpanded,
+				this.getStartupExpansionState(),
 				1,
 				0,
 			);
@@ -886,6 +894,10 @@ export class InteractiveMode {
 		return this.formatDisplayPath(absolutePath);
 	}
 
+	private getStartupExpansionState(): boolean {
+		return this.options.verbose || this.toolOutputExpanded;
+	}
+
 	/**
 	 * Get a short path relative to the package root for display.
 	 */
@@ -1132,7 +1144,7 @@ export class InteractiveMode {
 			const section = new ExpandableText(
 				() => `${sectionHeader(name, color)}\n${collapsedBody}`,
 				() => `${sectionHeader(name, color)}\n${expandedBody}`,
-				this.toolOutputExpanded,
+				this.getStartupExpansionState(),
 				0,
 				0,
 			);
@@ -4124,6 +4136,7 @@ export class InteractiveMode {
 	private async showLoginDialog(providerId: string): Promise<void> {
 		const providerInfo = this.session.modelRegistry.authStorage.getOAuthProviders().find((p) => p.id === providerId);
 		const providerName = providerInfo?.name || providerId;
+		const previousModel = this.session.model;
 
 		// Providers that use callback servers (can paste redirect URL)
 		const usesCallbackServer = providerInfo?.usesCallbackServer ?? false;
@@ -4199,8 +4212,50 @@ export class InteractiveMode {
 			// Success
 			restoreEditor();
 			this.session.modelRegistry.refresh();
+
+			let selectedModel: Model<any> | undefined;
+			let selectionError: string | undefined;
+			if (isUnknownModel(previousModel)) {
+				const availableModels = this.session.modelRegistry.getAvailable();
+				const providerModels = availableModels.filter((model) => model.provider === providerId);
+				if (!hasDefaultModelProvider(providerId)) {
+					selectionError = `Logged in to ${providerName}, but no default model is configured for provider "${providerId}". Use /model to select a model.`;
+				} else if (providerModels.length === 0) {
+					selectionError = `Logged in to ${providerName}, but no models are available for that provider. Use /model to select a model.`;
+				} else {
+					const defaultModelId = defaultModelPerProvider[providerId];
+					selectedModel = providerModels.find((model) => model.id === defaultModelId);
+					if (!selectedModel) {
+						selectionError = `Logged in to ${providerName}, but its default model "${defaultModelId}" is not available. Use /model to select a model.`;
+					} else {
+						try {
+							await this.session.setModel(selectedModel);
+						} catch (error: unknown) {
+							selectedModel = undefined;
+							const errorMessage = error instanceof Error ? error.message : String(error);
+							selectionError = `Logged in to ${providerName}, but selecting its default model failed: ${errorMessage}. Use /model to select a model.`;
+						}
+					}
+				}
+			}
+
 			await this.updateAvailableProviderCount();
-			this.showStatus(`Logged in to ${providerName}. Credentials saved to ${getAuthPath()}`);
+			this.footer.invalidate();
+			this.updateEditorBorderColor();
+			if (selectedModel) {
+				this.showStatus(
+					`Logged in to ${providerName}. Selected ${selectedModel.id}. Credentials saved to ${getAuthPath()}`,
+				);
+				void this.maybeWarnAboutAnthropicSubscriptionAuth(selectedModel);
+				this.checkDaxnutsEasterEgg(selectedModel);
+			} else {
+				this.showStatus(`Logged in to ${providerName}. Credentials saved to ${getAuthPath()}`);
+				if (selectionError) {
+					this.showError(selectionError);
+				} else {
+					void this.maybeWarnAboutAnthropicSubscriptionAuth();
+				}
+			}
 		} catch (error: unknown) {
 			restoreEditor();
 			const errorMsg = error instanceof Error ? error.message : String(error);

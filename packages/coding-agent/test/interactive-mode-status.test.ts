@@ -173,6 +173,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 			},
 			formatDisplayPath: (p: string) => (InteractiveMode as any).prototype.formatDisplayPath.call(fakeThis, p),
 			formatContextPath: (p: string) => (InteractiveMode as any).prototype.formatContextPath.call(fakeThis, p),
+			getStartupExpansionState: () => (InteractiveMode as any).prototype.getStartupExpansionState.call(fakeThis),
 			buildScopeGroups: () => [],
 			formatScopeGroups: () => "resource-list",
 			getShortPath: (p: string) => p,
@@ -203,6 +204,24 @@ describe("InteractiveMode.showLoadedResources", () => {
 		const fakeThis = createShowLoadedResourcesThis({
 			quietStartup: false,
 			toolOutputExpanded: true,
+			skills: [{ filePath: "/tmp/skill/SKILL.md", name: "commit" }],
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		const output = renderAll(fakeThis.chatContainer);
+		expect(output).toContain("[Skills]");
+		expect(output).toContain("resource-list");
+		expect(output).not.toContain("commit");
+	});
+
+	test("shows full resource listing on verbose startup even when tool output is collapsed", () => {
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: true,
+			verbose: true,
+			toolOutputExpanded: false,
 			skills: [{ filePath: "/tmp/skill/SKILL.md", name: "commit" }],
 		});
 
