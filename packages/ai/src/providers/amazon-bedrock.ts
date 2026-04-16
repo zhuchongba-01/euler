@@ -15,11 +15,14 @@ import {
 	type ConverseStreamMetadataEvent,
 	ImageFormat,
 	type Message,
+	type ServiceInputTypes,
+	type ServiceOutputTypes,
 	type SystemContentBlock,
 	type ToolChoice,
 	type ToolConfiguration,
 	ToolResultStatus,
 } from "@aws-sdk/client-bedrock-runtime";
+import type { FinalizeRequestMiddleware } from "@smithy/types";
 
 import { calculateCost } from "../models.js";
 import type {
@@ -184,18 +187,30 @@ export const streamBedrock: StreamFunction<"bedrock-converse-stream", BedrockOpt
 
 			// Inject bearer token middleware after SigV4 signing
 			if (bearerToken) {
-				client.middlewareStack.addRelativeTo(
-					(next) => async (args: any) => {
-						if (args.request?.headers) {
-							args.request.headers["authorization"] = `Bearer ${bearerToken}`;
-							delete args.request.headers["x-amz-date"];
-							delete args.request.headers["x-amz-security-token"];
-							delete args.request.headers["x-amz-content-sha256"];
+				const bearerTokenAuthMiddleware: FinalizeRequestMiddleware<ServiceInputTypes, ServiceOutputTypes> =
+					(next) => async (args) => {
+						const request = args.request;
+						if (
+							typeof request === "object" &&
+							request !== null &&
+							"headers" in request &&
+							typeof request.headers === "object" &&
+							request.headers !== null
+						) {
+							const headers = request.headers as Record<string, string>;
+							headers.authorization = `Bearer ${bearerToken}`;
+							delete headers["x-amz-date"];
+							delete headers["x-amz-security-token"];
+							delete headers["x-amz-content-sha256"];
 						}
 						return next(args);
-					},
-					{ relation: "after", toMiddleware: "awsAuthMiddleware", name: "bearerTokenAuth" },
-				);
+					};
+
+				client.middlewareStack.addRelativeTo(bearerTokenAuthMiddleware, {
+					relation: "after",
+					toMiddleware: "awsAuthMiddleware",
+					name: "bearerTokenAuth",
+				});
 			}
 
 			const cacheRetention = resolveCacheRetention(options.cacheRetention);
