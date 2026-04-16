@@ -4,7 +4,6 @@ import { Text } from "@mariozechner/pi-tui";
 import { type Static, Type } from "@sinclair/typebox";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
-import { glob } from "glob";
 import path from "path";
 import { keyHint } from "../../modes/interactive/components/keybinding-hints.js";
 import { ensureTool } from "../../utils/tools-manager.js";
@@ -225,39 +224,17 @@ export function createFindToolDefinition(
 							return;
 						}
 
-						// Build fd arguments.
+						// Build fd arguments. --no-require-git makes fd apply hierarchical .gitignore
+						// semantics whether or not the search path is inside a git repository, without
+						// leaking sibling-directory rules the way --ignore-file (a global source) would.
 						const args: string[] = [
 							"--glob",
 							"--color=never",
 							"--hidden",
+							"--no-require-git",
 							"--max-results",
 							String(effectiveLimit),
 						];
-						// Include .gitignore files from the search tree.
-						const gitignoreFiles = new Set<string>();
-						const rootGitignore = path.join(searchPath, ".gitignore");
-						if (existsSync(rootGitignore)) gitignoreFiles.add(rootGitignore);
-						try {
-							const nestedGitignores = await glob("**/.gitignore", {
-								cwd: searchPath,
-								dot: true,
-								absolute: true,
-								ignore: ["**/node_modules/**", "**/.git/**"],
-								signal,
-							});
-							for (const file of nestedGitignores) gitignoreFiles.add(file);
-						} catch {
-							if (signal?.aborted) {
-								settle(() => reject(new Error("Operation aborted")));
-								return;
-							}
-							// ignore
-						}
-						if (signal?.aborted) {
-							settle(() => reject(new Error("Operation aborted")));
-							return;
-						}
-						for (const gitignorePath of gitignoreFiles) args.push("--ignore-file", gitignorePath);
 
 						// fd --glob matches against the basename unless --full-path is set; in --full-path
 						// mode it matches against the absolute candidate path, so a path-containing
