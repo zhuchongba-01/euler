@@ -398,17 +398,18 @@ export class AgentSession {
 				toolCallId: toolCall.id,
 				input: args as Record<string, unknown>,
 				content: result.content,
-				details: isError ? undefined : result.details,
+				details: result.details,
 				isError,
 			});
 
-			if (!hookResult || isError) {
+			if (!hookResult) {
 				return undefined;
 			}
 
 			return {
 				content: hookResult.content,
 				details: hookResult.details,
+				isError: hookResult.isError ?? isError,
 			};
 		};
 	}
