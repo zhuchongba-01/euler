@@ -674,15 +674,21 @@ function buildParams(
 		params.tools = convertTools(context.tools, isOAuthToken, cacheControl);
 	}
 
-	// Configure thinking mode: adaptive (Opus 4.6 and Sonnet 4.6),
+	// Configure thinking mode: adaptive (Opus 4.6+ and Sonnet 4.6),
 	// budget-based (older models), or explicitly disabled.
 	if (model.reasoning) {
 		if (options?.thinkingEnabled) {
 			if (supportsAdaptiveThinking(model.id)) {
-				// Adaptive thinking: Claude decides when and how much to think
+				// Adaptive thinking: Claude decides when and how much to think.
+				// The Anthropic SDK types can lag newly supported effort values such as "xhigh".
 				params.thinking = { type: "adaptive" };
 				if (options.effort) {
-					params.output_config = { effort: options.effort };
+					params.output_config =
+						options.effort === "xhigh"
+							? ({ effort: options.effort } as unknown as NonNullable<
+									MessageCreateParamsStreaming["output_config"]
+								>)
+							: { effort: options.effort };
 				}
 			} else {
 				// Budget-based thinking for older models
