@@ -8,12 +8,6 @@
 
 - Fixed markdown strikethrough parsing to require strict double-tilde delimiters (`~~text~~`) with non-whitespace boundaries, preventing accidental strikethrough from loose tilde usage.
 
-## [0.67.3] - 2026-04-15
-
-### Fixed
-
-- Fixed Alt keybindings inside Zellij by skipping the Kitty keyboard protocol query there and enabling xterm `modifyOtherKeys` mode 2 directly ([#3163](https://github.com/badlogic/pi-mono/issues/3163))
-
 ## [0.67.2] - 2026-04-14
 
 ### Added
