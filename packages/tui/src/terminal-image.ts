@@ -42,6 +42,16 @@ export function detectCapabilities(): TerminalCapabilities {
 	const term = process.env.TERM?.toLowerCase() || "";
 	const colorTerm = process.env.COLORTERM?.toLowerCase() || "";
 
+	// tmux and screen swallow OSC 8 by default (passthrough is opt-in and wraps
+	// sequences differently). Force hyperlinks off whenever we detect them, even
+	// when the outer terminal would otherwise support OSC 8. Image protocols are
+	// also unreliable under tmux/screen, so leave `images: null` for safety.
+	const inTmuxOrScreen = !!process.env.TMUX || term.startsWith("tmux") || term.startsWith("screen");
+	if (inTmuxOrScreen) {
+		const trueColor = colorTerm === "truecolor" || colorTerm === "24bit";
+		return { images: null, trueColor, hyperlinks: false };
+	}
+
 	if (process.env.KITTY_WINDOW_ID || termProgram === "kitty") {
 		return { images: "kitty", trueColor: true, hyperlinks: true };
 	}
@@ -66,8 +76,12 @@ export function detectCapabilities(): TerminalCapabilities {
 		return { images: null, trueColor: true, hyperlinks: true };
 	}
 
+	// Unknown terminal: be conservative. OSC 8 is rendered invisibly as "just
+	// text" on terminals that swallow it, which means the URL disappears from
+	// the rendered output. Default to the legacy `text (url)` behavior unless we
+	// have positively identified a hyperlink-capable terminal above.
 	const trueColor = colorTerm === "truecolor" || colorTerm === "24bit";
-	return { images: null, trueColor, hyperlinks: true };
+	return { images: null, trueColor, hyperlinks: false };
 }
 
 export function getCapabilities(): TerminalCapabilities {
