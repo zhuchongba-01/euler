@@ -258,7 +258,18 @@ export function createFindToolDefinition(
 							return;
 						}
 						for (const gitignorePath of gitignoreFiles) args.push("--ignore-file", gitignorePath);
-						args.push(pattern, searchPath);
+
+						// fd --glob matches against the basename unless --full-path is set; in --full-path
+						// mode it matches against the absolute candidate path, so a path-containing
+						// pattern like 'src/**/*.spec.ts' needs a leading '**/' to match anything.
+						let effectivePattern = pattern;
+						if (pattern.includes("/")) {
+							args.push("--full-path");
+							if (!pattern.startsWith("/") && !pattern.startsWith("**/") && pattern !== "**") {
+								effectivePattern = `**/${pattern}`;
+							}
+						}
+						args.push(effectivePattern, searchPath);
 
 						const child = spawn(fdPath, args, { stdio: ["ignore", "pipe", "pipe"] });
 						const rl = createInterface({ input: child.stdout });
