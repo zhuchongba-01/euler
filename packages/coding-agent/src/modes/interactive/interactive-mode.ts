@@ -126,6 +126,22 @@ function isExpandable(obj: unknown): obj is Expandable {
 	return typeof obj === "object" && obj !== null && "setExpanded" in obj && typeof obj.setExpanded === "function";
 }
 
+class ExpandableText extends Text implements Expandable {
+	constructor(
+		private readonly getCollapsedText: () => string,
+		private readonly getExpandedText: () => string,
+		expanded = false,
+		paddingX = 0,
+		paddingY = 0,
+	) {
+		super(expanded ? getExpandedText() : getCollapsedText(), paddingX, paddingY);
+	}
+
+	setExpanded(expanded: boolean): void {
+		this.setText(expanded ? this.getExpandedText() : this.getCollapsedText());
+	}
+}
+
 type CompactionQueuedMessage = {
 	text: string;
 	mode: "steer" | "followUp";
@@ -499,7 +515,7 @@ export class InteractiveMode {
 			// Build startup instructions using keybinding hint helpers
 			const hint = (keybinding: AppKeybinding, description: string) => keyHint(keybinding, description);
 
-			const instructions = [
+			const expandedInstructions = [
 				hint("app.interrupt", "to interrupt"),
 				hint("app.clear", "to clear"),
 				rawKeyHint(`${keyText("app.clear")} twice`, "to exit"),
@@ -520,11 +536,28 @@ export class InteractiveMode {
 				hint("app.clipboard.pasteImage", "to paste image"),
 				rawKeyHint("drop files", "to attach"),
 			].join("\n");
+			const compactInstructions = [
+				hint("app.interrupt", "interrupt"),
+				rawKeyHint(`${keyText("app.clear")}/${keyText("app.exit")}`, "clear/exit"),
+				rawKeyHint("/", "commands"),
+				rawKeyHint("!", "bash"),
+				hint("app.tools.expand", "more"),
+			].join(theme.fg("muted", " · "));
+			const compactOnboarding = theme.fg(
+				"dim",
+				`Press ${keyText("app.tools.expand")} to show full startup help and loaded resources.`,
+			);
 			const onboarding = theme.fg(
 				"dim",
 				`Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.`,
 			);
-			this.builtInHeader = new Text(`${logo}\n${instructions}\n\n${onboarding}`, 1, 0);
+			this.builtInHeader = new ExpandableText(
+				() => `${logo}\n${compactInstructions}\n${compactOnboarding}\n\n${onboarding}`,
+				() => `${logo}\n${expandedInstructions}\n\n${onboarding}`,
+				this.toolOutputExpanded,
+				1,
+				0,
+			);
 
 			// Setup UI layout
 			this.headerContainer.addChild(new Spacer(1));
@@ -836,6 +869,23 @@ export class InteractiveMode {
 		return result;
 	}
 
+	private formatContextPath(p: string): string {
+		const cwd = path.resolve(this.sessionManager.getCwd());
+		const absolutePath = path.isAbsolute(p) ? path.resolve(p) : path.resolve(cwd, p);
+		const relativePath = path.relative(cwd, absolutePath);
+		const isInsideCwd =
+			relativePath === "" ||
+			(!relativePath.startsWith("..") &&
+				!relativePath.startsWith(`..${path.sep}`) &&
+				!path.isAbsolute(relativePath));
+
+		if (isInsideCwd) {
+			return relativePath || ".";
+		}
+
+		return this.formatDisplayPath(absolutePath);
+	}
+
 	/**
 	 * Get a short path relative to the package root for display.
 	 */
@@ -1057,6 +1107,38 @@ export class InteractiveMode {
 		}
 
 		const sectionHeader = (name: string, color: ThemeColor = "mdHeading") => theme.fg(color, `[${name}]`);
+		const compactPath = (resourcePath: string, sourceInfo?: SourceInfo): string => {
+			const shortPath = this.getShortPath(resourcePath, sourceInfo);
+			const normalizedPath = shortPath.replace(/\\/g, "/");
+			const segments = normalizedPath.split("/").filter((segment) => segment.length > 0 && segment !== "~");
+			if (segments.length > 0) {
+				return segments[segments.length - 1]!;
+			}
+			return shortPath;
+		};
+		const formatCompactList = (items: string[], options?: { sort?: boolean }): string => {
+			const labels = items.map((item) => item.trim()).filter((item) => item.length > 0);
+			if (options?.sort !== false) {
+				labels.sort((a, b) => a.localeCompare(b));
+			}
+			return theme.fg("dim", `  ${labels.join(", ")}`);
+		};
+		const addLoadedSection = (
+			name: string,
+			collapsedBody: string,
+			expandedBody = collapsedBody,
+			color: ThemeColor = "mdHeading",
+		): void => {
+			const section = new ExpandableText(
+				() => `${sectionHeader(name, color)}\n${collapsedBody}`,
+				() => `${sectionHeader(name, color)}\n${expandedBody}`,
+				this.toolOutputExpanded,
+				0,
+				0,
+			);
+			this.chatContainer.addChild(section);
+			this.chatContainer.addChild(new Spacer(1));
+		};
 
 		const skillsResult = this.session.resourceLoader.getSkills();
 		const promptsResult = this.session.resourceLoader.getPrompts();
@@ -1096,8 +1178,11 @@ export class InteractiveMode {
 				const contextList = contextFiles
 					.map((f) => theme.fg("dim", `  ${this.formatDisplayPath(f.path)}`))
 					.join("\n");
-				this.chatContainer.addChild(new Text(`${sectionHeader("Context")}\n${contextList}`, 0, 0));
-				this.chatContainer.addChild(new Spacer(1));
+				const contextCompactList = formatCompactList(
+					contextFiles.map((contextFile) => this.formatContextPath(contextFile.path)),
+					{ sort: false },
+				);
+				addLoadedSection("Context", contextCompactList, contextList);
 			}
 
 			const skills = skillsResult.skills;
@@ -1109,8 +1194,8 @@ export class InteractiveMode {
 					formatPath: (item) => this.formatDisplayPath(item.path),
 					formatPackagePath: (item) => this.getShortPath(item.path, item.sourceInfo),
 				});
-				this.chatContainer.addChild(new Text(`${sectionHeader("Skills")}\n${skillList}`, 0, 0));
-				this.chatContainer.addChild(new Spacer(1));
+				const skillCompactList = formatCompactList(skills.map((skill) => skill.name));
+				addLoadedSection("Skills", skillCompactList, skillList);
 			}
 
 			const templates = this.session.promptTemplates;
@@ -1129,8 +1214,8 @@ export class InteractiveMode {
 						return template ? `/${template.name}` : this.formatDisplayPath(item.path);
 					},
 				});
-				this.chatContainer.addChild(new Text(`${sectionHeader("Prompts")}\n${templateList}`, 0, 0));
-				this.chatContainer.addChild(new Spacer(1));
+				const promptCompactList = formatCompactList(templates.map((template) => `/${template.name}`));
+				addLoadedSection("Prompts", promptCompactList, templateList);
 			}
 
 			if (extensions.length > 0) {
@@ -1139,8 +1224,10 @@ export class InteractiveMode {
 					formatPath: (item) => this.formatDisplayPath(item.path),
 					formatPackagePath: (item) => this.getShortPath(item.path, item.sourceInfo),
 				});
-				this.chatContainer.addChild(new Text(`${sectionHeader("Extensions", "mdHeading")}\n${extList}`, 0, 0));
-				this.chatContainer.addChild(new Spacer(1));
+				const extensionCompactList = formatCompactList(
+					extensions.map((extension) => compactPath(extension.path, extension.sourceInfo)),
+				);
+				addLoadedSection("Extensions", extensionCompactList, extList, "mdHeading");
 			}
 
 			// Show loaded themes (excluding built-in)
@@ -1157,8 +1244,12 @@ export class InteractiveMode {
 					formatPath: (item) => this.formatDisplayPath(item.path),
 					formatPackagePath: (item) => this.getShortPath(item.path, item.sourceInfo),
 				});
-				this.chatContainer.addChild(new Text(`${sectionHeader("Themes")}\n${themeList}`, 0, 0));
-				this.chatContainer.addChild(new Spacer(1));
+				const themeCompactList = formatCompactList(
+					customThemes.map(
+						(loadedTheme) => loadedTheme.name ?? compactPath(loadedTheme.sourcePath!, loadedTheme.sourceInfo),
+					),
+				);
+				addLoadedSection("Themes", themeCompactList, themeList);
 			}
 		}
 
@@ -1607,6 +1698,9 @@ export class InteractiveMode {
 		if (factory) {
 			// Create and add custom header
 			this.customHeader = factory(this.ui, theme);
+			if (isExpandable(this.customHeader)) {
+				this.customHeader.setExpanded(this.toolOutputExpanded);
+			}
 			if (index !== -1) {
 				this.headerContainer.children[index] = this.customHeader;
 			} else {
@@ -1616,6 +1710,9 @@ export class InteractiveMode {
 		} else {
 			// Restore built-in header
 			this.customHeader = undefined;
+			if (isExpandable(this.builtInHeader)) {
+				this.builtInHeader.setExpanded(this.toolOutputExpanded);
+			}
 			if (index !== -1) {
 				this.headerContainer.children[index] = this.builtInHeader;
 			}
@@ -3080,6 +3177,10 @@ export class InteractiveMode {
 
 	private setToolsExpanded(expanded: boolean): void {
 		this.toolOutputExpanded = expanded;
+		const activeHeader = this.customHeader ?? this.builtInHeader;
+		if (isExpandable(activeHeader)) {
+			activeHeader.setExpanded(expanded);
+		}
 		for (const child of this.chatContainer.children) {
 			if (isExpandable(child)) {
 				child.setExpanded(expanded);
@@ -4152,6 +4253,10 @@ export class InteractiveMode {
 		try {
 			await this.session.reload();
 			this.keybindings.reload();
+			const activeHeader = this.customHeader ?? this.builtInHeader;
+			if (isExpandable(activeHeader)) {
+				activeHeader.setExpanded(this.toolOutputExpanded);
+			}
 			setRegisteredThemes(this.session.resourceLoader.getThemes().themes);
 			this.hideThinkingBlock = this.settingsManager.getHideThinkingBlock();
 			const themeName = this.settingsManager.getTheme();
