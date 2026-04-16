@@ -65,6 +65,10 @@ function parseTextSignature(
 
 export interface OpenAIResponsesStreamOptions {
 	serviceTier?: ResponseCreateParamsStreaming["service_tier"];
+	resolveServiceTier?: (
+		responseServiceTier: ResponseCreateParamsStreaming["service_tier"] | undefined,
+		requestServiceTier: ResponseCreateParamsStreaming["service_tier"] | undefined,
+	) => ResponseCreateParamsStreaming["service_tier"] | undefined;
 	applyServiceTierPricing?: (
 		usage: Usage,
 		serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined,
@@ -491,7 +495,9 @@ export async function processResponsesStream<TApi extends Api>(
 			}
 			calculateCost(model, output.usage);
 			if (options?.applyServiceTierPricing) {
-				const serviceTier = response?.service_tier ?? options.serviceTier;
+				const serviceTier = options.resolveServiceTier
+					? options.resolveServiceTier(response?.service_tier, options.serviceTier)
+					: (response?.service_tier ?? options.serviceTier);
 				options.applyServiceTierPricing(output.usage, serviceTier);
 			}
 			// Map status to stop reason
