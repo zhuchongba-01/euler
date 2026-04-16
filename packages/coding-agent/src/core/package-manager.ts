@@ -1597,7 +1597,7 @@ export class DefaultPackageManager implements PackageManager {
 		}
 		const packageJsonPath = join(targetDir, "package.json");
 		if (existsSync(packageJsonPath)) {
-			await this.runNpmCommand(["install"], { cwd: targetDir });
+			await this.runNpmCommand(["install", "--omit=dev"], { cwd: targetDir });
 		}
 	}
 
@@ -1632,7 +1632,7 @@ export class DefaultPackageManager implements PackageManager {
 
 		const packageJsonPath = join(targetDir, "package.json");
 		if (existsSync(packageJsonPath)) {
-			await this.runNpmCommand(["install"], { cwd: targetDir });
+			await this.runNpmCommand(["install", "--omit=dev"], { cwd: targetDir });
 		}
 	}
 
