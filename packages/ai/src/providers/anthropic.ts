@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type {
+	CacheControlEphemeral,
 	ContentBlockParam,
 	MessageCreateParamsStreaming,
 	MessageParam,
@@ -49,7 +50,7 @@ function resolveCacheRetention(cacheRetention?: CacheRetention): CacheRetention 
 function getCacheControl(
 	baseUrl: string,
 	cacheRetention?: CacheRetention,
-): { retention: CacheRetention; cacheControl?: { type: "ephemeral"; ttl?: "1h" } } {
+): { retention: CacheRetention; cacheControl?: CacheControlEphemeral } {
 	const retention = resolveCacheRetention(cacheRetention);
 	if (retention === "none") {
 		return { retention };
@@ -657,7 +658,7 @@ function buildParams(
 	}
 
 	if (context.tools) {
-		params.tools = convertTools(context.tools, isOAuthToken);
+		params.tools = convertTools(context.tools, isOAuthToken, cacheControl);
 	}
 
 	// Configure thinking mode: adaptive (Opus 4.6 and Sonnet 4.6),
@@ -709,7 +710,7 @@ function convertMessages(
 	messages: Message[],
 	model: Model<"anthropic-messages">,
 	isOAuthToken: boolean,
-	cacheControl?: { type: "ephemeral"; ttl?: "1h" },
+	cacheControl?: CacheControlEphemeral,
 ): MessageParam[] {
 	const params: MessageParam[] = [];
 
@@ -870,20 +871,25 @@ function convertMessages(
 	return params;
 }
 
-function convertTools(tools: Tool[], isOAuthToken: boolean): Anthropic.Messages.Tool[] {
+function convertTools(
+	tools: Tool[],
+	isOAuthToken: boolean,
+	cacheControl?: CacheControlEphemeral,
+): Anthropic.Messages.Tool[] {
 	if (!tools) return [];
 
-	return tools.map((tool) => {
-		const jsonSchema = tool.parameters as any; // TypeBox already generates JSON Schema
+	return tools.map((tool, index) => {
+		const schema = tool.parameters as { properties?: unknown; required?: string[] };
 
 		return {
 			name: isOAuthToken ? toClaudeCodeName(tool.name) : tool.name,
 			description: tool.description,
 			input_schema: {
-				type: "object" as const,
-				properties: jsonSchema.properties || {},
-				required: jsonSchema.required || [],
+				type: "object",
+				properties: schema.properties ?? {},
+				required: schema.required ?? [],
 			},
+			...(cacheControl && index === tools.length - 1 ? { cache_control: cacheControl } : {}),
 		};
 	});
 }
