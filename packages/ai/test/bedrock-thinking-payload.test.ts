@@ -5,7 +5,7 @@ import type { Context, Model, SimpleStreamOptions } from "../src/types.js";
 
 interface BedrockThinkingPayload {
 	additionalModelRequestFields?: {
-		thinking?: { type: string; budget_tokens?: number };
+		thinking?: { type: string; budget_tokens?: number; display?: string };
 		output_config?: { effort?: string };
 		anthropic_beta?: string[];
 	};
@@ -56,7 +56,7 @@ describe("Bedrock thinking payload", () => {
 
 		const payload = await capturePayload(model);
 
-		expect(payload.additionalModelRequestFields?.thinking).toEqual({ type: "adaptive" });
+		expect(payload.additionalModelRequestFields?.thinking).toEqual({ type: "adaptive", display: "summarized" });
 		expect(payload.additionalModelRequestFields?.output_config).toEqual({ effort: "high" });
 		expect(payload.additionalModelRequestFields?.anthropic_beta).toBeUndefined();
 	});
@@ -71,7 +71,7 @@ describe("Bedrock thinking payload", () => {
 
 		const payload = await capturePayload(model, { reasoning: "xhigh" });
 
-		expect(payload.additionalModelRequestFields?.thinking).toEqual({ type: "adaptive" });
+		expect(payload.additionalModelRequestFields?.thinking).toEqual({ type: "adaptive", display: "summarized" });
 		expect(payload.additionalModelRequestFields?.output_config).toEqual({ effort: "xhigh" });
 		expect(payload.additionalModelRequestFields?.anthropic_beta).toBeUndefined();
 	});

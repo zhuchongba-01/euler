@@ -4,7 +4,7 @@ import { streamSimple } from "../src/stream.js";
 import type { Context, Model, SimpleStreamOptions } from "../src/types.js";
 
 interface AnthropicThinkingPayload {
-	thinking?: { type: string; budget_tokens?: number };
+	thinking?: { type: string; budget_tokens?: number; display?: string };
 	output_config?: { effort?: string };
 }
 
@@ -128,14 +128,14 @@ describe("Anthropic thinking disable payload", () => {
 	it("uses adaptive thinking for Claude Opus 4.7 when reasoning is enabled", async () => {
 		const payload = await capturePayload(getModel("anthropic", "claude-opus-4-7"), { reasoning: "high" });
 
-		expect(payload.thinking).toEqual({ type: "adaptive" });
+		expect(payload.thinking).toEqual({ type: "adaptive", display: "summarized" });
 		expect(payload.output_config).toEqual({ effort: "high" });
 	});
 
 	it("maps xhigh reasoning to effort=xhigh for Claude Opus 4.7", async () => {
 		const payload = await capturePayload(getModel("anthropic", "claude-opus-4-7"), { reasoning: "xhigh" });
 
-		expect(payload.thinking).toEqual({ type: "adaptive" });
+		expect(payload.thinking).toEqual({ type: "adaptive", display: "summarized" });
 		expect(payload.output_config).toEqual({ effort: "xhigh" });
 	});
 });
