@@ -33,6 +33,9 @@ export type CreateAgentSessionRuntimeFactory = (options: {
 	sessionStartEvent?: SessionStartEvent;
 }) => Promise<CreateAgentSessionRuntimeResult>;
 
+/**
+ * Thrown when /import references a JSONL file path that does not exist.
+ */
 export class SessionImportFileNotFoundError extends Error {
 	readonly filePath: string;
 
@@ -258,6 +261,13 @@ export class AgentSessionRuntime {
 		return { cancelled: false, selectedText };
 	}
 
+	/**
+	 * Import a session JSONL file and switch runtime state to the imported session.
+	 *
+	 * @returns `{ cancelled: true }` when cancelled by `session_before_switch`, otherwise `{ cancelled: false }`.
+	 * @throws {SessionImportFileNotFoundError} When the input path does not exist.
+	 * @throws {MissingSessionCwdError} When the imported session cwd cannot be resolved and no override is provided.
+	 */
 	async importFromJsonl(inputPath: string, cwdOverride?: string): Promise<{ cancelled: boolean }> {
 		const resolvedPath = resolve(inputPath);
 		if (!existsSync(resolvedPath)) {

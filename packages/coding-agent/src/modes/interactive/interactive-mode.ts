@@ -47,7 +47,7 @@ import {
 	VERSION,
 } from "../../config.js";
 import { type AgentSession, type AgentSessionEvent, parseSkillBlock } from "../../core/agent-session.js";
-import type { AgentSessionRuntime } from "../../core/agent-session-runtime.js";
+import { type AgentSessionRuntime, SessionImportFileNotFoundError } from "../../core/agent-session-runtime.js";
 import type {
 	ExtensionContext,
 	ExtensionRunner,
@@ -4417,20 +4417,6 @@ export class InteractiveMode {
 			return;
 		}
 
-		const handleImportResult = async (result: "ok" | "cancelled" | "not_found"): Promise<void> => {
-			if (result === "cancelled") {
-				this.showStatus("Import cancelled");
-				return;
-			}
-			if (result === "not_found") {
-				this.showError(`Failed to import session: File not found: ${path.resolve(inputPath)}`);
-				return;
-			}
-			await this.handleRuntimeSessionChange();
-			this.renderCurrentSessionState();
-			this.showStatus(`Session imported from: ${inputPath}`);
-		};
-
 		try {
 			if (this.loadingAnimation) {
 				this.loadingAnimation.stop();
@@ -4438,7 +4424,13 @@ export class InteractiveMode {
 			}
 			this.statusContainer.clear();
 			const result = await this.runtimeHost.importFromJsonl(inputPath);
-			await handleImportResult(result);
+			if (result.cancelled) {
+				this.showStatus("Import cancelled");
+				return;
+			}
+			await this.handleRuntimeSessionChange();
+			this.renderCurrentSessionState();
+			this.showStatus(`Session imported from: ${inputPath}`);
 		} catch (error: unknown) {
 			if (error instanceof MissingSessionCwdError) {
 				const selectedCwd = await this.promptForMissingSessionCwd(error);
@@ -4447,7 +4439,17 @@ export class InteractiveMode {
 					return;
 				}
 				const result = await this.runtimeHost.importFromJsonl(inputPath, selectedCwd);
-				await handleImportResult(result);
+				if (result.cancelled) {
+					this.showStatus("Import cancelled");
+					return;
+				}
+				await this.handleRuntimeSessionChange();
+				this.renderCurrentSessionState();
+				this.showStatus(`Session imported from: ${inputPath}`);
+				return;
+			}
+			if (error instanceof SessionImportFileNotFoundError) {
+				this.showError(`Failed to import session: ${error.message}`);
 				return;
 			}
 			await this.handleFatalRuntimeError("Failed to import session", error);
