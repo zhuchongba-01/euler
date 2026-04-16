@@ -2958,6 +2958,11 @@ export class InteractiveMode {
 	}
 
 	private handleCtrlZ(): void {
+		if (process.platform === "win32") {
+			this.showStatus("Suspend to background is not supported on Windows");
+			return;
+		}
+
 		// Keep the event loop alive while suspended. Without this, stopping the TUI
 		// can leave Node with no ref'ed handles, causing the process to exit on fg
 		// before the SIGCONT handler gets a chance to restore the terminal.
