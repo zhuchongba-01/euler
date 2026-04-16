@@ -168,6 +168,13 @@ export const streamBedrock: StreamFunction<"bedrock-converse-stream", BedrockOpt
 			const command = new ConverseStreamCommand(commandInput);
 
 			const response = await client.send(command, { abortSignal: options.signal });
+			if (response.$metadata.httpStatusCode !== undefined) {
+				const responseHeaders: Record<string, string> = {};
+				if (response.$metadata.requestId) {
+					responseHeaders["x-amzn-requestid"] = response.$metadata.requestId;
+				}
+				await options?.onResponse?.({ status: response.$metadata.httpStatusCode, headers: responseHeaders }, model);
+			}
 
 			for await (const item of response.stream!) {
 				if (item.messageStart) {
