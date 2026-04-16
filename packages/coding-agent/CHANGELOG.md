@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `argument-hint` frontmatter field for prompt templates, displayed before the description in the autocomplete dropdown ([#2780](https://github.com/badlogic/pi-mono/pull/2780) by [@andresvi94](https://github.com/andresvi94))
+
 ### Fixed
 
 - Fixed `--verbose` startup output to begin with expanded startup help and loaded resource listings after the compact startup header change ([#3147](https://github.com/badlogic/pi-mono/issues/3147))
@@ -270,8 +274,6 @@ await runtime.fork("entry-id");
 - Added `defineTool()` so standalone and array-based custom tool definitions keep inferred parameter types without manual casts ([#2746](https://github.com/badlogic/pi-mono/issues/2746))
 
 - Added label timestamps to the session tree with a `Shift+T` toggle in `/tree`, smart date formatting, and timestamp preservation through branching ([#2691](https://github.com/badlogic/pi-mono/pull/2691) by [@w-winter](https://github.com/w-winter))
-
-- Added `argument-hint` frontmatter field for prompt templates, displayed before the description in the autocomplete dropdown ([#2761](https://github.com/badlogic/pi-mono/issues/2761))
 
 ### Fixed
 
