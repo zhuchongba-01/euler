@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import * as path from "node:path";
 import { Container } from "@mariozechner/pi-tui";
 import { beforeAll, describe, expect, test, vi } from "vitest";
+import type { SourceInfo } from "../src/core/source-info.js";
 import { InteractiveMode } from "../src/modes/interactive/interactive-mode.js";
 import { initTheme } from "../src/modes/interactive/theme/theme.js";
 
@@ -14,6 +15,21 @@ function renderLastLine(container: Container, width = 120): string {
 function renderAll(container: Container, width = 120): string {
 	return container.children.flatMap((child) => child.render(width)).join("\n");
 }
+
+function normalizeRenderedOutput(container: Container, width = 220): string {
+	return renderAll(container, width)
+		.replace(/\u001b\[[0-9;]*m/g, "")
+		.replace(/\\/g, "/")
+		.split("\n")
+		.map((line) => line.replace(/\s+$/g, ""))
+		.join("\n")
+		.trim();
+}
+
+type ExtensionFixture = {
+	path: string;
+	sourceInfo?: SourceInfo;
+};
 
 describe("InteractiveMode.showStatus", () => {
 	beforeAll(() => {
@@ -142,9 +158,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 		toolOutputExpanded?: boolean;
 		cwd?: string;
 		contextFiles?: Array<{ path: string; content?: string }>;
-		extensions?: Array<{ path: string }>;
+		extensions?: ExtensionFixture[];
 		skills?: Array<{ filePath: string; name: string }>;
 		skillDiagnostics?: Array<{ type: "warning" | "error" | "collision"; message: string }>;
+		useRealScopeGroups?: boolean;
 	}) {
 		const fakeThis: any = {
 			options: { verbose: options.verbose ?? false },
@@ -176,12 +193,140 @@ describe("InteractiveMode.showLoadedResources", () => {
 			getStartupExpansionState: () => (InteractiveMode as any).prototype.getStartupExpansionState.call(fakeThis),
 			buildScopeGroups: () => [],
 			formatScopeGroups: () => "resource-list",
-			getShortPath: (p: string) => p,
+			isPackageSource: (sourceInfo?: SourceInfo) =>
+				(InteractiveMode as any).prototype.isPackageSource.call(fakeThis, sourceInfo),
+			getShortPath: (p: string, sourceInfo?: SourceInfo) =>
+				(InteractiveMode as any).prototype.getShortPath.call(fakeThis, p, sourceInfo),
+			getCompactPathLabel: (p: string, sourceInfo?: SourceInfo) =>
+				(InteractiveMode as any).prototype.getCompactPathLabel.call(fakeThis, p, sourceInfo),
+			getCompactPackageSourceLabel: (sourceInfo?: SourceInfo) =>
+				(InteractiveMode as any).prototype.getCompactPackageSourceLabel.call(fakeThis, sourceInfo),
+			getCompactExtensionLabel: (p: string, sourceInfo?: SourceInfo) =>
+				(InteractiveMode as any).prototype.getCompactExtensionLabel.call(fakeThis, p, sourceInfo),
+			getCompactDisplayPathSegments: (p: string) =>
+				(InteractiveMode as any).prototype.getCompactDisplayPathSegments.call(fakeThis, p),
+			getCompactNonPackageExtensionLabel: (
+				p: string,
+				index: number,
+				allPaths: Array<{ path: string; segments: string[] }>,
+			) => (InteractiveMode as any).prototype.getCompactNonPackageExtensionLabel.call(fakeThis, p, index, allPaths),
+			getCompactExtensionLabels: (extensions: ExtensionFixture[]) =>
+				(InteractiveMode as any).prototype.getCompactExtensionLabels.call(fakeThis, extensions),
 			formatDiagnostics: () => "diagnostics",
 			getBuiltInCommandConflictDiagnostics: () => [],
 		};
 
+		if (options.useRealScopeGroups) {
+			fakeThis.getScopeGroup = (sourceInfo?: SourceInfo) =>
+				(InteractiveMode as any).prototype.getScopeGroup.call(fakeThis, sourceInfo);
+			fakeThis.buildScopeGroups = (items: Array<{ path: string; sourceInfo?: SourceInfo }>) =>
+				(InteractiveMode as any).prototype.buildScopeGroups.call(fakeThis, items);
+			fakeThis.formatScopeGroups = (groups: unknown, formatOptions: unknown) =>
+				(InteractiveMode as any).prototype.formatScopeGroups.call(fakeThis, groups, formatOptions);
+		}
+
 		return fakeThis;
+	}
+
+	function createSourceInfo(
+		filePath: string,
+		options: {
+			source: string;
+			scope: "user" | "project" | "temporary";
+			origin: "package" | "top-level";
+			baseDir?: string;
+		},
+	): SourceInfo {
+		return {
+			path: filePath,
+			source: options.source,
+			scope: options.scope,
+			origin: options.origin,
+			baseDir: options.baseDir,
+		};
+	}
+
+	function createExtensionFixtures(): ExtensionFixture[] {
+		return [
+			{
+				path: "/tmp/project/.pi/extensions/answer.ts",
+				sourceInfo: createSourceInfo("/tmp/project/.pi/extensions/answer.ts", {
+					source: "local",
+					scope: "project",
+					origin: "top-level",
+					baseDir: "/tmp/project/.pi/extensions",
+				}),
+			},
+			{
+				path: "/tmp/project/.pi/extensions/local-index/index.ts",
+				sourceInfo: createSourceInfo("/tmp/project/.pi/extensions/local-index/index.ts", {
+					source: "local",
+					scope: "project",
+					origin: "top-level",
+					baseDir: "/tmp/project/.pi/extensions",
+				}),
+			},
+			{
+				path: "/tmp/agent/extensions/user-index/index.ts",
+				sourceInfo: createSourceInfo("/tmp/agent/extensions/user-index/index.ts", {
+					source: "local",
+					scope: "user",
+					origin: "top-level",
+					baseDir: "/tmp/agent/extensions",
+				}),
+			},
+			{
+				path: "/tmp/project/.pi/npm/node_modules/pi-markdown-preview/extensions/index.ts",
+				sourceInfo: createSourceInfo("/tmp/project/.pi/npm/node_modules/pi-markdown-preview/extensions/index.ts", {
+					source: "npm:pi-markdown-preview",
+					scope: "project",
+					origin: "package",
+					baseDir: "/tmp/project/.pi/npm/node_modules/pi-markdown-preview",
+				}),
+			},
+			{
+				path: "/tmp/project/.pi/npm/node_modules/@scope/pi-scoped/extensions/index.ts",
+				sourceInfo: createSourceInfo("/tmp/project/.pi/npm/node_modules/@scope/pi-scoped/extensions/index.ts", {
+					source: "npm:@scope/pi-scoped",
+					scope: "project",
+					origin: "package",
+					baseDir: "/tmp/project/.pi/npm/node_modules/@scope/pi-scoped",
+				}),
+			},
+			{
+				path: "/tmp/project/.pi/git/github.com/HazAT/pi-interactive-subagents/extensions/index.ts",
+				sourceInfo: createSourceInfo(
+					"/tmp/project/.pi/git/github.com/HazAT/pi-interactive-subagents/extensions/index.ts",
+					{
+						source: "git:github.com/HazAT/pi-interactive-subagents",
+						scope: "project",
+						origin: "package",
+						baseDir: "/tmp/project/.pi/git/github.com/HazAT/pi-interactive-subagents",
+					},
+				),
+			},
+			{
+				path: "/tmp/project/.pi/git/github.com/HazAT/pi-interactive-subagents/extensions/subagents/index.ts",
+				sourceInfo: createSourceInfo(
+					"/tmp/project/.pi/git/github.com/HazAT/pi-interactive-subagents/extensions/subagents/index.ts",
+					{
+						source: "git:github.com/HazAT/pi-interactive-subagents",
+						scope: "project",
+						origin: "package",
+						baseDir: "/tmp/project/.pi/git/github.com/HazAT/pi-interactive-subagents",
+					},
+				),
+			},
+			{
+				path: "/tmp/temp/cli-extension.ts",
+				sourceInfo: createSourceInfo("/tmp/temp/cli-extension.ts", {
+					source: "cli",
+					scope: "temporary",
+					origin: "top-level",
+					baseDir: "/tmp/temp",
+				}),
+			},
+		];
 	}
 
 	test("shows a compact resource listing by default", () => {
@@ -249,6 +394,98 @@ describe("InteractiveMode.showLoadedResources", () => {
 		expect(output).toContain("[Extensions]");
 		expect(output).toContain("answer.ts, btw.ts");
 		expect(output).not.toContain("extensions/answer.ts");
+	});
+
+	test("captures mixed extension layouts in compact output", () => {
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			extensions: createExtensionFixtures(),
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  @scope/pi-scoped, answer.ts, cli-extension.ts, HazAT/pi-interactive-subagents, HazAT/pi-interactive-subagents:subagents, local-index/index.ts, pi-markdown-preview, user-index/index.ts"`);
+	});
+
+	test("adds more parent folders until local extension labels are unique", () => {
+		const extensions: ExtensionFixture[] = [
+			{
+				path: "/tmp/alpha/one/index.ts",
+				sourceInfo: createSourceInfo("/tmp/alpha/one/index.ts", {
+					source: "cli",
+					scope: "temporary",
+					origin: "top-level",
+					baseDir: "/tmp/alpha",
+				}),
+			},
+			{
+				path: "/tmp/beta/one/index.ts",
+				sourceInfo: createSourceInfo("/tmp/beta/one/index.ts", {
+					source: "cli",
+					scope: "temporary",
+					origin: "top-level",
+					baseDir: "/tmp/beta",
+				}),
+			},
+			{
+				path: "/tmp/gamma/one/index.ts",
+				sourceInfo: createSourceInfo("/tmp/gamma/one/index.ts", {
+					source: "cli",
+					scope: "temporary",
+					origin: "top-level",
+					baseDir: "/tmp/gamma",
+				}),
+			},
+		];
+
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			extensions,
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  alpha/one/index.ts, beta/one/index.ts, gamma/one/index.ts"`);
+	});
+
+	test("captures mixed extension layouts in expanded output", () => {
+		const fakeThis = createShowLoadedResourcesThis({
+			quietStartup: false,
+			toolOutputExpanded: true,
+			extensions: createExtensionFixtures(),
+			useRealScopeGroups: true,
+		});
+
+		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			force: false,
+		});
+
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toMatchInlineSnapshot(`
+"[Extensions]
+  project
+    /tmp/project/.pi/extensions/answer.ts
+    /tmp/project/.pi/extensions/local-index/index.ts
+    git:github.com/HazAT/pi-interactive-subagents
+      extensions/index.ts
+      extensions/subagents/index.ts
+    npm:@scope/pi-scoped
+      extensions/index.ts
+    npm:pi-markdown-preview
+      extensions/index.ts
+  user
+    /tmp/agent/extensions/user-index/index.ts
+  path
+    /tmp/temp/cli-extension.ts"`);
 	});
 
 	test("shows context paths relative to cwd while preserving full external paths", () => {

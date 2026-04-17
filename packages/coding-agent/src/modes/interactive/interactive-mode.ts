@@ -906,6 +906,20 @@ export class InteractiveMode {
 	 * Get a short path relative to the package root for display.
 	 */
 	private getShortPath(fullPath: string, sourceInfo?: SourceInfo): string {
+		const baseDir = sourceInfo?.baseDir;
+		if (baseDir && this.isPackageSource(sourceInfo)) {
+			const relativePath = path.relative(path.resolve(baseDir), path.resolve(fullPath));
+			if (
+				relativePath &&
+				relativePath !== "." &&
+				!relativePath.startsWith("..") &&
+				!relativePath.startsWith(`..${path.sep}`) &&
+				!path.isAbsolute(relativePath)
+			) {
+				return relativePath.replace(/\\/g, "/");
+			}
+		}
+
 		const source = sourceInfo?.source ?? "";
 		const npmMatch = fullPath.match(/node_modules\/(@?[^/]+(?:\/[^/]+)?)\/(.*)/);
 		if (npmMatch && source.startsWith("npm:")) {
@@ -918,6 +932,108 @@ export class InteractiveMode {
 		}
 
 		return this.formatDisplayPath(fullPath);
+	}
+
+	private getCompactPathLabel(resourcePath: string, sourceInfo?: SourceInfo): string {
+		const shortPath = this.getShortPath(resourcePath, sourceInfo);
+		const normalizedPath = shortPath.replace(/\\/g, "/");
+		const segments = normalizedPath.split("/").filter((segment) => segment.length > 0 && segment !== "~");
+		if (segments.length > 0) {
+			return segments[segments.length - 1]!;
+		}
+		return shortPath;
+	}
+
+	private getCompactPackageSourceLabel(sourceInfo?: SourceInfo): string {
+		const source = sourceInfo?.source ?? "";
+		if (source.startsWith("npm:")) {
+			return source.slice("npm:".length) || source;
+		}
+
+		const gitSource = parseGitUrl(source);
+		if (gitSource) {
+			return gitSource.path || source;
+		}
+
+		return source;
+	}
+
+	private getCompactExtensionLabel(resourcePath: string, sourceInfo?: SourceInfo): string {
+		if (!this.isPackageSource(sourceInfo)) {
+			return this.getCompactPathLabel(resourcePath, sourceInfo);
+		}
+
+		const sourceLabel = this.getCompactPackageSourceLabel(sourceInfo);
+		if (!sourceLabel) {
+			return this.getCompactPathLabel(resourcePath, sourceInfo);
+		}
+
+		const shortPath = this.getShortPath(resourcePath, sourceInfo).replace(/\\/g, "/");
+		const packagePath = shortPath.startsWith("extensions/") ? shortPath.slice("extensions/".length) : shortPath;
+		const parsedPath = path.posix.parse(packagePath);
+
+		if (parsedPath.name === "index") {
+			return !parsedPath.dir || parsedPath.dir === "." ? sourceLabel : `${sourceLabel}:${parsedPath.dir}`;
+		}
+
+		return `${sourceLabel}:${packagePath}`;
+	}
+
+	private getCompactDisplayPathSegments(resourcePath: string): string[] {
+		return this.formatDisplayPath(resourcePath)
+			.replace(/\\/g, "/")
+			.split("/")
+			.filter((segment) => segment.length > 0 && segment !== "~");
+	}
+
+	private getCompactNonPackageExtensionLabel(
+		resourcePath: string,
+		index: number,
+		allPaths: Array<{ path: string; segments: string[] }>,
+	): string {
+		const segments = allPaths[index]?.segments;
+		if (!segments || segments.length === 0) {
+			return this.getCompactPathLabel(resourcePath);
+		}
+
+		for (let segmentCount = 1; segmentCount <= segments.length; segmentCount += 1) {
+			const candidate = segments.slice(-segmentCount).join("/");
+			const isUnique = allPaths.every((item, itemIndex) => {
+				if (itemIndex === index) {
+					return true;
+				}
+				return item.segments.slice(-segmentCount).join("/") !== candidate;
+			});
+
+			if (isUnique) {
+				return candidate;
+			}
+		}
+
+		return segments.join("/");
+	}
+
+	private getCompactExtensionLabels(extensions: Array<{ path: string; sourceInfo?: SourceInfo }>): string[] {
+		const nonPackageExtensions = extensions
+			.map((extension) => ({
+				path: extension.path,
+				sourceInfo: extension.sourceInfo,
+				segments: this.getCompactDisplayPathSegments(extension.path),
+			}))
+			.filter((extension) => !this.isPackageSource(extension.sourceInfo));
+
+		return extensions.map((extension) => {
+			if (this.isPackageSource(extension.sourceInfo)) {
+				return this.getCompactExtensionLabel(extension.path, extension.sourceInfo);
+			}
+
+			const nonPackageIndex = nonPackageExtensions.findIndex((item) => item.path === extension.path);
+			if (nonPackageIndex === -1) {
+				return this.getCompactPathLabel(extension.path, extension.sourceInfo);
+			}
+
+			return this.getCompactNonPackageExtensionLabel(extension.path, nonPackageIndex, nonPackageExtensions);
+		});
 	}
 
 	private getDisplaySourceInfo(sourceInfo?: SourceInfo): {
@@ -1123,15 +1239,6 @@ export class InteractiveMode {
 		}
 
 		const sectionHeader = (name: string, color: ThemeColor = "mdHeading") => theme.fg(color, `[${name}]`);
-		const compactPath = (resourcePath: string, sourceInfo?: SourceInfo): string => {
-			const shortPath = this.getShortPath(resourcePath, sourceInfo);
-			const normalizedPath = shortPath.replace(/\\/g, "/");
-			const segments = normalizedPath.split("/").filter((segment) => segment.length > 0 && segment !== "~");
-			if (segments.length > 0) {
-				return segments[segments.length - 1]!;
-			}
-			return shortPath;
-		};
 		const formatCompactList = (items: string[], options?: { sort?: boolean }): string => {
 			const labels = items.map((item) => item.trim()).filter((item) => item.length > 0);
 			if (options?.sort !== false) {
@@ -1240,9 +1347,7 @@ export class InteractiveMode {
 					formatPath: (item) => this.formatDisplayPath(item.path),
 					formatPackagePath: (item) => this.getShortPath(item.path, item.sourceInfo),
 				});
-				const extensionCompactList = formatCompactList(
-					extensions.map((extension) => compactPath(extension.path, extension.sourceInfo)),
-				);
+				const extensionCompactList = formatCompactList(this.getCompactExtensionLabels(extensions));
 				addLoadedSection("Extensions", extensionCompactList, extList, "mdHeading");
 			}
 
@@ -1262,7 +1367,8 @@ export class InteractiveMode {
 				});
 				const themeCompactList = formatCompactList(
 					customThemes.map(
-						(loadedTheme) => loadedTheme.name ?? compactPath(loadedTheme.sourcePath!, loadedTheme.sourceInfo),
+						(loadedTheme) =>
+							loadedTheme.name ?? this.getCompactPathLabel(loadedTheme.sourcePath!, loadedTheme.sourceInfo),
 					),
 				);
 				addLoadedSection("Themes", themeCompactList, themeList);
