@@ -1,6 +1,8 @@
+import { EventEmitter } from "node:events";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DefaultPackageManager, type ProgressEvent, type ResolvedResource } from "../src/core/package-manager.js";
 import { SettingsManager } from "../src/core/settings-manager.js";
@@ -11,6 +13,16 @@ function normalizeForMatch(value: string): string {
 
 function pathEndsWith(actualPath: string, suffix: string): boolean {
 	return normalizeForMatch(actualPath).endsWith(normalizeForMatch(suffix));
+}
+
+class MockSpawnedProcess extends EventEmitter {
+	stdout = new PassThrough();
+	stderr = new PassThrough();
+
+	kill(): boolean {
+		this.emit("close", null, "SIGTERM");
+		return true;
+	}
 }
 
 // Helper to check if a resource is enabled
@@ -1552,6 +1564,39 @@ export default function(api) { api.registerTool({ name: "test", description: "te
 				["exec", "node@20", "--", "npm", "view", "@scope/pkg", "version", "--json"],
 				expect.objectContaining({ cwd: tempDir }),
 			);
+		});
+
+		it("should wait for close before resolving captured stdout", async () => {
+			const managerWithInternals = packageManager as unknown as {
+				spawnCaptureCommand(
+					command: string,
+					args: string[],
+					options?: { cwd?: string; env?: Record<string, string> },
+				): MockSpawnedProcess;
+				runCommandCapture(
+					command: string,
+					args: string[],
+					options?: { cwd?: string; timeoutMs?: number; env?: Record<string, string> },
+				): Promise<string>;
+			};
+			const child = new MockSpawnedProcess();
+			vi.spyOn(managerWithInternals, "spawnCaptureCommand").mockReturnValue(child);
+
+			let settled = false;
+			const capturePromise = managerWithInternals.runCommandCapture("git", ["rev-parse", "HEAD"]).then((value) => {
+				settled = true;
+				return value;
+			});
+
+			child.emit("exit", 0, null);
+			await Promise.resolve();
+			expect(settled).toBe(false);
+
+			child.stdout.write("abc123\n");
+			child.stdout.end();
+			child.emit("close", 0, null);
+
+			await expect(capturePromise).resolves.toBe("abc123");
 		});
 	});
 });
