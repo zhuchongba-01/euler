@@ -45,8 +45,9 @@ function clearAll(enabledIds: EnabledIds, allIds: string[], targetIds?: string[]
 	return enabledIds.filter((id) => !targets.has(id));
 }
 
-function move(enabledIds: EnabledIds, allIds: string[], id: string, delta: number): EnabledIds {
-	const list = enabledIds ?? [...allIds];
+function move(enabledIds: EnabledIds, id: string, delta: number): EnabledIds {
+	if (enabledIds === null) return null;
+	const list = [...enabledIds];
 	const index = list.indexOf(id);
 	if (index < 0) return list;
 	const newIndex = index + delta;
@@ -238,15 +239,15 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 
 		// Alt+Up/Down - Reorder enabled models
 		if (matchesKey(data, Key.alt("up")) || matchesKey(data, Key.alt("down"))) {
+			if (this.enabledIds === null) return;
 			const item = this.filteredItems[this.selectedIndex];
 			if (item && isEnabled(this.enabledIds, item.fullId)) {
 				const delta = matchesKey(data, Key.alt("up")) ? -1 : 1;
-				const enabledList = this.enabledIds ?? this.allIds;
-				const currentIndex = enabledList.indexOf(item.fullId);
+				const currentIndex = this.enabledIds.indexOf(item.fullId);
 				const newIndex = currentIndex + delta;
 				// Only move if within bounds
-				if (newIndex >= 0 && newIndex < enabledList.length) {
-					this.enabledIds = move(this.enabledIds, this.allIds, item.fullId, delta);
+				if (newIndex >= 0 && newIndex < this.enabledIds.length) {
+					this.enabledIds = move(this.enabledIds, item.fullId, delta);
 					this.isDirty = true;
 					this.selectedIndex += delta;
 					this.refresh();
