@@ -2,11 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added Bedrock Converse bearer-token authentication via `AWS_BEARER_TOKEN_BEDROCK`, enabling API-key style access without SigV4 credentials ([#3125](https://github.com/badlogic/pi-mono/pull/3125) by [@wirjo](https://github.com/wirjo))
+
 ### Fixed
 
 - Fixed Anthropic and Bedrock adaptive-thinking payload tests to expect the default `display: "summarized"` field when reasoning is enabled.
 - Fixed Mistral Small 4 reasoning requests to use `reasoning_effort` instead of `prompt_mode`, restoring default thinking support for `mistral-small-2603` and `mistral-small-latest` ([#3338](https://github.com/badlogic/pi-mono/issues/3338))
 - Fixed `qwen-chat-template` OpenAI-compatible requests to set `chat_template_kwargs.preserve_thinking: true`, preserving prior Qwen thinking across turns so multi-turn tool calls keep their arguments instead of degrading to empty `{}` payloads ([#3325](https://github.com/badlogic/pi-mono/issues/3325))
+- Fixed OpenAI Codex service-tier accounting to trust the explicitly requested tier when the API echoes the default tier in responses, keeping downstream usage costs aligned with the caller-selected tier ([#3307](https://github.com/badlogic/pi-mono/pull/3307) by [@markusylisiurunen](https://github.com/markusylisiurunen))
 
 ## [0.67.6] - 2026-04-16
 
