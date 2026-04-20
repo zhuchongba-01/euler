@@ -15,10 +15,15 @@ import type {
 	ExtensionFactory,
 	SessionBeforeForkEvent,
 	SessionBeforeSwitchEvent,
+	SessionShutdownEvent,
 	SessionStartEvent,
 } from "../src/index.js";
 
-type RecordedSessionEvent = SessionBeforeSwitchEvent | SessionBeforeForkEvent | SessionStartEvent;
+type RecordedSessionEvent =
+	| SessionBeforeSwitchEvent
+	| SessionBeforeForkEvent
+	| SessionShutdownEvent
+	| SessionStartEvent;
 
 describe("AgentSessionRuntime session lifecycle events", () => {
 	const cleanups: Array<() => Promise<void> | void> = [];
@@ -90,6 +95,9 @@ describe("AgentSessionRuntime session lifecycle events", () => {
 			pi.on("session_before_switch", (event) => {
 				events.push(event);
 			});
+			pi.on("session_shutdown", (event) => {
+				events.push(event);
+			});
 			pi.on("session_start", (event) => {
 				events.push(event);
 			});
@@ -105,13 +113,14 @@ describe("AgentSessionRuntime session lifecycle events", () => {
 		const newSessionResult = await runtimeHost.newSession();
 		expect(newSessionResult.cancelled).toBe(false);
 		await runtimeHost.session.bindExtensions({});
+		const secondSessionFile = runtimeHost.session.sessionFile;
 		expect(events).toEqual([
 			{ type: "session_before_switch", reason: "new", targetSessionFile: undefined },
+			{ type: "session_shutdown", reason: "new", targetSessionFile: secondSessionFile },
 			{ type: "session_start", reason: "new", previousSessionFile: originalSessionFile },
 		]);
 
 		events.length = 0;
-		const secondSessionFile = runtimeHost.session.sessionFile;
 		expect(secondSessionFile).toBeTruthy();
 
 		const switchResult = await runtimeHost.switchSession(originalSessionFile!);
@@ -119,6 +128,7 @@ describe("AgentSessionRuntime session lifecycle events", () => {
 		await runtimeHost.session.bindExtensions({});
 		expect(events).toEqual([
 			{ type: "session_before_switch", reason: "resume", targetSessionFile: originalSessionFile },
+			{ type: "session_shutdown", reason: "resume", targetSessionFile: originalSessionFile },
 			{ type: "session_start", reason: "resume", previousSessionFile: secondSessionFile },
 		]);
 	});
@@ -158,6 +168,9 @@ describe("AgentSessionRuntime session lifecycle events", () => {
 					return { cancel: true };
 				}
 			});
+			pi.on("session_shutdown", (event) => {
+				events.push(event);
+			});
 			pi.on("session_start", (event) => {
 				events.push(event);
 			});
@@ -176,6 +189,7 @@ describe("AgentSessionRuntime session lifecycle events", () => {
 		await runtimeHost.session.bindExtensions({});
 		expect(events).toEqual([
 			{ type: "session_before_fork", entryId: userMessage.entryId, position: "before" },
+			{ type: "session_shutdown", reason: "fork", targetSessionFile: runtimeHost.session.sessionFile },
 			{ type: "session_start", reason: "fork", previousSessionFile },
 		]);
 

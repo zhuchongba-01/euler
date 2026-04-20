@@ -446,10 +446,12 @@ pi.on("session_tree", async (event, ctx) => {
 
 #### session_shutdown
 
-Fired on exit (Ctrl+C, Ctrl+D, SIGHUP, SIGTERM).
+Fired before an extension runtime is torn down.
 
 ```typescript
-pi.on("session_shutdown", async (_event, ctx) => {
+pi.on("session_shutdown", async (event, ctx) => {
+  // event.reason - "quit" | "reload" | "new" | "resume" | "fork"
+  // event.targetSessionFile - destination session for session replacement flows
   // Cleanup, save state, etc.
 });
 ```

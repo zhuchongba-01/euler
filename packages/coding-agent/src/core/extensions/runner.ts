@@ -45,6 +45,7 @@ import type {
 	SessionBeforeForkResult,
 	SessionBeforeSwitchResult,
 	SessionBeforeTreeResult,
+	SessionShutdownEvent,
 	ToolCallEvent,
 	ToolCallEventResult,
 	ToolResultEvent,
@@ -168,11 +169,12 @@ export type ShutdownHandler = () => void;
  * Helper function to emit session_shutdown event to extensions.
  * Returns true if the event was emitted, false if there were no handlers.
  */
-export async function emitSessionShutdownEvent(extensionRunner: ExtensionRunner): Promise<boolean> {
+export async function emitSessionShutdownEvent(
+	extensionRunner: ExtensionRunner,
+	event: SessionShutdownEvent,
+): Promise<boolean> {
 	if (extensionRunner.hasHandlers("session_shutdown")) {
-		await extensionRunner.emit({
-			type: "session_shutdown",
-		});
+		await extensionRunner.emit(event);
 		return true;
 	}
 	return false;

@@ -16,10 +16,15 @@ import type {
 	ExtensionFactory,
 	SessionBeforeForkEvent,
 	SessionBeforeSwitchEvent,
+	SessionShutdownEvent,
 	SessionStartEvent,
 } from "../../src/index.js";
 
-type RecordedSessionEvent = SessionBeforeSwitchEvent | SessionBeforeForkEvent | SessionStartEvent;
+type RecordedSessionEvent =
+	| SessionBeforeSwitchEvent
+	| SessionBeforeForkEvent
+	| SessionShutdownEvent
+	| SessionStartEvent;
 
 describe("AgentSessionRuntime characterization", () => {
 	const cleanups: Array<() => Promise<void> | void> = [];
@@ -121,6 +126,9 @@ describe("AgentSessionRuntime characterization", () => {
 			pi.on("session_before_switch", (event) => {
 				events.push(event);
 			});
+			pi.on("session_shutdown", (event) => {
+				events.push(event);
+			});
 			pi.on("session_start", (event) => {
 				events.push(event);
 			});
@@ -138,19 +146,21 @@ describe("AgentSessionRuntime characterization", () => {
 		await runtime.session.bindExtensions({});
 		expect(runtime.session).not.toBe(originalSession);
 		expect(runtime.session.messages).toEqual([]);
+		const secondSessionFile = runtime.session.sessionFile;
 		expect(events).toEqual([
 			{ type: "session_before_switch", reason: "new", targetSessionFile: undefined },
+			{ type: "session_shutdown", reason: "new", targetSessionFile: secondSessionFile },
 			{ type: "session_start", reason: "new", previousSessionFile: originalSessionFile },
 		]);
 
 		events.length = 0;
-		const secondSessionFile = runtime.session.sessionFile;
 
 		const switchResult = await runtime.switchSession(originalSessionFile!);
 		expect(switchResult.cancelled).toBe(false);
 		await runtime.session.bindExtensions({});
 		expect(events).toEqual([
 			{ type: "session_before_switch", reason: "resume", targetSessionFile: originalSessionFile },
+			{ type: "session_shutdown", reason: "resume", targetSessionFile: originalSessionFile },
 			{ type: "session_start", reason: "resume", previousSessionFile: secondSessionFile },
 		]);
 	});
@@ -201,6 +211,9 @@ describe("AgentSessionRuntime characterization", () => {
 					return { cancel: true };
 				}
 			});
+			pi.on("session_shutdown", (event) => {
+				events.push(event);
+			});
 			pi.on("session_start", (event) => {
 				events.push(event);
 			});
@@ -217,6 +230,7 @@ describe("AgentSessionRuntime characterization", () => {
 		await runtime.session.bindExtensions({});
 		expect(events).toEqual([
 			{ type: "session_before_fork", entryId: userMessage.entryId, position: "before" },
+			{ type: "session_shutdown", reason: "fork", targetSessionFile: runtime.session.sessionFile },
 			{ type: "session_start", reason: "fork", previousSessionFile },
 		]);
 

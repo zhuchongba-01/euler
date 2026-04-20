@@ -512,9 +512,12 @@ export interface SessionCompactEvent {
 	fromExtension: boolean;
 }
 
-/** Fired on graceful process shutdown paths such as Ctrl+C, Ctrl+D, SIGHUP, and SIGTERM. */
+/** Fired before an extension runtime is torn down due to quit, reload, or session replacement. */
 export interface SessionShutdownEvent {
 	type: "session_shutdown";
+	reason: "quit" | "reload" | "new" | "resume" | "fork";
+	/** Destination session file when shutting down due to session replacement. */
+	targetSessionFile?: string;
 }
 
 /** Preparation data for tree navigation */
