@@ -3373,7 +3373,7 @@ export const MODELS = {
 			cost: {
 				input: 1.25,
 				output: 10,
-				cacheRead: 0.31,
+				cacheRead: 0.125,
 				cacheWrite: 0,
 			},
 			contextWindow: 1048576,
@@ -6710,6 +6710,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "opencode",
 			baseUrl: "https://opencode.ai/zen/v1",
+			compat: {"cacheControlFormat":"anthropic"},
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -6727,6 +6728,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "opencode",
 			baseUrl: "https://opencode.ai/zen/v1",
+			compat: {"cacheControlFormat":"anthropic"},
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -6865,6 +6867,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "opencode-go",
 			baseUrl: "https://opencode.ai/zen/go/v1",
+			compat: {"cacheControlFormat":"anthropic"},
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -6882,6 +6885,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "opencode-go",
 			baseUrl: "https://opencode.ai/zen/go/v1",
+			compat: {"cacheControlFormat":"anthropic"},
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -8009,13 +8013,13 @@ export const MODELS = {
 			reasoning: false,
 			input: ["text"],
 			cost: {
-				input: 0.09999999999999999,
-				output: 0.32,
+				input: 0.12,
+				output: 0.38,
 				cacheRead: 0,
 				cacheWrite: 0,
 			},
 			contextWindow: 131072,
-			maxTokens: 16384,
+			maxTokens: 131072,
 		} satisfies Model<"openai-completions">,
 		"meta-llama/llama-3.3-70b-instruct:free": {
 			id: "meta-llama/llama-3.3-70b-instruct:free",
@@ -8033,23 +8037,6 @@ export const MODELS = {
 			},
 			contextWindow: 65536,
 			maxTokens: 4096,
-		} satisfies Model<"openai-completions">,
-		"meta-llama/llama-4-maverick": {
-			id: "meta-llama/llama-4-maverick",
-			name: "Meta: Llama 4 Maverick",
-			api: "openai-completions",
-			provider: "openrouter",
-			baseUrl: "https://openrouter.ai/api/v1",
-			reasoning: false,
-			input: ["text", "image"],
-			cost: {
-				input: 0.15,
-				output: 0.6,
-				cacheRead: 0,
-				cacheWrite: 0,
-			},
-			contextWindow: 1048576,
-			maxTokens: 16384,
 		} satisfies Model<"openai-completions">,
 		"meta-llama/llama-4-scout": {
 			id: "meta-llama/llama-4-scout",
@@ -8609,7 +8596,7 @@ export const MODELS = {
 				cacheRead: 0.07,
 				cacheWrite: 0,
 			},
-			contextWindow: 256000,
+			contextWindow: 262144,
 			maxTokens: 4096,
 		} satisfies Model<"openai-completions">,
 		"nex-agi/deepseek-v3.1-nex-n1": {
@@ -9087,23 +9074,6 @@ export const MODELS = {
 			},
 			contextWindow: 128000,
 			maxTokens: 16384,
-		} satisfies Model<"openai-completions">,
-		"openai/gpt-4o:extended": {
-			id: "openai/gpt-4o:extended",
-			name: "OpenAI: GPT-4o (extended)",
-			api: "openai-completions",
-			provider: "openrouter",
-			baseUrl: "https://openrouter.ai/api/v1",
-			reasoning: false,
-			input: ["text", "image"],
-			cost: {
-				input: 6,
-				output: 18,
-				cacheRead: 0,
-				cacheWrite: 0,
-			},
-			contextWindow: 128000,
-			maxTokens: 64000,
 		} satisfies Model<"openai-completions">,
 		"openai/gpt-5": {
 			id: "openai/gpt-5",
@@ -9995,7 +9965,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "openrouter",
 			baseUrl: "https://openrouter.ai/api/v1",
-			reasoning: true,
+			reasoning: false,
 			input: ["text"],
 			cost: {
 				input: 0.071,

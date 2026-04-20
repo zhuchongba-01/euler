@@ -34,6 +34,7 @@ const compat: Required<OpenAICompletionsCompat> = {
 	vercelGatewayRouting: {},
 	zaiToolStream: false,
 	supportsStrictMode: true,
+	cacheControlFormat: "anthropic",
 	sendSessionAffinityHeaders: false,
 };
 

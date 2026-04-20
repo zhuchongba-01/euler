@@ -5,7 +5,9 @@ import type {
 	ChatCompletionContentPart,
 	ChatCompletionContentPartImage,
 	ChatCompletionContentPartText,
+	ChatCompletionDeveloperMessageParam,
 	ChatCompletionMessageParam,
+	ChatCompletionSystemMessageParam,
 	ChatCompletionToolMessageParam,
 } from "openai/resources/chat/completions.js";
 import { getEnvApiKey } from "../env-api-keys.js";
@@ -58,6 +60,25 @@ export interface OpenAICompletionsOptions extends StreamOptions {
 	toolChoice?: "auto" | "none" | "required" | { type: "function"; function: { name: string } };
 	reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh";
 }
+
+interface OpenAICompatCacheControl {
+	type: "ephemeral";
+	ttl?: string;
+}
+
+type ResolvedOpenAICompletionsCompat = Omit<Required<OpenAICompletionsCompat>, "cacheControlFormat"> & {
+	cacheControlFormat?: OpenAICompletionsCompat["cacheControlFormat"];
+};
+
+type ChatCompletionInstructionMessageParam = ChatCompletionDeveloperMessageParam | ChatCompletionSystemMessageParam;
+
+type ChatCompletionTextPartWithCacheControl = ChatCompletionContentPartText & {
+	cache_control?: OpenAICompatCacheControl;
+};
+
+type ChatCompletionToolWithCacheControl = OpenAI.Chat.Completions.ChatCompletionTool & {
+	cache_control?: OpenAICompatCacheControl;
+};
 
 function resolveCacheRetention(cacheRetention?: CacheRetention): CacheRetention {
 	if (cacheRetention) {
@@ -354,7 +375,7 @@ function createClient(
 	apiKey?: string,
 	optionsHeaders?: Record<string, string>,
 	sessionId?: string,
-	compat: Required<OpenAICompletionsCompat> = getCompat(model),
+	compat: ResolvedOpenAICompletionsCompat = getCompat(model),
 ) {
 	if (!apiKey) {
 		if (!process.env.OPENAI_API_KEY) {
@@ -398,11 +419,11 @@ function buildParams(
 	model: Model<"openai-completions">,
 	context: Context,
 	options?: OpenAICompletionsOptions,
-	compat: Required<OpenAICompletionsCompat> = getCompat(model),
+	compat: ResolvedOpenAICompletionsCompat = getCompat(model),
 	cacheRetention: CacheRetention = resolveCacheRetention(options?.cacheRetention),
 ) {
 	const messages = convertMessages(model, context, compat);
-	maybeAddOpenRouterAnthropicCacheControl(model, messages);
+	const cacheControl = getCompatCacheControl(model, compat, cacheRetention);
 
 	const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
 		model: model.id,
@@ -441,6 +462,10 @@ function buildParams(
 	} else if (hasToolHistory(context.messages)) {
 		// Anthropic (via LiteLLM/proxy) requires tools param when conversation has tool_calls/tool_results
 		params.tools = [];
+	}
+
+	if (cacheControl) {
+		applyAnthropicCacheControl(messages, params.tools, cacheControl);
 	}
 
 	if (options?.toolChoice) {
@@ -497,43 +522,126 @@ function mapReasoningEffort(
 	return reasoningEffortMap[effort] ?? effort;
 }
 
-function maybeAddOpenRouterAnthropicCacheControl(
+function getCompatCacheControl(
 	model: Model<"openai-completions">,
+	compat: ResolvedOpenAICompletionsCompat,
+	cacheRetention: CacheRetention,
+): OpenAICompatCacheControl | undefined {
+	if (compat.cacheControlFormat !== "anthropic" || cacheRetention === "none") {
+		return undefined;
+	}
+
+	const ttl = cacheRetention === "long" && model.baseUrl.includes("api.anthropic.com") ? "1h" : undefined;
+	return { type: "ephemeral", ...(ttl ? { ttl } : {}) };
+}
+
+function applyAnthropicCacheControl(
 	messages: ChatCompletionMessageParam[],
+	tools: OpenAI.Chat.Completions.ChatCompletionTool[] | undefined,
+	cacheControl: OpenAICompatCacheControl,
 ): void {
-	if (model.provider !== "openrouter" || !model.id.startsWith("anthropic/")) return;
+	addCacheControlToSystemPrompt(messages, cacheControl);
+	addCacheControlToLastTool(tools, cacheControl);
+	addCacheControlToLastConversationMessage(messages, cacheControl);
+}
 
-	// Anthropic-style caching requires cache_control on a text part. Add a breakpoint
-	// on the last user/assistant message (walking backwards until we find text content).
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const msg = messages[i];
-		if (msg.role !== "user" && msg.role !== "assistant") continue;
-
-		const content = msg.content;
-		if (typeof content === "string") {
-			msg.content = [
-				Object.assign({ type: "text" as const, text: content }, { cache_control: { type: "ephemeral" } }),
-			];
+function addCacheControlToSystemPrompt(
+	messages: ChatCompletionMessageParam[],
+	cacheControl: OpenAICompatCacheControl,
+): void {
+	for (const message of messages) {
+		if (message.role === "system" || message.role === "developer") {
+			addCacheControlToInstructionMessage(message, cacheControl);
 			return;
 		}
+	}
+}
 
-		if (!Array.isArray(content)) continue;
-
-		// Find last text part and add cache_control
-		for (let j = content.length - 1; j >= 0; j--) {
-			const part = content[j];
-			if (part?.type === "text") {
-				Object.assign(part, { cache_control: { type: "ephemeral" } });
+function addCacheControlToLastConversationMessage(
+	messages: ChatCompletionMessageParam[],
+	cacheControl: OpenAICompatCacheControl,
+): void {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const message = messages[i];
+		if (message.role === "user" || message.role === "assistant") {
+			if (addCacheControlToMessage(message, cacheControl)) {
 				return;
 			}
 		}
 	}
 }
 
+function addCacheControlToLastTool(
+	tools: OpenAI.Chat.Completions.ChatCompletionTool[] | undefined,
+	cacheControl: OpenAICompatCacheControl,
+): void {
+	if (!tools || tools.length === 0) {
+		return;
+	}
+
+	const lastTool = tools[tools.length - 1] as ChatCompletionToolWithCacheControl;
+	lastTool.cache_control = cacheControl;
+}
+
+function addCacheControlToInstructionMessage(
+	message: ChatCompletionInstructionMessageParam,
+	cacheControl: OpenAICompatCacheControl,
+): boolean {
+	return addCacheControlToTextContent(message, cacheControl);
+}
+
+function addCacheControlToMessage(
+	message: ChatCompletionMessageParam,
+	cacheControl: OpenAICompatCacheControl,
+): boolean {
+	if (message.role === "user" || message.role === "assistant") {
+		return addCacheControlToTextContent(message, cacheControl);
+	}
+	return false;
+}
+
+function addCacheControlToTextContent(
+	message:
+		| ChatCompletionInstructionMessageParam
+		| ChatCompletionAssistantMessageParam
+		| Extract<ChatCompletionMessageParam, { role: "user" }>,
+	cacheControl: OpenAICompatCacheControl,
+): boolean {
+	const content = message.content;
+	if (typeof content === "string") {
+		if (content.length === 0) {
+			return false;
+		}
+		message.content = [
+			{
+				type: "text",
+				text: content,
+				cache_control: cacheControl,
+			},
+		] as ChatCompletionTextPartWithCacheControl[];
+		return true;
+	}
+
+	if (!Array.isArray(content)) {
+		return false;
+	}
+
+	for (let i = content.length - 1; i >= 0; i--) {
+		const part = content[i];
+		if (part?.type === "text") {
+			const textPart = part as ChatCompletionTextPartWithCacheControl;
+			textPart.cache_control = cacheControl;
+			return true;
+		}
+	}
+
+	return false;
+}
+
 export function convertMessages(
 	model: Model<"openai-completions">,
 	context: Context,
-	compat: Required<OpenAICompletionsCompat>,
+	compat: ResolvedOpenAICompletionsCompat,
 ): ChatCompletionMessageParam[] {
 	const params: ChatCompletionMessageParam[] = [];
 
@@ -756,7 +864,7 @@ export function convertMessages(
 
 function convertTools(
 	tools: Tool[],
-	compat: Required<OpenAICompletionsCompat>,
+	compat: ResolvedOpenAICompletionsCompat,
 ): OpenAI.Chat.Completions.ChatCompletionTool[] {
 	return tools.map((tool) => ({
 		type: "function",
@@ -839,7 +947,7 @@ function mapStopReason(reason: ChatCompletionChunk.Choice["finish_reason"] | str
  * Provider takes precedence over URL-based detection since it's explicitly configured.
  * Returns a fully resolved OpenAICompletionsCompat object with all fields set.
  */
-function detectCompat(model: Model<"openai-completions">): Required<OpenAICompletionsCompat> {
+function detectCompat(model: Model<"openai-completions">): ResolvedOpenAICompletionsCompat {
 	const provider = model.provider;
 	const baseUrl = model.baseUrl;
 
@@ -860,6 +968,7 @@ function detectCompat(model: Model<"openai-completions">): Required<OpenAIComple
 
 	const isGrok = provider === "xai" || baseUrl.includes("api.x.ai");
 	const isGroq = provider === "groq" || baseUrl.includes("groq.com");
+	const cacheControlFormat = provider === "openrouter" && model.id.startsWith("anthropic/") ? "anthropic" : undefined;
 
 	const reasoningEffortMap =
 		isGroq && model.id === "qwen/qwen3-32b"
@@ -890,6 +999,7 @@ function detectCompat(model: Model<"openai-completions">): Required<OpenAIComple
 		vercelGatewayRouting: {},
 		zaiToolStream: false,
 		supportsStrictMode: true,
+		cacheControlFormat,
 		sendSessionAffinityHeaders: false,
 	};
 }
@@ -898,7 +1008,7 @@ function detectCompat(model: Model<"openai-completions">): Required<OpenAIComple
  * Get resolved compatibility settings for a model.
  * Uses explicit model.compat if provided, otherwise auto-detects from provider/URL.
  */
-function getCompat(model: Model<"openai-completions">): Required<OpenAICompletionsCompat> {
+function getCompat(model: Model<"openai-completions">): ResolvedOpenAICompletionsCompat {
 	const detected = detectCompat(model);
 	if (!model.compat) return detected;
 
@@ -918,6 +1028,7 @@ function getCompat(model: Model<"openai-completions">): Required<OpenAICompletio
 		vercelGatewayRouting: model.compat.vercelGatewayRouting ?? detected.vercelGatewayRouting,
 		zaiToolStream: model.compat.zaiToolStream ?? detected.zaiToolStream,
 		supportsStrictMode: model.compat.supportsStrictMode ?? detected.supportsStrictMode,
+		cacheControlFormat: model.compat.cacheControlFormat ?? detected.cacheControlFormat,
 		sendSessionAffinityHeaders: model.compat.sendSessionAffinityHeaders ?? detected.sendSessionAffinityHeaders,
 	};
 }
