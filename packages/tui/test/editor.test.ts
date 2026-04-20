@@ -2476,14 +2476,17 @@ describe("Editor component", () => {
 
 		it("awaits async slash command argument completions", async () => {
 			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-			const provider = new CombinedAutocompleteProvider([
-				{
-					name: "load-skills",
-					description: "Load skills",
-					getArgumentCompletions: async (prefix) =>
-						prefix.startsWith("s") ? [{ value: "skill-a", label: "skill-a" }] : null,
-				},
-			]);
+			const provider = new CombinedAutocompleteProvider(
+				[
+					{
+						name: "load-skills",
+						description: "Load skills",
+						getArgumentCompletions: async (prefix) =>
+							prefix.startsWith("s") ? [{ value: "skill-a", label: "skill-a" }] : null,
+					},
+				],
+				process.cwd(),
+			);
 			editor.setAutocompleteProvider(provider);
 			editor.setText("/load-skills ");
 
@@ -2498,15 +2501,18 @@ describe("Editor component", () => {
 
 		it("ignores invalid slash command argument completion results", async () => {
 			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-			const provider = new CombinedAutocompleteProvider([
-				{
-					name: "load-skills",
-					description: "Load skills",
-					getArgumentCompletions: (() => "not-an-array") as unknown as (
-						argumentPrefix: string,
-					) => Promise<{ value: string; label: string }[] | null>,
-				},
-			]);
+			const provider = new CombinedAutocompleteProvider(
+				[
+					{
+						name: "load-skills",
+						description: "Load skills",
+						getArgumentCompletions: (() => "not-an-array") as unknown as (
+							argumentPrefix: string,
+						) => Promise<{ value: string; label: string }[] | null>,
+					},
+				],
+				process.cwd(),
+			);
 			editor.setAutocompleteProvider(provider);
 			editor.setText("/load-skills ");
 
@@ -2518,14 +2524,17 @@ describe("Editor component", () => {
 
 		it("does not show argument completions when command has no argument completer", async () => {
 			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-			const provider = new CombinedAutocompleteProvider([
-				{ name: "help", description: "Show help" },
-				{
-					name: "model",
-					description: "Switch model",
-					getArgumentCompletions: () => [{ value: "claude-opus", label: "claude-opus" }],
-				},
-			]);
+			const provider = new CombinedAutocompleteProvider(
+				[
+					{ name: "help", description: "Show help" },
+					{
+						name: "model",
+						description: "Switch model",
+						getArgumentCompletions: () => [{ value: "claude-opus", label: "claude-opus" }],
+					},
+				],
+				process.cwd(),
+			);
 			editor.setAutocompleteProvider(provider);
 
 			editor.handleInput("/");

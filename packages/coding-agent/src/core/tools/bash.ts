@@ -444,7 +444,3 @@ export function createBashToolDefinition(
 export function createBashTool(cwd: string, options?: BashToolOptions): AgentTool<typeof bashSchema> {
 	return wrapToolDefinition(createBashToolDefinition(cwd, options));
 }
-
-/** Default bash tool using process.cwd() for backwards compatibility. */
-export const bashToolDefinition = createBashToolDefinition(process.cwd());
-export const bashTool = createBashTool(process.cwd());

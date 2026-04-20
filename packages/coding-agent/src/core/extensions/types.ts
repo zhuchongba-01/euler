@@ -104,7 +104,7 @@ export type TerminalInputHandler = (data: string) => { consume?: boolean; data?:
 
 /** Working indicator configuration for the interactive streaming loader. */
 export interface WorkingIndicatorOptions {
-	/** Animation frames. Use an empty array to hide the indicator entirely. */
+	/** Animation frames. Use an empty array to hide the indicator entirely. Custom frames are rendered verbatim. */
 	frames?: string[];
 	/** Frame interval in milliseconds for animated indicators. */
 	intervalMs?: number;
@@ -142,6 +142,7 @@ export interface ExtensionUIContext {
 	 * - Omit the argument to restore the default animated spinner.
 	 * - Use `frames: ["●"]` for a static indicator.
 	 * - Use `frames: []` to hide the indicator entirely.
+	 * - Custom frames are rendered as provided, so extensions must add their own colors.
 	 */
 	setWorkingIndicator(options?: WorkingIndicatorOptions): void;
 

@@ -2,15 +2,25 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { executeBash } from "../src/core/bash-executor.js";
-import { bashTool, createBashTool, createLocalBashOperations } from "../src/core/tools/bash.js";
-import { editTool } from "../src/core/tools/edit.js";
-import { findTool } from "../src/core/tools/find.js";
-import { grepTool } from "../src/core/tools/grep.js";
-import { lsTool } from "../src/core/tools/ls.js";
-import { readTool } from "../src/core/tools/read.js";
-import { writeTool } from "../src/core/tools/write.js";
+import { executeBashWithOperations } from "../src/core/bash-executor.js";
+import { createBashTool, createLocalBashOperations } from "../src/core/tools/bash.js";
+import {
+	createEditTool,
+	createFindTool,
+	createGrepTool,
+	createLsTool,
+	createReadTool,
+	createWriteTool,
+} from "../src/index.js";
 import * as shellModule from "../src/utils/shell.js";
+
+const readTool = createReadTool(process.cwd());
+const writeTool = createWriteTool(process.cwd());
+const editTool = createEditTool(process.cwd());
+const bashTool = createBashTool(process.cwd());
+const grepTool = createGrepTool(process.cwd());
+const findTool = createFindTool(process.cwd());
+const lsTool = createLsTool(process.cwd());
 
 // Helper to extract text from content blocks
 function getTextOutput(result: any): string {
@@ -438,7 +448,11 @@ describe("Coding Agent Tools", () => {
 		});
 
 		it("should preserve executeBash sanitization when using local bash operations", async () => {
-			const result = await executeBash("printf '\\033[31mred\\033[0m\\r\\n'");
+			const result = await executeBashWithOperations(
+				"printf '\\033[31mred\\033[0m\\r\\n'",
+				process.cwd(),
+				createLocalBashOperations(),
+			);
 
 			expect(result.exitCode).toBe(0);
 			expect(result.output).toBe("red\n");
@@ -468,7 +482,7 @@ describe("Coding Agent Tools", () => {
 		});
 
 		it("executeBash should persist full output when truncation happens by line count only", async () => {
-			const result = await executeBash("seq 3000");
+			const result = await executeBashWithOperations("seq 3000", process.cwd(), createLocalBashOperations());
 			const fullOutputPath = result.fullOutputPath;
 
 			expect(result.truncated).toBe(true);

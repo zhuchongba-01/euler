@@ -133,9 +133,6 @@ export class AgentSessionRuntime {
 	}
 
 	private apply(result: CreateAgentSessionRuntimeResult): void {
-		if (process.cwd() !== result.services.cwd) {
-			process.chdir(result.services.cwd);
-		}
 		this._session = result.session;
 		this._services = result.services;
 		this._diagnostics = result.diagnostics;
@@ -346,9 +343,6 @@ export async function createAgentSessionRuntime(
 ): Promise<AgentSessionRuntime> {
 	assertSessionCwdExists(options.sessionManager, options.cwd);
 	const result = await createRuntime(options);
-	if (process.cwd() !== result.services.cwd) {
-		process.chdir(result.services.cwd);
-	}
 	return new AgentSessionRuntime(
 		result.session,
 		result.services,

@@ -53,7 +53,7 @@ export function getShellConfig(): { shell: string; args: string[] } {
 		return cachedShellConfig;
 	}
 
-	const settings = SettingsManager.create();
+	const settings = SettingsManager.create(process.cwd());
 	const customShellPath = settings.getShellPath();
 
 	// 1. Check user-specified shell path
