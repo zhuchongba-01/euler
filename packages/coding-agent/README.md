@@ -167,7 +167,7 @@ Type `/` in the editor to trigger commands. [Extensions](#extensions) can regist
 | `/resume` | Pick from previous sessions |
 | `/new` | Start a new session |
 | `/name <name>` | Set session display name |
-| `/session` | Show session info (path, tokens, cost) |
+| `/session` | Show session info (file, ID, messages, tokens, cost) |
 | `/tree` | Jump to any point in the session and continue from there |
 | `/fork` | Create a new session from a previous user message |
 | `/clone` | Duplicate the current active branch into a new session |
@@ -225,9 +225,11 @@ Sessions auto-save to `~/.pi/agent/sessions/` organized by working directory.
 pi -c                  # Continue most recent session
 pi -r                  # Browse and select from past sessions
 pi --no-session        # Ephemeral mode (don't save)
-pi --session <path>    # Use specific session file or ID
-pi --fork <path>       # Fork specific session file or ID into a new session
+pi --session <path|id> # Use specific session file or ID
+pi --fork <path|id>    # Fork specific session file or ID into a new session
 ```
+
+Use `/session` in interactive mode to see the current session ID before reusing it with `--session <id>` or `--fork <id>`.
 
 ### Branching
 
@@ -508,8 +510,8 @@ cat README.md | pi -p "Summarize this text"
 |--------|-------------|
 | `-c`, `--continue` | Continue most recent session |
 | `-r`, `--resume` | Browse and select session |
-| `--session <path>` | Use specific session file or partial UUID |
-| `--fork <path>` | Fork specific session file or partial UUID into a new session |
+| `--session <path\|id>` | Use specific session file or partial UUID |
+| `--fork <path\|id>` | Fork specific session file or partial UUID into a new session |
 | `--session-dir <dir>` | Custom session storage directory |
 | `--no-session` | Ephemeral mode (don't save) |
 

@@ -1879,6 +1879,9 @@ export class InteractiveMode {
 					this.pendingWorkingMessage = message;
 				}
 			},
+			setWorkingIndicator: () => {
+				// Working indicator customization not implemented in interactive mode yet.
+			},
 			setHiddenThinkingLabel: (label) => this.setHiddenThinkingLabel(label),
 			setWidget: (key, content, options) => this.setExtensionWidget(key, content, options),
 			setFooter: (factory) => this.setExtensionFooter(factory),
