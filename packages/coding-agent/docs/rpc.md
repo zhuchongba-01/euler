@@ -580,7 +580,7 @@ If an extension cancelled the switch:
 
 #### fork
 
-Create a new fork from a previous user message. Can be cancelled by a `session_before_fork` extension event handler. Returns the text of the message being forked from.
+Create a new fork from a previous user message on the active branch. Can be cancelled by a `session_before_fork` extension event handler. Returns the text of the message being forked from.
 
 ```json
 {"type": "fork", "entryId": "abc123"}
@@ -603,6 +603,34 @@ If an extension cancelled the fork:
   "command": "fork",
   "success": true,
   "data": {"text": "The original prompt text...", "cancelled": true}
+}
+```
+
+#### clone
+
+Duplicate the current active branch into a new session at the current position. Can be cancelled by a `session_before_fork` extension event handler.
+
+```json
+{"type": "clone"}
+```
+
+Response:
+```json
+{
+  "type": "response",
+  "command": "clone",
+  "success": true,
+  "data": {"cancelled": false}
+}
+```
+
+If an extension cancelled the clone:
+```json
+{
+  "type": "response",
+  "command": "clone",
+  "success": true,
+  "data": {"cancelled": true}
 }
 ```
 

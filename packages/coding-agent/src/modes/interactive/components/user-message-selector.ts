@@ -120,8 +120,14 @@ export class UserMessageSelectorComponent extends Container {
 
 		// Add header
 		this.addChild(new Spacer(1));
-		this.addChild(new Text(theme.bold("Branch from Message"), 1, 0));
-		this.addChild(new Text(theme.fg("muted", "Select a message or duplicate the current session"), 1, 0));
+		this.addChild(new Text(theme.bold("Fork from Message"), 1, 0));
+		this.addChild(
+			new Text(
+				theme.fg("muted", "Select a user message to copy the active path up to that point into a new session"),
+				1,
+				0,
+			),
+		);
 		this.addChild(new Spacer(1));
 		this.addChild(new DynamicBorder());
 		this.addChild(new Spacer(1));

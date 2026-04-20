@@ -567,6 +567,18 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 				return success(id, "fork", { text: result.selectedText, cancelled: result.cancelled });
 			}
 
+			case "clone": {
+				const leafId = session.sessionManager.getLeafId();
+				if (!leafId) {
+					return error(id, "clone", "Cannot clone session: no current entry selected");
+				}
+				const result = await runtimeHost.fork(leafId, { position: "at" });
+				if (!result.cancelled) {
+					await rebindSession();
+				}
+				return success(id, "clone", { cancelled: result.cancelled });
+			}
+
 			case "get_fork_messages": {
 				const messages = session.getUserMessagesForForking();
 				return success(id, "get_fork_messages", { messages });

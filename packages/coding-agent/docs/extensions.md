@@ -269,7 +269,7 @@ user sends another prompt ◄─────────────────
   ├─► session_start { reason: "new" | "resume", previousSessionFile? }
   └─► resources_discover { reason: "startup" }
 
-/fork
+/fork or /clone
   ├─► session_before_fork (can cancel)
   ├─► session_shutdown
   ├─► session_start { reason: "fork", previousSessionFile }
@@ -346,18 +346,19 @@ Do cleanup work in `session_shutdown`, then reestablish any in-memory state in `
 
 #### session_before_fork
 
-Fired when forking via `/fork`.
+Fired when forking via `/fork` or cloning via `/clone`.
 
 ```typescript
 pi.on("session_before_fork", async (event, ctx) => {
-  // event.entryId - ID of the entry being forked from
-  return { cancel: true }; // Cancel fork
+  // event.entryId - ID of the selected entry
+  // event.position - "before" for /fork, "at" for /clone
+  return { cancel: true }; // Cancel fork/clone
   // OR
-  return { skipConversationRestore: true }; // Fork but don't rewind messages
+  return { skipConversationRestore: true }; // Reserved for future conversation restore control
 });
 ```
 
-After a successful fork, pi emits `session_shutdown` for the old extension instance, reloads and rebinds extensions for the new session, then emits `session_start` with `reason: "fork"` and `previousSessionFile`.
+After a successful fork or clone, pi emits `session_shutdown` for the old extension instance, reloads and rebinds extensions for the new session, then emits `session_start` with `reason: "fork"` and `previousSessionFile`.
 Do cleanup work in `session_shutdown`, then reestablish any in-memory state in `session_start`.
 
 #### session_before_compact / session_compact
@@ -909,7 +910,7 @@ if (result.cancelled) {
 }
 ```
 
-### ctx.fork(entryId)
+### ctx.fork(entryId, options?)
 
 Fork from a specific entry, creating a new session file:
 
@@ -918,7 +919,16 @@ const result = await ctx.fork("entry-id-123");
 if (!result.cancelled) {
   // Now in the forked session
 }
+
+const cloneResult = await ctx.fork("entry-id-456", { position: "at" });
+if (!cloneResult.cancelled) {
+  // New session contains the active path through entry-id-456
+}
 ```
+
+Options:
+- `position`: `"before"` (default) forks before the selected user message, restoring that prompt into the editor
+- `position`: `"at"` duplicates the active path through the selected entry without restoring editor text
 
 ### ctx.navigateTree(targetId, options?)
 
