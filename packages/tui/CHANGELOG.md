@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `LoaderIndicatorOptions` and `Loader.setIndicator()` support for custom loader frames and animation intervals, allowing TUI consumers to use animated, static, or hidden loader indicators ([#3413](https://github.com/badlogic/pi-mono/issues/3413))
+
 ### Fixed
 
 - Fixed `@` autocomplete fuzzy search to stop matching against the full base path for plain queries, so worktree or cwd paths containing the query text no longer crowd out real results such as `@plan` suggestions ([#2778](https://github.com/badlogic/pi-mono/issues/2778))
