@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Fixed missing `@sinclair/typebox` runtime dependency in `@mariozechner/pi-coding-agent`, so strict pnpm installs no longer fail with `ERR_MODULE_NOT_FOUND` when starting `pi` ([#3434](https://github.com/badlogic/pi-mono/issues/3434))
 - Fixed shared/exported plain-text tool output to preserve indentation instead of collapsing leading whitespace in the web share page ([#3440](https://github.com/badlogic/pi-mono/issues/3440))
 - Fixed skill resolution to dedupe symlinked aliases by canonical path, so `pi config` no longer shows duplicate skill entries when `~/.pi/agent/skills` points to `~/.agents/skills` ([#3405](https://github.com/badlogic/pi-mono/issues/3405))
 - Fixed OpenRouter request attribution to include Pi app headers (`HTTP-Referer: https://pi.dev`, `X-OpenRouter-Title: pi`, `X-OpenRouter-Categories: cli-agent`) when sessions are created through the coding-agent SDK and install telemetry is enabled ([#3414](https://github.com/badlogic/pi-mono/issues/3414))
