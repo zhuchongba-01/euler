@@ -1001,6 +1001,20 @@ export class DefaultPackageManager implements PackageManager {
 		const parsed = this.parseSource(source);
 		if (parsed.type === "npm") {
 			if (parsed.pinned) return;
+
+			const installedPath = this.getNpmInstallPath(parsed, scope);
+			const installedVersion = existsSync(installedPath) ? this.getInstalledNpmVersion(installedPath) : undefined;
+			if (installedVersion) {
+				try {
+					const latestVersion = await this.getLatestNpmVersion(parsed.name);
+					if (latestVersion === installedVersion) {
+						return;
+					}
+				} catch {
+					// Preserve existing update behavior when version lookup fails.
+				}
+			}
+
 			await this.withProgress("update", source, `Updating ${source}...`, async () => {
 				await this.installNpm(
 					{

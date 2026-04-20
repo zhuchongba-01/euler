@@ -1455,18 +1455,46 @@ export default function(api) { api.registerTool({ name: "test", description: "te
 	});
 
 	describe("offline mode and network timeouts", () => {
-		it("should update project npm packages using @latest", async () => {
+		it("should update project npm packages using @latest when newer version is available", async () => {
+			const installedPath = join(tempDir, ".pi", "npm", "node_modules", "example");
+			mkdirSync(installedPath, { recursive: true });
+			writeFileSync(join(installedPath, "package.json"), JSON.stringify({ name: "example", version: "1.0.0" }));
 			settingsManager.setProjectPackages(["npm:example"]);
 
+			const runCommandCaptureSpy = vi.spyOn(packageManager as any, "runCommandCapture").mockResolvedValue('"1.2.3"');
 			const runCommandSpy = vi.spyOn(packageManager as any, "runCommand").mockResolvedValue(undefined);
 
 			await packageManager.update("npm:example");
 
+			expect(runCommandCaptureSpy).toHaveBeenCalledWith(
+				"npm",
+				["view", "example", "version", "--json"],
+				expect.objectContaining({ cwd: tempDir, timeoutMs: expect.any(Number) }),
+			);
 			expect(runCommandSpy).toHaveBeenCalledWith(
 				"npm",
 				["install", "example@latest", "--prefix", join(tempDir, ".pi", "npm")],
 				undefined,
 			);
+		});
+
+		it("should skip project npm update when installed version matches latest", async () => {
+			const installedPath = join(tempDir, ".pi", "npm", "node_modules", "example");
+			mkdirSync(installedPath, { recursive: true });
+			writeFileSync(join(installedPath, "package.json"), JSON.stringify({ name: "example", version: "1.2.3" }));
+			settingsManager.setProjectPackages(["npm:example"]);
+
+			const runCommandCaptureSpy = vi.spyOn(packageManager as any, "runCommandCapture").mockResolvedValue('"1.2.3"');
+			const runCommandSpy = vi.spyOn(packageManager as any, "runCommand").mockResolvedValue(undefined);
+
+			await packageManager.update("npm:example");
+
+			expect(runCommandCaptureSpy).toHaveBeenCalledWith(
+				"npm",
+				["view", "example", "version", "--json"],
+				expect.objectContaining({ cwd: tempDir, timeoutMs: expect.any(Number) }),
+			);
+			expect(runCommandSpy).not.toHaveBeenCalled();
 		});
 
 		it("should suggest npm source prefixes for update lookups", async () => {
