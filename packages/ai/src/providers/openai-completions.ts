@@ -97,8 +97,11 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 
 		try {
 			const apiKey = options?.apiKey || getEnvApiKey(model.provider) || "";
-			const client = createClient(model, context, apiKey, options?.headers);
-			let params = buildParams(model, context, options);
+			const compat = getCompat(model);
+			const cacheRetention = resolveCacheRetention(options?.cacheRetention);
+			const cacheSessionId = cacheRetention === "none" ? undefined : options?.sessionId;
+			const client = createClient(model, context, apiKey, options?.headers, cacheSessionId, compat);
+			let params = buildParams(model, context, options, compat, cacheRetention);
 			const nextParams = await options?.onPayload?.(params, model);
 			if (nextParams !== undefined) {
 				params = nextParams as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming;
@@ -350,6 +353,8 @@ function createClient(
 	context: Context,
 	apiKey?: string,
 	optionsHeaders?: Record<string, string>,
+	sessionId?: string,
+	compat: Required<OpenAICompletionsCompat> = getCompat(model),
 ) {
 	if (!apiKey) {
 		if (!process.env.OPENAI_API_KEY) {
@@ -370,6 +375,12 @@ function createClient(
 		Object.assign(headers, copilotHeaders);
 	}
 
+	if (sessionId && compat.sendSessionAffinityHeaders) {
+		headers.session_id = sessionId;
+		headers["x-client-request-id"] = sessionId;
+		headers["x-session-affinity"] = sessionId;
+	}
+
 	// Merge options headers last so they can override defaults
 	if (optionsHeaders) {
 		Object.assign(headers, optionsHeaders);
@@ -383,12 +394,16 @@ function createClient(
 	});
 }
 
-function buildParams(model: Model<"openai-completions">, context: Context, options?: OpenAICompletionsOptions) {
-	const compat = getCompat(model);
+function buildParams(
+	model: Model<"openai-completions">,
+	context: Context,
+	options?: OpenAICompletionsOptions,
+	compat: Required<OpenAICompletionsCompat> = getCompat(model),
+	cacheRetention: CacheRetention = resolveCacheRetention(options?.cacheRetention),
+) {
 	const messages = convertMessages(model, context, compat);
 	maybeAddOpenRouterAnthropicCacheControl(model, messages);
 
-	const cacheRetention = resolveCacheRetention(options?.cacheRetention);
 	const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
 		model: model.id,
 		messages,
@@ -580,13 +595,10 @@ export function convertMessages(
 						} satisfies ChatCompletionContentPartImage;
 					}
 				});
-				const filteredContent = !model.input.includes("image")
-					? content.filter((c) => c.type !== "image_url")
-					: content;
-				if (filteredContent.length === 0) continue;
+				if (content.length === 0) continue;
 				params.push({
 					role: "user",
-					content: filteredContent,
+					content,
 				});
 			}
 		} else if (msg.role === "assistant") {
@@ -878,6 +890,7 @@ function detectCompat(model: Model<"openai-completions">): Required<OpenAIComple
 		vercelGatewayRouting: {},
 		zaiToolStream: false,
 		supportsStrictMode: true,
+		sendSessionAffinityHeaders: false,
 	};
 }
 
@@ -905,5 +918,6 @@ function getCompat(model: Model<"openai-completions">): Required<OpenAICompletio
 		vercelGatewayRouting: model.compat.vercelGatewayRouting ?? detected.vercelGatewayRouting,
 		zaiToolStream: model.compat.zaiToolStream ?? detected.zaiToolStream,
 		supportsStrictMode: model.compat.supportsStrictMode ?? detected.supportsStrictMode,
+		sendSessionAffinityHeaders: model.compat.sendSessionAffinityHeaders ?? detected.sendSessionAffinityHeaders,
 	};
 }
