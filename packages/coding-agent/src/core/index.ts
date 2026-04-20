@@ -35,6 +35,8 @@ export {
 	type AgentToolResult,
 	type AgentToolUpdateCallback,
 	type BeforeAgentStartEvent,
+	type BeforeAgentStartEventResult,
+	type BuildSystemPromptOptions,
 	type ContextEvent,
 	defineTool,
 	discoverAndLoadExtensions,
