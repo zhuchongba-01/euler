@@ -84,6 +84,10 @@ const buildBuiltinKeybindings = (resolvedKeybindings: KeybindingsConfig): BuiltI
 		const restrictOverride = (RESERVED_KEYBINDINGS_FOR_EXTENSION_CONFLICTS as readonly string[]).includes(keybinding);
 		for (const key of keyList) {
 			const normalizedKey = key.toLowerCase() as KeyId;
+			// If multiple actions bind the same key, the reserved action wins so extensions
+			// remain blocked by reserved shortcuts regardless of iteration order.
+			const existing = builtinKeybindings[normalizedKey];
+			if (existing?.restrictOverride && !restrictOverride) continue;
 			builtinKeybindings[normalizedKey] = {
 				keybinding,
 				restrictOverride,

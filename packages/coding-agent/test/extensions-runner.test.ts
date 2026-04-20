@@ -180,6 +180,29 @@ describe("ExtensionRunner", () => {
 			warnSpy.mockRestore();
 		});
 
+		it("blocks shortcuts when reserved key is also bound to non-reserved actions", async () => {
+			const extCode = `
+				export default function(pi) {
+					pi.registerShortcut("ctrl+p", {
+						description: "Conflicts with shared reserved default",
+						handler: async () => {},
+					});
+				}
+			`;
+			fs.writeFileSync(path.join(extensionsDir, "shared-reserved.ts"), extCode);
+
+			const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+			const result = await discoverAndLoadExtensions([], tempDir, tempDir);
+			const runner = new ExtensionRunner(result.extensions, result.runtime, tempDir, sessionManager, modelRegistry);
+			const shortcuts = runner.getShortcuts(defaultKeybindings);
+
+			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("conflicts with built-in"));
+			expect(shortcuts.has("ctrl+p")).toBe(false);
+
+			warnSpy.mockRestore();
+		});
+
 		it("blocks shortcuts when reserved action has multiple keys", async () => {
 			const extCode = `
 				export default function(pi) {
