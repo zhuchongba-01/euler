@@ -1922,7 +1922,7 @@ Extensions can interact with users via `ctx.ui` methods and customize how messag
 - Async operations with cancel (BorderedLoader)
 - Settings toggles (SettingsList)
 - Status indicators (setStatus)
-- Working message during streaming (setWorkingMessage)
+- Working message and indicator during streaming (`setWorkingMessage`, `setWorkingIndicator`)
 - Widgets above/below editor (setWidget)
 - Custom footers (setFooter)
 
@@ -2006,6 +2006,12 @@ ctx.ui.setStatus("my-ext", undefined);  // Clear
 // Working message (shown during streaming)
 ctx.ui.setWorkingMessage("Thinking deeply...");
 ctx.ui.setWorkingMessage();  // Restore default
+
+// Working indicator (shown during streaming)
+ctx.ui.setWorkingIndicator({ frames: ["●"] });  // Static dot
+ctx.ui.setWorkingIndicator({ frames: ["·", "•", "●", "•"], intervalMs: 120 });
+ctx.ui.setWorkingIndicator({ frames: [] });  // Hide indicator
+ctx.ui.setWorkingIndicator();  // Restore default spinner
 
 // Widget above editor (default)
 ctx.ui.setWidget("my-widget", ["Line 1", "Line 2"]);
@@ -2271,6 +2277,7 @@ All examples in [examples/extensions/](../examples/extensions/).
 | `auto-commit-on-exit.ts` | Commit on shutdown | `on("session_shutdown")`, `exec` |
 | **UI Components** |||
 | `status-line.ts` | Footer status indicator | `setStatus`, session events |
+| `working-indicator.ts` | Customize the streaming working indicator | `setWorkingIndicator`, `registerCommand` |
 | `custom-footer.ts` | Replace footer entirely | `registerCommand`, `setFooter` |
 | `custom-header.ts` | Replace startup header | `on("session_start")`, `setHeader` |
 | `modal-editor.ts` | Vim-style modal editor | `setEditorComponent`, `CustomEditor` |
