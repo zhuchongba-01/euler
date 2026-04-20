@@ -309,7 +309,7 @@ export interface ExtensionCommandContext extends ExtensionContext {
 	}): Promise<{ cancelled: boolean }>;
 
 	/** Fork from a specific entry, creating a new session file. */
-	fork(entryId: string): Promise<{ cancelled: boolean }>;
+	fork(entryId: string, options?: { position?: "before" | "at" }): Promise<{ cancelled: boolean }>;
 
 	/** Navigate to a different point in the session tree. */
 	navigateTree(
@@ -473,6 +473,7 @@ export interface SessionBeforeSwitchEvent {
 export interface SessionBeforeForkEvent {
 	type: "session_before_fork";
 	entryId: string;
+	position: "before" | "at";
 }
 
 /** Fired before context compaction (can be cancelled or customized) */
@@ -1423,7 +1424,7 @@ export interface ExtensionCommandContextActions {
 		parentSession?: string;
 		setup?: (sessionManager: SessionManager) => Promise<void>;
 	}) => Promise<{ cancelled: boolean }>;
-	fork: (entryId: string) => Promise<{ cancelled: boolean }>;
+	fork: (entryId: string, options?: { position?: "before" | "at" }) => Promise<{ cancelled: boolean }>;
 	navigateTree: (
 		targetId: string,
 		options?: { summarize?: boolean; customInstructions?: string; replaceInstructions?: boolean; label?: string },

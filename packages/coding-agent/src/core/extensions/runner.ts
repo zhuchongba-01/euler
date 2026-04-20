@@ -143,7 +143,10 @@ export type NewSessionHandler = (options?: {
 	setup?: (sessionManager: SessionManager) => Promise<void>;
 }) => Promise<{ cancelled: boolean }>;
 
-export type ForkHandler = (entryId: string) => Promise<{ cancelled: boolean }>;
+export type ForkHandler = (
+	entryId: string,
+	options?: { position?: "before" | "at" },
+) => Promise<{ cancelled: boolean }>;
 
 export type NavigateTreeHandler = (
 	targetId: string,
@@ -559,7 +562,7 @@ export class ExtensionRunner {
 			...this.createContext(),
 			waitForIdle: () => this.waitForIdleFn(),
 			newSession: (options) => this.newSessionHandler(options),
-			fork: (entryId) => this.forkHandler(entryId),
+			fork: (entryId, options) => this.forkHandler(entryId, options),
 			navigateTree: (targetId, options) => this.navigateTreeHandler(targetId, options),
 			switchSession: (sessionPath) => this.switchSessionHandler(sessionPath),
 			reload: () => this.reloadHandler(),

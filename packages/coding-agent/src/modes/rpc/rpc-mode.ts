@@ -298,8 +298,8 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 					}
 					return result;
 				},
-				fork: async (entryId) => {
-					const result = await runtimeHost.fork(entryId);
+				fork: async (entryId, forkOptions) => {
+					const result = await runtimeHost.fork(entryId, forkOptions);
 					if (!result.cancelled) {
 						await rebindSession();
 					}
