@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed skill resolution to dedupe symlinked aliases by canonical path, so `pi config` no longer shows duplicate skill entries when `~/.pi/agent/skills` points to `~/.agents/skills` ([#3405](https://github.com/badlogic/pi-mono/issues/3405))
+
 ## [0.67.68] - 2026-04-17
 
 ## [0.67.67] - 2026-04-17
