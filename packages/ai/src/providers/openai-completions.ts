@@ -12,6 +12,7 @@ import { getEnvApiKey } from "../env-api-keys.js";
 import { calculateCost, supportsXhigh } from "../models.js";
 import type {
 	AssistantMessage,
+	CacheRetention,
 	Context,
 	Message,
 	Model,
@@ -56,6 +57,16 @@ function hasToolHistory(messages: Message[]): boolean {
 export interface OpenAICompletionsOptions extends StreamOptions {
 	toolChoice?: "auto" | "none" | "required" | { type: "function"; function: { name: string } };
 	reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh";
+}
+
+function resolveCacheRetention(cacheRetention?: CacheRetention): CacheRetention {
+	if (cacheRetention) {
+		return cacheRetention;
+	}
+	if (typeof process !== "undefined" && process.env.PI_CACHE_RETENTION === "long") {
+		return "long";
+	}
+	return "short";
 }
 
 export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenAICompletionsOptions> = (
@@ -377,10 +388,14 @@ function buildParams(model: Model<"openai-completions">, context: Context, optio
 	const messages = convertMessages(model, context, compat);
 	maybeAddOpenRouterAnthropicCacheControl(model, messages);
 
+	const cacheRetention = resolveCacheRetention(options?.cacheRetention);
 	const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
 		model: model.id,
 		messages,
 		stream: true,
+		prompt_cache_key:
+			model.baseUrl.includes("api.openai.com") && cacheRetention !== "none" ? options?.sessionId : undefined,
+		prompt_cache_retention: model.baseUrl.includes("api.openai.com") && cacheRetention === "long" ? "24h" : undefined,
 	};
 
 	if (compat.supportsUsageInStreaming !== false) {

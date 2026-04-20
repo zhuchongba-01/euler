@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fixed OpenRouter Meta tests by switching `meta-llama/llama-4-maverick` to `meta-llama/llama-4-scout` to avoid type-check failures from model-catalog drift.
+- Fixed direct OpenAI Chat Completions requests to map `sessionId` and `cacheRetention` to OpenAI prompt caching fields, sending `prompt_cache_key` when caching is enabled and `prompt_cache_retention: "24h"` for direct `api.openai.com` requests with long retention ([#3426](https://github.com/badlogic/pi-mono/issues/3426))
 
 ## [0.67.68] - 2026-04-17
 
