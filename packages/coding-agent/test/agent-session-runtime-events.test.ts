@@ -76,7 +76,6 @@ describe("AgentSessionRuntime session lifecycle events", () => {
 		cleanups.push(async () => {
 			await runtimeHost.dispose();
 			faux.unregister();
-			process.chdir(tmpdir());
 			if (existsSync(tempDir)) {
 				rmSync(tempDir, { recursive: true, force: true });
 			}

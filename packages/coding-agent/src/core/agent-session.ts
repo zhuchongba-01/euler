@@ -150,6 +150,8 @@ export interface AgentSessionConfig {
 	modelRegistry: ModelRegistry;
 	/** Initial active built-in tool names. Default: [read, bash, edit, write] */
 	initialActiveToolNames?: string[];
+	/** Optional allowlist of tool names. When provided, only these tool names are exposed. */
+	allowedToolNames?: string[];
 	/**
 	 * Override base tools (useful for custom runtimes).
 	 *
@@ -278,6 +280,7 @@ export class AgentSession {
 	private _cwd: string;
 	private _extensionRunnerRef?: { current?: ExtensionRunner };
 	private _initialActiveToolNames?: string[];
+	private _allowedToolNames?: Set<string>;
 	private _baseToolsOverride?: Record<string, AgentTool>;
 	private _sessionStartEvent: SessionStartEvent;
 	private _extensionUIContext?: ExtensionUIContext;
@@ -309,6 +312,7 @@ export class AgentSession {
 		this._modelRegistry = config.modelRegistry;
 		this._extensionRunnerRef = config.extensionRunnerRef;
 		this._initialActiveToolNames = config.initialActiveToolNames;
+		this._allowedToolNames = config.allowedToolNames ? new Set(config.allowedToolNames) : undefined;
 		this._baseToolsOverride = config.baseToolsOverride;
 		this._sessionStartEvent = config.sessionStartEvent ?? { type: "session_start", reason: "startup" };
 
@@ -2221,6 +2225,8 @@ export class AgentSession {
 	private _refreshToolRegistry(options?: { activeToolNames?: string[]; includeAllExtensionTools?: boolean }): void {
 		const previousRegistryNames = new Set(this._toolRegistry.keys());
 		const previousActiveToolNames = this.getActiveToolNames();
+		const allowedToolNames = this._allowedToolNames;
+		const isAllowedTool = (name: string): boolean => !allowedToolNames || allowedToolNames.has(name);
 
 		const registeredTools = this._extensionRunner.getAllRegisteredTools();
 		const allCustomTools = [
@@ -2229,15 +2235,17 @@ export class AgentSession {
 				definition,
 				sourceInfo: createSyntheticSourceInfo(`<sdk:${definition.name}>`, { source: "sdk" }),
 			})),
-		];
+		].filter((tool) => isAllowedTool(tool.definition.name));
 		const definitionRegistry = new Map<string, ToolDefinitionEntry>(
-			Array.from(this._baseToolDefinitions.entries()).map(([name, definition]) => [
-				name,
-				{
-					definition,
-					sourceInfo: createSyntheticSourceInfo(`<builtin:${name}>`, { source: "builtin" }),
-				},
-			]),
+			Array.from(this._baseToolDefinitions.entries())
+				.filter(([name]) => isAllowedTool(name))
+				.map(([name, definition]) => [
+					name,
+					{
+						definition,
+						sourceInfo: createSyntheticSourceInfo(`<builtin:${name}>`, { source: "builtin" }),
+					},
+				]),
 		);
 		for (const tool of allCustomTools) {
 			definitionRegistry.set(tool.definition.name, {
@@ -2265,10 +2273,12 @@ export class AgentSession {
 		const runner = this._extensionRunner;
 		const wrappedExtensionTools = wrapRegisteredTools(allCustomTools, runner);
 		const wrappedBuiltInTools = wrapRegisteredTools(
-			Array.from(this._baseToolDefinitions.values()).map((definition) => ({
-				definition,
-				sourceInfo: createSyntheticSourceInfo(`<builtin:${definition.name}>`, { source: "builtin" }),
-			})),
+			Array.from(this._baseToolDefinitions.values())
+				.filter((definition) => isAllowedTool(definition.name))
+				.map((definition) => ({
+					definition,
+					sourceInfo: createSyntheticSourceInfo(`<builtin:${definition.name}>`, { source: "builtin" }),
+				})),
 			runner,
 		);
 
@@ -2278,11 +2288,17 @@ export class AgentSession {
 		}
 		this._toolRegistry = toolRegistry;
 
-		const nextActiveToolNames = options?.activeToolNames
-			? [...options.activeToolNames]
-			: [...previousActiveToolNames];
+		const nextActiveToolNames = (
+			options?.activeToolNames ? [...options.activeToolNames] : [...previousActiveToolNames]
+		).filter((name) => isAllowedTool(name));
 
-		if (options?.includeAllExtensionTools) {
+		if (allowedToolNames) {
+			for (const toolName of this._toolRegistry.keys()) {
+				if (allowedToolNames.has(toolName)) {
+					nextActiveToolNames.push(toolName);
+				}
+			}
+		} else if (options?.includeAllExtensionTools) {
 			for (const tool of wrappedExtensionTools) {
 				nextActiveToolNames.push(tool.name);
 			}

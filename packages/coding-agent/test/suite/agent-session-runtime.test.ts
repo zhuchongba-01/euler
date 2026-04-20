@@ -28,7 +28,6 @@ describe("AgentSessionRuntime characterization", () => {
 		while (cleanups.length > 0) {
 			await cleanups.pop()?.();
 		}
-		process.chdir(tmpdir());
 	});
 
 	async function createRuntimeForTest(
@@ -391,7 +390,7 @@ describe("AgentSessionRuntime characterization", () => {
 		await expect(runtime.fork("missing-entry")).rejects.toThrow("Invalid entry ID for forking");
 	});
 
-	it("updates process.cwd() on cross-cwd session replacement", async () => {
+	it("updates the runtime session cwd on cross-cwd session replacement", async () => {
 		const firstDir = join(tmpdir(), `pi-runtime-cwd-a-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 		const secondDir = join(tmpdir(), `pi-runtime-cwd-b-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 		mkdirSync(firstDir, { recursive: true });
@@ -459,8 +458,8 @@ describe("AgentSessionRuntime characterization", () => {
 
 		await runtime.switchSession(otherSessionFile);
 
-		expect(realpathSync(process.cwd())).toBe(realpathSync(secondDir));
 		expect(realpathSync(runtime.session.sessionManager.getCwd())).toBe(realpathSync(secondDir));
+		expect(realpathSync(runtime.cwd)).toBe(realpathSync(secondDir));
 	});
 
 	it("restores model and thinking state from the destination session", async () => {
