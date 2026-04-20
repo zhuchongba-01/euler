@@ -137,7 +137,6 @@ async function walkDirectoryWithFd(
 		"f",
 		"--type",
 		"d",
-		"--full-path",
 		"--hidden",
 		"--exclude",
 		".git",
@@ -146,6 +145,10 @@ async function walkDirectoryWithFd(
 		"--exclude",
 		".git/**",
 	];
+
+	if (toDisplayPath(query).includes("/")) {
+		args.push("--full-path");
+	}
 
 	if (query) {
 		args.push(buildFdPathQuery(query));

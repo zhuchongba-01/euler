@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed `@` autocomplete fuzzy search to stop matching against the full base path for plain queries, so worktree or cwd paths containing the query text no longer crowd out real results such as `@plan` suggestions ([#2778](https://github.com/badlogic/pi-mono/issues/2778))
 - Fixed xterm `modifyOtherKeys` printable input so shifted uppercase letters insert correctly in the editor and shifted letter bindings parse and match consistently ([#3436](https://github.com/badlogic/pi-mono/issues/3436))
 
 ## [0.67.68] - 2026-04-17
