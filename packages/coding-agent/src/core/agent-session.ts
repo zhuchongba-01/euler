@@ -2320,6 +2320,7 @@ export class AgentSession {
 	}): void {
 		const autoResizeImages = this.settingsManager.getImageAutoResize();
 		const shellCommandPrefix = this.settingsManager.getShellCommandPrefix();
+		const shellPath = this.settingsManager.getShellPath();
 		const baseToolDefinitions = this._baseToolsOverride
 			? Object.fromEntries(
 					Object.entries(this._baseToolsOverride).map(([name, tool]) => [
@@ -2329,7 +2330,7 @@ export class AgentSession {
 				)
 			: createAllToolDefinitions(this._cwd, {
 					read: { autoResizeImages },
-					bash: { commandPrefix: shellCommandPrefix },
+					bash: { commandPrefix: shellCommandPrefix, shellPath },
 				});
 
 		this._baseToolDefinitions = new Map(
@@ -2551,13 +2552,14 @@ export class AgentSession {
 
 		// Apply command prefix if configured (e.g., "shopt -s expand_aliases" for alias support)
 		const prefix = this.settingsManager.getShellCommandPrefix();
+		const shellPath = this.settingsManager.getShellPath();
 		const resolvedCommand = prefix ? `${prefix}\n${command}` : command;
 
 		try {
 			const result = await executeBashWithOperations(
 				resolvedCommand,
 				this.sessionManager.getCwd(),
-				options?.operations ?? createLocalBashOperations(),
+				options?.operations ?? createLocalBashOperations({ shellPath }),
 				{
 					onChunk,
 					signal: this._bashAbortController.signal,

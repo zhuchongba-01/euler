@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- Fixed shell-path resolution to stop consulting ambient `process.cwd()` state during bash execution, so session/project-specific `shellPath` settings now follow the active coding-agent session cwd instead of the launcher cwd ([#3452](https://github.com/badlogic/pi-mono/issues/3452))
 - Fixed `ctx.ui.setWorkingIndicator()` custom frames to render verbatim instead of forcing the theme accent color, so extensions now own working-indicator coloring when they customize it ([#3467](https://github.com/badlogic/pi-mono/issues/3467))
 - Fixed `pi update` reinstalling npm packages that are already at the latest published version by checking the installed package version before running `npm install <pkg>@latest` ([#3000](https://github.com/badlogic/pi-mono/issues/3000))
 - Fixed built-in tool wrapping to use the same extension-runner context path as extension tools, so built-in tools receive execution context and `read` can warn when the current model does not support images ([#3429](https://github.com/badlogic/pi-mono/issues/3429))

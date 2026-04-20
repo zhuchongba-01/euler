@@ -409,6 +409,28 @@ describe("Coding Agent Tools", () => {
 			await expect(bashWithBadShell.execute("test-call-12", { command: "echo test" })).rejects.toThrow(/ENOENT/);
 		});
 
+		it("should pass shellPath through to shell resolution", async () => {
+			const getShellConfigSpy = vi.spyOn(shellModule, "getShellConfig");
+			const bashWithCustomShell = createBashTool(testDir, {
+				shellPath: "/custom/bash",
+				operations: {
+					exec: async () => ({ exitCode: 0 }),
+				},
+			});
+
+			await bashWithCustomShell.execute("test-call-12b", { command: "echo test" });
+
+			expect(getShellConfigSpy).not.toHaveBeenCalled();
+
+			const ops = createLocalBashOperations({ shellPath: "/custom/bash" });
+			await expect(
+				ops.exec("echo test", testDir, {
+					onData: () => {},
+				}),
+			).rejects.toThrow("Custom shell path not found: /custom/bash");
+			expect(getShellConfigSpy).toHaveBeenCalledWith("/custom/bash");
+		});
+
 		it("should prepend command prefix when configured", async () => {
 			const bashWithPrefix = createBashTool(testDir, {
 				commandPrefix: "export TEST_VAR=hello",
