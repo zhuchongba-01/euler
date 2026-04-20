@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Changed `pi update` to batch npm package updates per scope and run git package updates with bounded parallelism, reducing multi-package update time while preserving skip behavior for pinned and already-current packages ([#2980](https://github.com/badlogic/pi-mono/issues/2980))
 - Documented async extension factory functions in the extensions and custom-provider docs, including startup ordering and dynamic model/provider discovery via async initialization ([#3469](https://github.com/badlogic/pi-mono/issues/3469))
 
 ### Fixed
