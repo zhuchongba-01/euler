@@ -132,7 +132,7 @@ When a provider requests a retry delay longer than `maxDelayMs` (e.g., Google's 
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `sessionDir` | string | - | Directory where session files are stored. Accepts absolute or relative paths. |
+| `sessionDir` | string | - | Directory where session files are stored. Accepts absolute or relative paths, plus `~`. |
 
 ```json
 { "sessionDir": ".pi/sessions" }

@@ -1,5 +1,6 @@
 import type { Transport } from "@mariozechner/pi-ai";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { homedir } from "os";
 import { dirname, join } from "path";
 import lockfile from "proper-lockfile";
 import { CONFIG_DIR_NAME, getAgentDir } from "../config.js";
@@ -534,7 +535,17 @@ export class SettingsManager {
 	}
 
 	getSessionDir(): string | undefined {
-		return this.settings.sessionDir;
+		const sessionDir = this.settings.sessionDir;
+		if (!sessionDir) {
+			return sessionDir;
+		}
+		if (sessionDir === "~") {
+			return homedir();
+		}
+		if (sessionDir.startsWith("~/")) {
+			return join(homedir(), sessionDir.slice(2));
+		}
+		return sessionDir;
 	}
 
 	getDefaultProvider(): string | undefined {
