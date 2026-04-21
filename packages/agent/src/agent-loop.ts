@@ -369,22 +369,29 @@ async function executeToolCallsSequential(
 		});
 
 		const preparation = await prepareToolCall(currentContext, assistantMessage, toolCall, config, signal);
+		let finalized: FinalizedToolCallOutcome;
 		if (preparation.kind === "immediate") {
-			results.push(await emitToolCallOutcome(toolCall, preparation.result, preparation.isError, emit));
+			finalized = {
+				toolCall,
+				result: preparation.result,
+				isError: preparation.isError,
+			};
 		} else {
 			const executed = await executePreparedToolCall(preparation, signal, emit);
-			results.push(
-				await finalizeExecutedToolCall(
-					currentContext,
-					assistantMessage,
-					preparation,
-					executed,
-					config,
-					signal,
-					emit,
-				),
+			finalized = await finalizeExecutedToolCall(
+				currentContext,
+				assistantMessage,
+				preparation,
+				executed,
+				config,
+				signal,
 			);
 		}
+
+		await emitToolExecutionEnd(finalized, emit);
+		const toolResultMessage = createToolResultMessage(finalized);
+		await emitToolResultMessage(toolResultMessage, emit);
+		results.push(toolResultMessage);
 	}
 
 	return results;
@@ -398,8 +405,7 @@ async function executeToolCallsParallel(
 	signal: AbortSignal | undefined,
 	emit: AgentEventSink,
 ): Promise<ToolResultMessage[]> {
-	const results: ToolResultMessage[] = [];
-	const runnableCalls: PreparedToolCall[] = [];
+	const finalizedCalls: FinalizedToolCallEntry[] = [];
 
 	for (const toolCall of toolCalls) {
 		await emit({
@@ -411,30 +417,39 @@ async function executeToolCallsParallel(
 
 		const preparation = await prepareToolCall(currentContext, assistantMessage, toolCall, config, signal);
 		if (preparation.kind === "immediate") {
-			results.push(await emitToolCallOutcome(toolCall, preparation.result, preparation.isError, emit));
-		} else {
-			runnableCalls.push(preparation);
+			const finalized = {
+				toolCall,
+				result: preparation.result,
+				isError: preparation.isError,
+			} satisfies FinalizedToolCallOutcome;
+			await emitToolExecutionEnd(finalized, emit);
+			finalizedCalls.push(finalized);
+			continue;
 		}
-	}
 
-	const runningCalls = runnableCalls.map((prepared) => ({
-		prepared,
-		execution: executePreparedToolCall(prepared, signal, emit),
-	}));
-
-	for (const running of runningCalls) {
-		const executed = await running.execution;
-		results.push(
-			await finalizeExecutedToolCall(
+		finalizedCalls.push(async () => {
+			const executed = await executePreparedToolCall(preparation, signal, emit);
+			const finalized = await finalizeExecutedToolCall(
 				currentContext,
 				assistantMessage,
-				running.prepared,
+				preparation,
 				executed,
 				config,
 				signal,
-				emit,
-			),
-		);
+			);
+			await emitToolExecutionEnd(finalized, emit);
+			return finalized;
+		});
+	}
+
+	const orderedFinalizedCalls = await Promise.all(
+		finalizedCalls.map((entry) => (typeof entry === "function" ? entry() : Promise.resolve(entry))),
+	);
+	const results: ToolResultMessage[] = [];
+	for (const finalized of orderedFinalizedCalls) {
+		const toolResultMessage = createToolResultMessage(finalized);
+		await emitToolResultMessage(toolResultMessage, emit);
+		results.push(toolResultMessage);
 	}
 
 	return results;
@@ -457,6 +472,14 @@ type ExecutedToolCallOutcome = {
 	result: AgentToolResult<any>;
 	isError: boolean;
 };
+
+type FinalizedToolCallOutcome = {
+	toolCall: AgentToolCall;
+	result: AgentToolResult<any>;
+	isError: boolean;
+};
+
+type FinalizedToolCallEntry = FinalizedToolCallOutcome | (() => Promise<FinalizedToolCallOutcome>);
 
 function prepareToolCallArguments(tool: AgentTool<any>, toolCall: AgentToolCall): AgentToolCall {
 	if (!tool.prepareArguments) {
@@ -568,8 +591,7 @@ async function finalizeExecutedToolCall(
 	executed: ExecutedToolCallOutcome,
 	config: AgentLoopConfig,
 	signal: AbortSignal | undefined,
-	emit: AgentEventSink,
-): Promise<ToolResultMessage> {
+): Promise<FinalizedToolCallOutcome> {
 	let result = executed.result;
 	let isError = executed.isError;
 
@@ -599,7 +621,11 @@ async function finalizeExecutedToolCall(
 		}
 	}
 
-	return await emitToolCallOutcome(prepared.toolCall, result, isError, emit);
+	return {
+		toolCall: prepared.toolCall,
+		result,
+		isError,
+	};
 }
 
 function createErrorToolResult(message: string): AgentToolResult<any> {
@@ -609,31 +635,29 @@ function createErrorToolResult(message: string): AgentToolResult<any> {
 	};
 }
 
-async function emitToolCallOutcome(
-	toolCall: AgentToolCall,
-	result: AgentToolResult<any>,
-	isError: boolean,
-	emit: AgentEventSink,
-): Promise<ToolResultMessage> {
+async function emitToolExecutionEnd(finalized: FinalizedToolCallOutcome, emit: AgentEventSink): Promise<void> {
 	await emit({
 		type: "tool_execution_end",
-		toolCallId: toolCall.id,
-		toolName: toolCall.name,
-		result,
-		isError,
+		toolCallId: finalized.toolCall.id,
+		toolName: finalized.toolCall.name,
+		result: finalized.result,
+		isError: finalized.isError,
 	});
+}
 
-	const toolResultMessage: ToolResultMessage = {
+function createToolResultMessage(finalized: FinalizedToolCallOutcome): ToolResultMessage {
+	return {
 		role: "toolResult",
-		toolCallId: toolCall.id,
-		toolName: toolCall.name,
-		content: result.content,
-		details: result.details,
-		isError,
+		toolCallId: finalized.toolCall.id,
+		toolName: finalized.toolCall.name,
+		content: finalized.result.content,
+		details: finalized.result.details,
+		isError: finalized.isError,
 		timestamp: Date.now(),
 	};
+}
 
+async function emitToolResultMessage(toolResultMessage: ToolResultMessage, emit: AgentEventSink): Promise<void> {
 	await emit({ type: "message_start", message: toolResultMessage });
 	await emit({ type: "message_end", message: toolResultMessage });
-	return toolResultMessage;
 }

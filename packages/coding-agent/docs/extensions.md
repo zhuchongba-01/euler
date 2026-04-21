@@ -547,7 +547,8 @@ Fired for tool execution lifecycle updates.
 In parallel tool mode:
 - `tool_execution_start` is emitted in assistant source order during the preflight phase
 - `tool_execution_update` events may interleave across tools
-- `tool_execution_end` is emitted in assistant source order, matching final tool result message order
+- `tool_execution_end` is emitted in tool completion order after each tool is finalized
+- final `toolResult` message events are still emitted later in assistant source order
 
 ```typescript
 pi.on("tool_execution_start", async (event, ctx) => {
@@ -697,6 +698,8 @@ pi.on("tool_call", (event) => {
 #### tool_result
 
 Fired after tool execution finishes and before `tool_execution_end` plus the final tool result message events are emitted. **Can modify result.**
+
+In parallel tool mode, `tool_result` and `tool_execution_end` may interleave in tool completion order, while final `toolResult` message events are still emitted later in assistant source order.
 
 `tool_result` handlers chain like middleware:
 - Handlers run in extension load order

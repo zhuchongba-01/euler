@@ -30,7 +30,8 @@ export type StreamFn = (
  *
  * - "sequential": each tool call is prepared, executed, and finalized before the next one starts.
  * - "parallel": tool calls are prepared sequentially, then allowed tools execute concurrently.
- *   Final tool lifecycle and tool-result artifacts are emitted in tool completion order.
+ *   `tool_execution_end` is emitted in tool completion order after each tool is finalized,
+ *   while tool-result message artifacts are emitted later in assistant source order.
  */
 export type ToolExecutionMode = "sequential" | "parallel";
 
@@ -186,7 +187,8 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	 * Tool execution mode.
 	 * - "sequential": execute tool calls one by one
 	 * - "parallel": preflight tool calls sequentially, then execute allowed tools concurrently;
-	 *   final tool lifecycle and tool-result artifacts are emitted in tool completion order
+	 *   emit `tool_execution_end` in tool completion order after each tool is finalized,
+	 *   then emit tool-result message artifacts later in assistant source order
 	 *
 	 * Default: "parallel"
 	 */
@@ -201,7 +203,7 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	beforeToolCall?: (context: BeforeToolCallContext, signal?: AbortSignal) => Promise<BeforeToolCallResult | undefined>;
 
 	/**
-	 * Called after a tool finishes executing, before final tool events are emitted.
+	 * Called after a tool finishes executing, before `tool_execution_end` and tool-result message events are emitted.
 	 *
 	 * Return an `AfterToolCallResult` to override parts of the executed tool result:
 	 * - `content` replaces the full content array

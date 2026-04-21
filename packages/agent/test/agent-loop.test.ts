@@ -449,7 +449,7 @@ describe("agentLoop with AgentMessage", () => {
 		expect(executed).toEqual([[{ oldText: "before", newText: "after" }]]);
 	});
 
-	it("should execute tool calls in parallel and emit tool results in source order", async () => {
+	it("should emit tool_execution_end in completion order but persist tool results in source order", async () => {
 		const toolSchema = Type.Object({ value: Type.String() });
 		let firstResolved = false;
 		let parallelObserved = false;
@@ -519,15 +519,29 @@ describe("agentLoop with AgentMessage", () => {
 			events.push(event);
 		}
 
+		const toolExecutionEndIds = events.flatMap((event) => {
+			if (event.type !== "tool_execution_end") {
+				return [];
+			}
+			return [event.toolCallId];
+		});
 		const toolResultIds = events.flatMap((event) => {
 			if (event.type !== "message_end" || event.message.role !== "toolResult") {
 				return [];
 			}
 			return [event.message.toolCallId];
 		});
+		const turnToolResultIds = events.flatMap((event) => {
+			if (event.type !== "turn_end") {
+				return [];
+			}
+			return event.toolResults.map((toolResult) => toolResult.toolCallId);
+		});
 
 		expect(parallelObserved).toBe(true);
+		expect(toolExecutionEndIds).toEqual(["tool-2", "tool-1"]);
 		expect(toolResultIds).toEqual(["tool-1", "tool-2"]);
+		expect(turnToolResultIds).toEqual(["tool-1", "tool-2"]);
 	});
 
 	it("should inject queued messages after all tool calls complete", async () => {
