@@ -384,7 +384,7 @@ export const MODELS = {
 			name: "Claude Haiku 4.5 (EU)",
 			api: "bedrock-converse-stream",
 			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+			baseUrl: "https://bedrock-runtime.eu-central-1.amazonaws.com",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -401,7 +401,7 @@ export const MODELS = {
 			name: "Claude Opus 4.5 (EU)",
 			api: "bedrock-converse-stream",
 			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+			baseUrl: "https://bedrock-runtime.eu-central-1.amazonaws.com",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -418,7 +418,7 @@ export const MODELS = {
 			name: "Claude Opus 4.6 (EU)",
 			api: "bedrock-converse-stream",
 			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+			baseUrl: "https://bedrock-runtime.eu-central-1.amazonaws.com",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -435,7 +435,7 @@ export const MODELS = {
 			name: "Claude Opus 4.7 (EU)",
 			api: "bedrock-converse-stream",
 			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+			baseUrl: "https://bedrock-runtime.eu-central-1.amazonaws.com",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -452,7 +452,7 @@ export const MODELS = {
 			name: "Claude Sonnet 4 (EU)",
 			api: "bedrock-converse-stream",
 			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+			baseUrl: "https://bedrock-runtime.eu-central-1.amazonaws.com",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -469,7 +469,7 @@ export const MODELS = {
 			name: "Claude Sonnet 4.5 (EU)",
 			api: "bedrock-converse-stream",
 			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+			baseUrl: "https://bedrock-runtime.eu-central-1.amazonaws.com",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -486,7 +486,7 @@ export const MODELS = {
 			name: "Claude Sonnet 4.6 (EU)",
 			api: "bedrock-converse-stream",
 			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+			baseUrl: "https://bedrock-runtime.eu-central-1.amazonaws.com",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
