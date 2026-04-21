@@ -762,7 +762,7 @@ function createClient(
 		return { client, isOAuthToken: false };
 	}
 
-	const betaFeatures = ["fine-grained-tool-streaming-2025-05-14"];
+	const betaFeatures: string[] = [];
 	if (needsInterleavedBeta) {
 		betaFeatures.push("interleaved-thinking-2025-05-14");
 	}
@@ -778,7 +778,7 @@ function createClient(
 				{
 					accept: "application/json",
 					"anthropic-dangerous-direct-browser-access": "true",
-					"anthropic-beta": `claude-code-20250219,oauth-2025-04-20,${betaFeatures.join(",")}`,
+					"anthropic-beta": ["claude-code-20250219", "oauth-2025-04-20", ...betaFeatures].join(","),
 					"user-agent": `claude-cli/${claudeCodeVersion}`,
 					"x-app": "cli",
 				},
@@ -799,7 +799,7 @@ function createClient(
 			{
 				accept: "application/json",
 				"anthropic-dangerous-direct-browser-access": "true",
-				"anthropic-beta": betaFeatures.join(","),
+				...(betaFeatures.length > 0 ? { "anthropic-beta": betaFeatures.join(",") } : {}),
 			},
 			model.headers,
 			optionsHeaders,
@@ -1091,6 +1091,7 @@ function convertTools(
 		return {
 			name: isOAuthToken ? toClaudeCodeName(tool.name) : tool.name,
 			description: tool.description,
+			eager_input_streaming: true,
 			input_schema: {
 				type: "object",
 				properties: schema.properties ?? {},
