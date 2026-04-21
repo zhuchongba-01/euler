@@ -106,10 +106,10 @@ describe("totalTokens field", () => {
 
 	describe.skipIf(!process.env.ANTHROPIC_API_KEY)("Anthropic (API Key)", () => {
 		it(
-			"claude-sonnet-4-5 - should return totalTokens equal to sum of components",
+			"claude-3-5-haiku - should return totalTokens equal to sum of components",
 			{ retry: 3, timeout: 60000 },
 			async () => {
-				const llm = getModel("anthropic", "claude-sonnet-4-5");
+				const llm = getModel("anthropic", "claude-3-5-haiku-20241022");
 
 				console.log(`\nAnthropic / ${llm.id}:`);
 				const { first, second } = await testTotalTokensWithCache(llm, { apiKey: process.env.ANTHROPIC_API_KEY });
