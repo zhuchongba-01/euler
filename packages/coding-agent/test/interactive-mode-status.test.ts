@@ -175,7 +175,10 @@ describe("InteractiveMode.showLoadedResources", () => {
 			},
 			session: {
 				promptTemplates: [],
-				extensionRunner: undefined,
+				extensionRunner: {
+					getCommandDiagnostics: () => [],
+					getShortcutDiagnostics: () => [],
+				},
 				resourceLoader: {
 					getPathMetadata: () => new Map(),
 					getAgentsFiles: () => ({ agentsFiles: options.contextFiles ?? [] }),
