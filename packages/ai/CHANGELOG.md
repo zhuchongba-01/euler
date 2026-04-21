@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Hardened Anthropic streaming against malformed tool-call JSON by owning SSE parsing with defensive JSON repair, replacing the deprecated `fine-grained-tool-streaming` beta header with per-tool `eager_input_streaming`, and updating stale test model references ([#3175](https://github.com/badlogic/pi-mono/issues/3175))
 - Fixed Bedrock runtime endpoint resolution to stop pinning built-in regional endpoints over `AWS_REGION` / `AWS_PROFILE`, restoring `us.*` and `eu.*` inference profile support after v0.68.0 while preserving custom VPC/proxy endpoint overrides ([#3481](https://github.com/badlogic/pi-mono/issues/3481), [#3485](https://github.com/badlogic/pi-mono/issues/3485), [#3486](https://github.com/badlogic/pi-mono/issues/3486), [#3487](https://github.com/badlogic/pi-mono/issues/3487), [#3488](https://github.com/badlogic/pi-mono/issues/3488))
 
 ## [0.68.0] - 2026-04-20
