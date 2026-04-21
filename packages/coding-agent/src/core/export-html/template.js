@@ -1448,18 +1448,21 @@
       // INITIALIZATION
       // ============================================================
 
-      // Escape HTML tags in text (but not code blocks)
-      function escapeHtmlTags(text) {
-        return text.replace(/<(?=[a-zA-Z\/])/g, '&lt;');
-      }
-
-      // Configure marked with syntax highlighting and HTML escaping for text
+      // Configure marked with syntax highlighting and TUI-compatible HTML handling
       const strictStrikethroughRegex = /^(~~)(?=[^\s~])((?:\\.|[^\\])*?(?:\\.|[^\s~\\]))\1(?=[^~]|$)/;
 
       marked.use({
         breaks: true,
         gfm: true,
         tokenizer: {
+          // Treat HTML-like input as plain text so tags are shown verbatim,
+          // matching the TUI markdown renderer.
+          html() {
+            return undefined;
+          },
+          tag() {
+            return undefined;
+          },
           del(src) {
             const match = strictStrikethroughRegex.exec(src);
             if (!match) return undefined;
@@ -1492,10 +1495,6 @@
               }
             }
             return `<pre><code class="hljs">${highlighted}</code></pre>`;
-          },
-          // Text content: escape HTML tags
-          text(token) {
-            return escapeHtmlTags(escapeHtml(token.text));
           },
           // Inline code: escape HTML
           codespan(token) {

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed exported session markdown to render Markdown while showing HTML-like message content such as `<file name="...">...</file>` verbatim, so shared sessions match the TUI instead of letting the browser interpret message text ([#3484](https://github.com/badlogic/pi-mono/issues/3484))
+
 ## [0.68.0] - 2026-04-20
 
 ### New Features
