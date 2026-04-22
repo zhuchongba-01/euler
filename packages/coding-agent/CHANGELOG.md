@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added OSC 9;4 terminal progress indicators during agent streaming and compaction, so terminals like iTerm2, WezTerm, Windows Terminal, and Kitty show activity in their tab bar
+
+### Breaking Changes
+
+- Session-replacement commands now invalidate captured pre-replacement session-bound extension objects after `ctx.newSession()`, `ctx.fork()`, and `ctx.switchSession()`. Old `pi` and command `ctx` references now throw instead of silently targeting the replaced session. Migration: move post-switch work into `withSession`, and use only the `ReplacedSessionContext` passed to that callback for session-bound operations such as `sendUserMessage()`, `sendMessage()`, and `sessionManager` access.
+
+### Fixed
+
+- Fixed extension session-replacement flows so `ctx.newSession()`, `ctx.fork()`, `ctx.switchSession()`, and imported-session replacements fully rebind before post-switch work runs, added `withSession` replacement callbacks with fresh `ReplacedSessionContext` helpers, and make stale pre-replacement `pi` / `ctx` session-bound accesses throw instead of silently targeting the wrong session ([#2860](https://github.com/badlogic/pi-mono/issues/2860))
+
 ## [0.68.1] - 2026-04-22
 
 ### New Features

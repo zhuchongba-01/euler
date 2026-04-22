@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `setProgress(active: boolean)` to the `Terminal` interface for OSC 9;4 progress indicator support
+
 ## [0.68.1] - 2026-04-22
 
 ### Fixed
