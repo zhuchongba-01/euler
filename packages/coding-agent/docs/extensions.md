@@ -1691,6 +1691,9 @@ pi.registerTool({
     return {
       content: [{ type: "text", text: "Done" }],  // Sent to LLM
       details: { data: result },                   // For rendering & state
+      // Optional: stop after this tool batch when every finalized tool result
+      // in the batch also returns terminate: true.
+      terminate: true,
     };
   },
 
@@ -1701,6 +1704,8 @@ pi.registerTool({
 ```
 
 **Signaling errors:** To mark a tool execution as failed (sets `isError: true` on the result and reports it to the LLM), throw an error from `execute`. Returning a value never sets the error flag regardless of what properties you include in the return object.
+
+**Early termination:** Return `terminate: true` from `execute()` to hint that the automatic follow-up LLM call should be skipped after the current tool batch. This only takes effect when every finalized tool result in that batch is terminating. See [examples/extensions/structured-output.ts](../examples/extensions/structured-output.ts) for a minimal example where the agent ends on a final structured-output tool call.
 
 ```typescript
 // Correct: throw to signal an error
@@ -2383,6 +2388,7 @@ All examples in [examples/extensions/](../examples/extensions/).
 | `questionnaire.ts` | Multi-step wizard tool | `registerTool`, `ui.custom` |
 | `todo.ts` | Stateful tool with persistence | `registerTool`, `appendEntry`, `renderResult`, session events |
 | `dynamic-tools.ts` | Register tools after startup and during commands | `registerTool`, `session_start`, `registerCommand` |
+| `structured-output.ts` | Final structured-output tool with `terminate: true` | `registerTool`, terminating tool results |
 | `truncated-tool.ts` | Output truncation example | `registerTool`, `truncateHead` |
 | `tool-override.ts` | Override built-in read tool | `registerTool` (same name as built-in) |
 | **Commands** |||
