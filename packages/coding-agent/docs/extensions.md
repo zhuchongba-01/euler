@@ -949,8 +949,11 @@ pi.registerCommand("my-cmd", {
 Create a new session:
 
 ```typescript
+const parentSession = ctx.sessionManager.getSessionFile();
+const kickoff = "Continue in the replacement session";
+
 const result = await ctx.newSession({
-  parentSession: ctx.sessionManager.getSessionFile(),
+  parentSession,
   setup: async (sm) => {
     sm.appendMessage({
       role: "user",
@@ -958,12 +961,21 @@ const result = await ctx.newSession({
       timestamp: Date.now(),
     });
   },
+  withSession: async (ctx) => {
+    // Use only the replacement-session ctx here.
+    await ctx.sendUserMessage(kickoff);
+  },
 });
 
 if (result.cancelled) {
   // An extension cancelled the new session
 }
 ```
+
+Options:
+- `parentSession`: parent session file to record in the new session header
+- `setup`: mutate the new session's `SessionManager` before `withSession` runs
+- `withSession`: run post-switch work against a fresh replacement-session context. Do not use captured old `pi` / command `ctx`; see [Session replacement lifecycle and footguns](#session-replacement-lifecycle-and-footguns).
 
 ### ctx.fork(entryId, options?)
 
@@ -984,6 +996,7 @@ if (!cloneResult.cancelled) {
 Options:
 - `position`: `"before"` (default) forks before the selected user message, restoring that prompt into the editor
 - `position`: `"at"` duplicates the active path through the selected entry without restoring editor text
+- `withSession`: run post-switch work against a fresh replacement-session context. Do not use captured old `pi` / command `ctx`; see [Session replacement lifecycle and footguns](#session-replacement-lifecycle-and-footguns).
 
 ### ctx.navigateTree(targetId, options?)
 
@@ -1004,16 +1017,23 @@ Options:
 - `replaceInstructions`: If true, `customInstructions` replaces the default prompt instead of being appended
 - `label`: Label to attach to the branch summary entry (or target entry if not summarizing)
 
-### ctx.switchSession(sessionPath)
+### ctx.switchSession(sessionPath, options?)
 
 Switch to a different session file:
 
 ```typescript
-const result = await ctx.switchSession("/path/to/session.jsonl");
+const result = await ctx.switchSession("/path/to/session.jsonl", {
+  withSession: async (ctx) => {
+    await ctx.sendUserMessage("Resume work in the replacement session");
+  },
+});
 if (result.cancelled) {
   // An extension cancelled the switch via session_before_switch
 }
 ```
+
+Options:
+- `withSession`: run post-switch work against a fresh replacement-session context. Do not use captured old `pi` / command `ctx`; see [Session replacement lifecycle and footguns](#session-replacement-lifecycle-and-footguns).
 
 To discover available sessions, use the static `SessionManager.list()` or `SessionManager.listAll()` methods:
 
@@ -1032,6 +1052,49 @@ pi.registerCommand("switch", {
     if (choice) {
       await ctx.switchSession(choice);
     }
+  },
+});
+```
+
+### Session replacement lifecycle and footguns
+
+`withSession` receives a fresh `ReplacedSessionContext`, which extends `ExtensionCommandContext` with async `sendMessage()` and `sendUserMessage()` helpers bound to the replacement session.
+
+Lifecycle and footguns:
+- `withSession` runs only after the old session has emitted `session_shutdown`, the old runtime has been torn down, the replacement session has been rebound, and the new extension instance has already received `session_start`.
+- The callback still executes in the original closure, not inside the new extension instance. That means your old extension instance may already have run its shutdown cleanup before `withSession` starts.
+- Captured old `pi` / old command `ctx` session-bound objects are stale after replacement and will throw if used. Use only the `ctx` passed to `withSession` for session-bound work.
+- Previously extracted raw objects are still your responsibility. For example, if you capture `const sm = ctx.sessionManager` before replacement, `sm` is still the old `SessionManager` object. Do not reuse it after replacement.
+- Code in `withSession` should assume any state invalidated by your `session_shutdown` handler is already gone. Only capture plain data that survives shutdown cleanly, such as strings, ids, and serialized config.
+
+Safe pattern:
+
+```typescript
+pi.registerCommand("handoff", {
+  handler: async (_args, ctx) => {
+    const kickoff = "Continue from the replacement session";
+    await ctx.newSession({
+      withSession: async (ctx) => {
+        await ctx.sendUserMessage(kickoff);
+      },
+    });
+  },
+});
+```
+
+Unsafe pattern:
+
+```typescript
+pi.registerCommand("handoff", {
+  handler: async (_args, ctx) => {
+    const oldSessionManager = ctx.sessionManager;
+    await ctx.newSession({
+      withSession: async (_ctx) => {
+        // stale old objects: do not do this
+        oldSessionManager.getSessionFile();
+        pi.sendUserMessage("wrong");
+      },
+    });
   },
 });
 ```
