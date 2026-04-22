@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `terminate: true` tool-result hints to skip the automatic follow-up LLM call when every finalized tool result in the current batch opts into early termination ([#3525](https://github.com/badlogic/pi-mono/issues/3525))
+
 ## [0.68.1] - 2026-04-22
 
 ### Fixed

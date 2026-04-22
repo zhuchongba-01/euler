@@ -56,6 +56,7 @@ export interface BeforeToolCallResult {
  * - `content`: if provided, replaces the tool result content array in full
  * - `details`: if provided, replaces the tool result details value in full
  * - `isError`: if provided, replaces the tool result error flag
+ * - `terminate`: if provided, replaces the early-termination hint
  *
  * Omitted fields keep the original executed tool result values.
  * There is no deep merge for `content` or `details`.
@@ -64,6 +65,11 @@ export interface AfterToolCallResult {
 	content?: (TextContent | ImageContent)[];
 	details?: unknown;
 	isError?: boolean;
+	/**
+	 * Hint that the agent should stop after the current tool batch.
+	 * Early termination only happens when every finalized tool result in the batch sets this to true.
+	 */
+	terminate?: boolean;
 }
 
 /** Context passed to `beforeToolCall`. */
@@ -209,6 +215,7 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	 * - `content` replaces the full content array
 	 * - `details` replaces the full details payload
 	 * - `isError` replaces the error flag
+	 * - `terminate` replaces the early-termination hint
 	 *
 	 * Any omitted fields keep their original values. No deep merge is performed.
 	 * The hook receives the agent abort signal and is responsible for honoring it.
@@ -286,6 +293,11 @@ export interface AgentToolResult<T> {
 	content: (TextContent | ImageContent)[];
 	/** Arbitrary structured details for logs or UI rendering. */
 	details: T;
+	/**
+	 * Hint that the agent should stop after the current tool batch.
+	 * Early termination only happens when every finalized tool result in the batch sets this to true.
+	 */
+	terminate?: boolean;
 }
 
 /** Callback used by tools to stream partial execution updates. */
