@@ -466,7 +466,8 @@ Fired after user submits prompt, before agent loop. Can inject a message and/or 
 pi.on("before_agent_start", async (event, ctx) => {
   // event.prompt - user's prompt text
   // event.images - attached images (if any)
-  // event.systemPrompt - current system prompt
+  // event.systemPrompt - current chained system prompt for this handler
+  //   (includes changes from earlier before_agent_start handlers)
   // event.systemPromptOptions - structured options used to build the system prompt
   //   .customPrompt - any custom system prompt (from --system-prompt, SYSTEM.md, or custom templates)
   //   .selectedTools - tools currently active in the prompt
@@ -491,6 +492,8 @@ pi.on("before_agent_start", async (event, ctx) => {
 ```
 
 The `systemPromptOptions` field gives extensions access to the same structured data Pi uses to build the system prompt. This lets you inspect what Pi has loaded — custom prompts, guidelines, tool snippets, context files, skills — without re-discovering resources or re-parsing flags. Use it when your extension needs to make deep, informed changes to the system prompt while respecting user-provided configuration.
+
+Inside `before_agent_start`, `event.systemPrompt` and `ctx.getSystemPrompt()` both reflect the chained system prompt as of the current handler. Later `before_agent_start` handlers can still modify it again.
 
 #### agent_start / agent_end
 
@@ -579,6 +582,8 @@ pi.on("context", async (event, ctx) => {
 #### before_provider_request
 
 Fired after the provider-specific payload is built, right before the request is sent. Handlers run in extension load order. Returning `undefined` keeps the payload unchanged. Returning any other value replaces the payload for later handlers and for the actual request.
+
+This hook can rewrite provider-level system instructions or remove them entirely. Those payload-level changes are not reflected by `ctx.getSystemPrompt()`, which reports Pi's system prompt string rather than the final serialized provider payload.
 
 ```typescript
 pi.on("before_provider_request", (event, ctx) => {
@@ -918,7 +923,12 @@ ctx.compact({
 
 ### ctx.getSystemPrompt()
 
-Returns the current effective system prompt. This includes any modifications made by `before_agent_start` handlers for the current turn.
+Returns Pi's current system prompt string.
+
+- During `before_agent_start`, this reflects chained system-prompt changes made so far for the current turn.
+- It does not include later `context` message mutations.
+- It does not include `before_provider_request` payload rewrites.
+- If later-loaded extensions run after yours, they can still change what is ultimately sent.
 
 ```typescript
 pi.on("before_agent_start", (event, ctx) => {
