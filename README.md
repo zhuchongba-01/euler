@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="https://shittycodingagent.ai">
-    <img src="https://shittycodingagent.ai/logo.svg" alt="pi logo" width="128">
+  <a href="https://pi.dev">
+    <img src="https://pi.dev/logo.svg" alt="pi logo" width="128">
   </a>
 </p>
 <p align="center">

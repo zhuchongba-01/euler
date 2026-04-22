@@ -1314,7 +1314,7 @@ Examples:
 
 ### Changed
 
-- Share URLs now use pi.dev by default while shittycodingagent.ai and buildwithpi.ai continue to work.
+- Share URLs now use pi.dev by default while pi.dev and buildwithpi.ai continue to work.
 
 ### Fixed
 
@@ -1917,7 +1917,7 @@ There are multiple SDK breaking changes since v0.49.3. For the quickest migratio
 
 ### Changed
 
-- `/share` now outputs `buildwithpi.ai` session preview URLs instead of `shittycodingagent.ai`
+- `/share` now outputs `buildwithpi.ai` session preview URLs instead of `pi.dev`
 
 ## [0.45.0] - 2026-01-13
 
@@ -2839,7 +2839,7 @@ Total color count increased from 46 to 50. See [docs/themes.md](docs/themes.md) 
 
 - `ctx.ui.setStatus(key, text)` for hooks to display persistent status text in the footer ([#385](https://github.com/badlogic/pi-mono/pull/385) by [@prateekmedia](https://github.com/prateekmedia))
 - `ctx.ui.theme` getter for styling status text and other output with theme colors
-- `/share` command to upload session as a secret GitHub gist and get a shareable URL via shittycodingagent.ai ([#380](https://github.com/badlogic/pi-mono/issues/380))
+- `/share` command to upload session as a secret GitHub gist and get a shareable URL via pi.dev ([#380](https://github.com/badlogic/pi-mono/issues/380))
 - HTML export now includes a tree visualization sidebar for navigating session branches ([#375](https://github.com/badlogic/pi-mono/issues/375))
 - HTML export supports keyboard shortcuts: Ctrl+T to toggle thinking blocks, Ctrl+O to toggle tool outputs
 - HTML export supports theme-configurable background colors via optional `export` section in theme JSON ([#387](https://github.com/badlogic/pi-mono/pull/387) by [@mitsuhiko](https://github.com/mitsuhiko))
