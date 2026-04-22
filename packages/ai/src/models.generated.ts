@@ -4167,6 +4167,23 @@ export const MODELS = {
 			contextWindow: 1048576,
 			maxTokens: 65535,
 		} satisfies Model<"google-gemini-cli">,
+		"gemini-3.1-flash-lite-preview": {
+			id: "gemini-3.1-flash-lite-preview",
+			name: "Gemini 3.1 Flash Lite Preview (Cloud Code Assist)",
+			api: "google-gemini-cli",
+			provider: "google-gemini-cli",
+			baseUrl: "https://cloudcode-pa.googleapis.com",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: {
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+			},
+			contextWindow: 1048576,
+			maxTokens: 65535,
+		} satisfies Model<"google-gemini-cli">,
 		"gemini-3.1-pro-preview": {
 			id: "gemini-3.1-pro-preview",
 			name: "Gemini 3.1 Pro Preview (Cloud Code Assist)",
@@ -7101,10 +7118,9 @@ export const MODELS = {
 		"qwen3.5-plus": {
 			id: "qwen3.5-plus",
 			name: "Qwen3.5 Plus",
-			api: "openai-completions",
+			api: "anthropic-messages",
 			provider: "opencode",
-			baseUrl: "https://opencode.ai/zen/v1",
-			compat: {"cacheControlFormat":"anthropic"},
+			baseUrl: "https://opencode.ai/zen",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -7115,14 +7131,13 @@ export const MODELS = {
 			},
 			contextWindow: 262144,
 			maxTokens: 65536,
-		} satisfies Model<"openai-completions">,
+		} satisfies Model<"anthropic-messages">,
 		"qwen3.6-plus": {
 			id: "qwen3.6-plus",
 			name: "Qwen3.6 Plus",
-			api: "openai-completions",
+			api: "anthropic-messages",
 			provider: "opencode",
-			baseUrl: "https://opencode.ai/zen/v1",
-			compat: {"cacheControlFormat":"anthropic"},
+			baseUrl: "https://opencode.ai/zen",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -7133,7 +7148,7 @@ export const MODELS = {
 			},
 			contextWindow: 262144,
 			maxTokens: 65536,
-		} satisfies Model<"openai-completions">,
+		} satisfies Model<"anthropic-messages">,
 	},
 	"opencode-go": {
 		"glm-5": {
@@ -7275,10 +7290,9 @@ export const MODELS = {
 		"qwen3.5-plus": {
 			id: "qwen3.5-plus",
 			name: "Qwen3.5 Plus",
-			api: "openai-completions",
+			api: "anthropic-messages",
 			provider: "opencode-go",
-			baseUrl: "https://opencode.ai/zen/go/v1",
-			compat: {"cacheControlFormat":"anthropic"},
+			baseUrl: "https://opencode.ai/zen/go",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -7289,14 +7303,13 @@ export const MODELS = {
 			},
 			contextWindow: 262144,
 			maxTokens: 65536,
-		} satisfies Model<"openai-completions">,
+		} satisfies Model<"anthropic-messages">,
 		"qwen3.6-plus": {
 			id: "qwen3.6-plus",
 			name: "Qwen3.6 Plus",
-			api: "openai-completions",
+			api: "anthropic-messages",
 			provider: "opencode-go",
-			baseUrl: "https://opencode.ai/zen/go/v1",
-			compat: {"cacheControlFormat":"anthropic"},
+			baseUrl: "https://opencode.ai/zen/go",
 			reasoning: true,
 			input: ["text", "image"],
 			cost: {
@@ -7307,7 +7320,7 @@ export const MODELS = {
 			},
 			contextWindow: 262144,
 			maxTokens: 65536,
-		} satisfies Model<"openai-completions">,
+		} satisfies Model<"anthropic-messages">,
 	},
 	"openrouter": {
 		"ai21/jamba-large-1.7": {
