@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Render SVG artifact previews through a blob-backed image instead of injecting untrusted SVG markup into the page DOM ([#3552](https://github.com/badlogic/pi-mono/issues/3552))
+
 ## [0.68.1] - 2026-04-22
 
 ## [0.68.0] - 2026-04-20
