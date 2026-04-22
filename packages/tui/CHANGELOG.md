@@ -5,6 +5,7 @@
 ### Added
 
 - Added `setProgress(active: boolean)` to the `Terminal` interface for OSC 9;4 progress indicator support
+- Added generic stacked autocomplete support for extension wrappers via `AutocompleteProvider.shouldTriggerFileCompletion?()` and `#` as a natural autocomplete trigger alongside `@` ([#2983](https://github.com/badlogic/pi-mono/issues/2983))
 
 ## [0.68.1] - 2026-04-22
 

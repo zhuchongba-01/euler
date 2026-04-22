@@ -11,6 +11,7 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type { AssistantMessage, ImageContent, Message, Model, OAuthProviderId } from "@mariozechner/pi-ai";
 import type {
 	AutocompleteItem,
+	AutocompleteProvider,
 	EditorComponent,
 	EditorTheme,
 	Keybinding,
@@ -50,6 +51,7 @@ import {
 import { type AgentSession, type AgentSessionEvent, parseSkillBlock } from "../../core/agent-session.js";
 import { type AgentSessionRuntime, SessionImportFileNotFoundError } from "../../core/agent-session-runtime.js";
 import type {
+	AutocompleteProviderFactory,
 	ExtensionCommandContext,
 	ExtensionContext,
 	ExtensionRunner,
@@ -191,7 +193,8 @@ export class InteractiveMode {
 	private statusContainer: Container;
 	private defaultEditor: CustomEditor;
 	private editor: EditorComponent;
-	private autocompleteProvider: CombinedAutocompleteProvider | undefined;
+	private autocompleteProvider: AutocompleteProvider | undefined;
+	private autocompleteProviderWrappers: AutocompleteProviderFactory[] = [];
 	private fdPath: string | undefined;
 	private editorContainer: Container;
 	private footer: FooterComponent;
@@ -391,7 +394,7 @@ export class InteractiveMode {
 			}));
 	}
 
-	private setupAutocomplete(fdPath: string | undefined): void {
+	private createBaseAutocompleteProvider(): AutocompleteProvider {
 		// Define commands for autocomplete
 		const slashCommands: SlashCommand[] = BUILTIN_SLASH_COMMANDS.map((command) => ({
 			name: command.name,
@@ -461,15 +464,23 @@ export class InteractiveMode {
 			}
 		}
 
-		// Setup autocomplete
-		this.autocompleteProvider = new CombinedAutocompleteProvider(
+		return new CombinedAutocompleteProvider(
 			[...slashCommands, ...templateCommands, ...extensionCommands, ...skillCommandList],
 			this.sessionManager.getCwd(),
-			fdPath,
+			this.fdPath,
 		);
-		this.defaultEditor.setAutocompleteProvider(this.autocompleteProvider);
+	}
+
+	private setupAutocompleteProvider(): void {
+		let provider = this.createBaseAutocompleteProvider();
+		for (const wrapProvider of this.autocompleteProviderWrappers) {
+			provider = wrapProvider(provider);
+		}
+
+		this.autocompleteProvider = provider;
+		this.defaultEditor.setAutocompleteProvider(provider);
 		if (this.editor !== this.defaultEditor) {
-			this.editor.setAutocompleteProvider?.(this.autocompleteProvider);
+			this.editor.setAutocompleteProvider?.(provider);
 		}
 	}
 
@@ -1492,7 +1503,7 @@ export class InteractiveMode {
 		});
 
 		setRegisteredThemes(this.session.resourceLoader.getThemes().themes);
-		this.setupAutocomplete(this.fdPath);
+		this.setupAutocompleteProvider();
 
 		const extensionRunner = this.session.extensionRunner;
 		this.setupExtensionShortcuts(extensionRunner);
@@ -1708,7 +1719,9 @@ export class InteractiveMode {
 		this.clearExtensionWidgets();
 		this.footerDataProvider.clearExtensionStatuses();
 		this.footer.invalidate();
+		this.autocompleteProviderWrappers = [];
 		this.setCustomEditorComponent(undefined);
+		this.setupAutocompleteProvider();
 		this.defaultEditor.onExtensionShortcut = undefined;
 		this.updateTerminalTitle();
 		this.pendingWorkingMessage = undefined;
@@ -1886,6 +1899,10 @@ export class InteractiveMode {
 			setEditorText: (text) => this.editor.setText(text),
 			getEditorText: () => this.editor.getExpandedText?.() ?? this.editor.getText(),
 			editor: (title, prefill) => this.showExtensionEditor(title, prefill),
+			addAutocompleteProvider: (factory) => {
+				this.autocompleteProviderWrappers.push(factory);
+				this.setupAutocompleteProvider();
+			},
 			setEditorComponent: (factory) => this.setCustomEditorComponent(factory),
 			get theme() {
 				return theme;
@@ -3705,7 +3722,7 @@ export class InteractiveMode {
 					},
 					onEnableSkillCommandsChange: (enabled) => {
 						this.settingsManager.setEnableSkillCommands(enabled);
-						this.setupAutocomplete(this.fdPath);
+						this.setupAutocompleteProvider();
 					},
 					onSteeringModeChange: (mode) => {
 						this.session.setSteeringMode(mode);
@@ -4493,7 +4510,7 @@ export class InteractiveMode {
 			}
 			this.ui.setShowHardwareCursor(this.settingsManager.getShowHardwareCursor());
 			this.ui.setClearOnShrink(this.settingsManager.getClearOnShrink());
-			this.setupAutocomplete(this.fdPath);
+			this.setupAutocompleteProvider();
 			const runner = this.session.extensionRunner;
 			this.setupExtensionShortcuts(runner);
 			this.rebuildChatFromMessages();

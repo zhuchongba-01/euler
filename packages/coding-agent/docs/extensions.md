@@ -2063,6 +2063,7 @@ Extensions can interact with users via `ctx.ui` methods and customize how messag
 - Status indicators (setStatus)
 - Working message and indicator during streaming (`setWorkingMessage`, `setWorkingIndicator`)
 - Widgets above/below editor (setWidget)
+- Autocomplete providers layered on top of built-in slash/path completion (addAutocompleteProvider)
 - Custom footers (setFooter)
 
 ### Dialogs
@@ -2184,6 +2185,28 @@ const current = ctx.ui.getEditorText();
 // Paste into editor (triggers paste handling, including collapse for large content)
 ctx.ui.pasteToEditor("pasted content");
 
+// Stack custom autocomplete behavior on top of the built-in provider
+ctx.ui.addAutocompleteProvider((current) => ({
+  async getSuggestions(lines, line, col, options) {
+    const beforeCursor = (lines[line] ?? "").slice(0, col);
+    const match = beforeCursor.match(/(?:^|[ \t])#([^\s#]*)$/);
+    if (!match) {
+      return current.getSuggestions(lines, line, col, options);
+    }
+
+    return {
+      prefix: `#${match[1] ?? ""}`,
+      items: [{ value: "#2983", label: "#2983", description: "Extension API for autocomplete" }],
+    };
+  },
+  applyCompletion(lines, line, col, item, prefix) {
+    return current.applyCompletion(lines, line, col, item, prefix);
+  },
+  shouldTriggerFileCompletion(lines, line, col) {
+    return current.shouldTriggerFileCompletion?.(lines, line, col) ?? true;
+  },
+}));
+
 // Tool output expansion
 const wasExpanded = ctx.ui.getToolsExpanded();
 ctx.ui.setToolsExpanded(true);
@@ -2205,6 +2228,50 @@ ctx.ui.theme.fg("accent", "styled text");  // Access current theme
 ```
 
 Custom working-indicator frames are rendered verbatim. If you want colors, add them to the frame strings yourself, for example with `ctx.ui.theme.fg(...)`.
+
+### Autocomplete Providers
+
+Use `ctx.ui.addAutocompleteProvider()` to stack custom autocomplete logic on top of the built-in slash-command and path provider.
+
+Typical pattern:
+
+- inspect the text before the cursor
+- return your own suggestions when your extension-specific syntax matches
+- otherwise delegate to `current.getSuggestions(...)`
+- delegate `applyCompletion(...)` unless you need custom insertion behavior
+
+```typescript
+pi.on("session_start", (_event, ctx) => {
+  ctx.ui.addAutocompleteProvider((current) => ({
+    async getSuggestions(lines, cursorLine, cursorCol, options) {
+      const line = lines[cursorLine] ?? "";
+      const beforeCursor = line.slice(0, cursorCol);
+      const match = beforeCursor.match(/(?:^|[ \t])#([^\s#]*)$/);
+      if (!match) {
+        return current.getSuggestions(lines, cursorLine, cursorCol, options);
+      }
+
+      return {
+        prefix: `#${match[1] ?? ""}`,
+        items: [
+          { value: "#2983", label: "#2983", description: "Extension API for registering custom @ autocomplete providers" },
+          { value: "#2753", label: "#2753", description: "Reload stale resource settings" },
+        ],
+      };
+    },
+
+    applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
+      return current.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
+    },
+
+    shouldTriggerFileCompletion(lines, cursorLine, cursorCol) {
+      return current.shouldTriggerFileCompletion?.(lines, cursorLine, cursorCol) ?? true;
+    },
+  }));
+});
+```
+
+See [github-issue-autocomplete.ts](../examples/extensions/github-issue-autocomplete.ts) for a complete example that preloads the latest open GitHub issues with `gh issue list` and filters them locally for fast `#...` completion. It requires GitHub CLI (`gh`) and a GitHub repository checkout.
 
 ### Custom Components
 
@@ -2429,6 +2496,7 @@ All examples in [examples/extensions/](../examples/extensions/).
 | **UI Components** |||
 | `status-line.ts` | Footer status indicator | `setStatus`, session events |
 | `working-indicator.ts` | Customize the streaming working indicator | `setWorkingIndicator`, `registerCommand` |
+| `github-issue-autocomplete.ts` | Add `#1234` issue completions on top of built-in autocomplete by preloading recent open issues from `gh issue list` | `addAutocompleteProvider`, `on("session_start")`, `exec` |
 | `custom-footer.ts` | Replace footer entirely | `registerCommand`, `setFooter` |
 | `custom-header.ts` | Replace startup header | `on("session_start")`, `setHeader` |
 | `modal-editor.ts` | Vim-style modal editor | `setEditorComponent`, `CustomEditor` |

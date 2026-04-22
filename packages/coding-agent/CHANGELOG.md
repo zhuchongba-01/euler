@@ -6,6 +6,7 @@
 
 - Added `structured-output.ts` extension example plus extension docs for terminating tool results, showing how a custom tool can return `terminate: true` so the agent ends on the tool call without an extra follow-up LLM turn ([#3525](https://github.com/badlogic/pi-mono/issues/3525))
 - Added OSC 9;4 terminal progress indicators during agent streaming and compaction, so terminals like iTerm2, WezTerm, Windows Terminal, and Kitty show activity in their tab bar
+- Added `ctx.ui.addAutocompleteProvider(...)` for stacking extension autocomplete providers on top of the built-in slash/path provider, plus a `github-issue-autocomplete.ts` example and extension docs ([#2983](https://github.com/badlogic/pi-mono/issues/2983))
 
 ### Breaking Changes
 

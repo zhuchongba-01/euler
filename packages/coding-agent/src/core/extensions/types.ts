@@ -30,6 +30,7 @@ import type {
 } from "@mariozechner/pi-ai";
 import type {
 	AutocompleteItem,
+	AutocompleteProvider,
 	Component,
 	EditorComponent,
 	EditorTheme,
@@ -111,6 +112,9 @@ export interface WorkingIndicatorOptions {
 	/** Frame interval in milliseconds for animated indicators. */
 	intervalMs?: number;
 }
+
+/** Wrap the current autocomplete provider with additional behavior. */
+export type AutocompleteProviderFactory = (current: AutocompleteProvider) => AutocompleteProvider;
 
 /**
  * UI context for extensions to request interactive UI.
@@ -205,6 +209,9 @@ export interface ExtensionUIContext {
 
 	/** Show a multi-line editor for text editing. */
 	editor(title: string, prefill?: string): Promise<string | undefined>;
+
+	/** Stack additional autocomplete behavior on top of the built-in provider. */
+	addAutocompleteProvider(factory: AutocompleteProviderFactory): void;
 
 	/**
 	 * Set a custom editor component via factory function.
