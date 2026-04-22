@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fixed `google-gemini-cli` built-in model discovery to include `gemini-3.1-flash-lite-preview`, so Cloud Code Assist model lists expose it without requiring manual `--model` fallback selection ([#3545](https://github.com/badlogic/pi-mono/issues/3545))
+- Fixed `transformMessages()` to synthesize missing trailing tool results for transcripts that end with unresolved assistant tool calls during direct low-level history replay ([#3555](https://github.com/badlogic/pi-mono/issues/3555))
 
 ## [0.68.1] - 2026-04-22
 
