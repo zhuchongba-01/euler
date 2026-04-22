@@ -18,10 +18,11 @@ import {
 	type SimpleStreamOptions,
 } from "@mariozechner/pi-ai";
 import { registerOAuthProvider, resetOAuthProviders } from "@mariozechner/pi-ai/oauth";
-import { type Static, Type } from "@sinclair/typebox";
-import AjvModule from "ajv";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+import { type Static, Type } from "typebox";
+import { Compile } from "typebox/compile";
+import type { TLocalizedValidationError } from "typebox/error";
 import { getAgentDir } from "../config.js";
 import type { AuthStorage } from "./auth-storage.js";
 import {
@@ -30,9 +31,6 @@ import {
 	resolveConfigValueUncached,
 	resolveHeadersOrThrow,
 } from "./resolve-config-value.js";
-
-const Ajv = (AjvModule as any).default || AjvModule;
-const ajv = new Ajv();
 
 // Schema for OpenRouter routing preferences
 const PercentileCutoffsSchema = Type.Object({
@@ -179,9 +177,22 @@ const ModelsConfigSchema = Type.Object({
 	providers: Type.Record(Type.String(), ProviderConfigSchema),
 });
 
-ajv.addSchema(ModelsConfigSchema, "ModelsConfig");
+const validateModelsConfig = Compile(ModelsConfigSchema);
 
 type ModelsConfig = Static<typeof ModelsConfigSchema>;
+
+function formatValidationPath(error: TLocalizedValidationError): string {
+	if (error.keyword === "required") {
+		const requiredProperties = (error.params as { requiredProperties?: string[] }).requiredProperties;
+		const requiredProperty = requiredProperties?.[0];
+		if (requiredProperty) {
+			const basePath = error.instancePath.replace(/^\//, "").replace(/\//g, ".");
+			return basePath ? `${basePath}.${requiredProperty}` : requiredProperty;
+		}
+	}
+	const path = error.instancePath.replace(/^\//, "").replace(/\//g, ".");
+	return path || "root";
+}
 
 /** Provider override config (baseUrl, compat) without request auth/headers */
 interface ProviderOverride {
@@ -417,16 +428,18 @@ export class ModelRegistry {
 
 		try {
 			const content = readFileSync(modelsJsonPath, "utf-8");
-			const config: ModelsConfig = JSON.parse(content);
+			const parsed = JSON.parse(content) as unknown;
 
-			// Validate schema
-			const validate = ajv.getSchema("ModelsConfig")!;
-			if (!validate(config)) {
+			if (!validateModelsConfig.Check(parsed)) {
 				const errors =
-					validate.errors?.map((e: any) => `  - ${e.instancePath || "root"}: ${e.message}`).join("\n") ||
-					"Unknown schema error";
+					validateModelsConfig
+						.Errors(parsed)
+						.map((error) => `  - ${formatValidationPath(error)}: ${error.message}`)
+						.join("\n") || "Unknown schema error";
 				return emptyCustomModelsResult(`Invalid models.json schema:\n${errors}\n\nFile: ${modelsJsonPath}`);
 			}
+
+			const config = parsed as ModelsConfig;
 
 			// Additional validation
 			this.validateConfig(config);
