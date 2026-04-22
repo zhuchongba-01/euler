@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Migrated TypeBox support from `@sinclair/typebox` 0.34.x plus AJV to `typebox` 1.x plus TypeBox's built-in validator and value-conversion APIs. Tool argument validation now runs in eval-restricted JavaScript runtimes such as Cloudflare Workers and other environments that disallow `eval` / `new Function`, instead of being silently skipped. Migration: install and import from `typebox` instead of `@sinclair/typebox`, and retest any coercion-sensitive tool paths that serialize schemas to plain JSON because those now go through the new TypeBox-based validation and coercion path rather than AJV ([#3112](https://github.com/badlogic/pi-mono/issues/3112))
+
 ### Fixed
 
 - Fixed `google-gemini-cli` built-in model discovery to include `gemini-3.1-flash-lite-preview`, so Cloud Code Assist model lists expose it without requiring manual `--model` fallback selection ([#3545](https://github.com/badlogic/pi-mono/issues/3545))

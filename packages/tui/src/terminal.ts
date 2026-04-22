@@ -363,8 +363,8 @@ export class ProcessTerminal implements Terminal {
 
 	setProgress(active: boolean): void {
 		if (active) {
-			// OSC 9;4;1;0 - indeterminate progress
-			process.stdout.write("\x1b]9;4;1;0\x07");
+			// OSC 9;4;3 - indeterminate progress
+			process.stdout.write("\x1b]9;4;3\x07");
 		} else {
 			// OSC 9;4;0 - clear progress
 			process.stdout.write("\x1b]9;4;0;\x07");

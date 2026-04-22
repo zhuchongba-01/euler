@@ -57,7 +57,7 @@ Create `~/.pi/agent/extensions/my-extension.ts`:
 
 ```typescript
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 
 export default function (pi: ExtensionAPI) {
   // React to events
@@ -139,7 +139,7 @@ To share extensions via npm or git as pi packages, see [packages.md](packages.md
 | Package | Purpose |
 |---------|---------|
 | `@mariozechner/pi-coding-agent` | Extension types (`ExtensionAPI`, `ExtensionContext`, events) |
-| `@sinclair/typebox` | Schema definitions for tool parameters |
+| `typebox` | Schema definitions for tool parameters |
 | `@mariozechner/pi-ai` | AI utilities (`StringEnum` for Google-compatible enums) |
 | `@mariozechner/pi-tui` | TUI components for custom rendering |
 
@@ -1139,7 +1139,7 @@ Example tool the LLM can call to trigger reload:
 
 ```typescript
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("reload-runtime", {
@@ -1186,7 +1186,7 @@ Use `promptSnippet` to opt a custom tool into a one-line entry in `Available too
 See [dynamic-tools.ts](../examples/extensions/dynamic-tools.ts) for a full example.
 
 ```typescript
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 
 pi.registerTool({
@@ -1657,7 +1657,7 @@ async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 ### Tool Definition
 
 ```typescript
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { Text } from "@mariozechner/pi-tui";
 

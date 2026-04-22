@@ -29,7 +29,6 @@ import { createEventBus, type EventBus } from "../event-bus.js";
 import type { ExecOptions } from "../exec.js";
 import { execCommand } from "../exec.js";
 import { createSyntheticSourceInfo } from "../source-info.js";
-import * as _bundledTypeboxCompilerCompat from "./typebox-compiler-compat.js";
 import type {
 	Extension,
 	ExtensionAPI,
@@ -47,11 +46,9 @@ const VIRTUAL_MODULES: Record<string, unknown> = {
 	typebox: _bundledTypebox,
 	"typebox/compile": _bundledTypeboxCompile,
 	"typebox/value": _bundledTypeboxValue,
-	"typebox/compiler": _bundledTypeboxCompilerCompat,
 	"@sinclair/typebox": _bundledTypebox,
 	"@sinclair/typebox/compile": _bundledTypeboxCompile,
 	"@sinclair/typebox/value": _bundledTypeboxValue,
-	"@sinclair/typebox/compiler": _bundledTypeboxCompilerCompat,
 	"@mariozechner/pi-agent-core": _bundledPiAgentCore,
 	"@mariozechner/pi-tui": _bundledPiTui,
 	"@mariozechner/pi-ai": _bundledPiAi,
@@ -67,14 +64,6 @@ const require = createRequire(import.meta.url);
  */
 let _aliases: Record<string, string> | null = null;
 
-function resolveTypeboxCompilerCompatPath(baseDir: string): string {
-	const jsPath = path.resolve(baseDir, "typebox-compiler-compat.js");
-	if (fs.existsSync(jsPath)) {
-		return jsPath;
-	}
-	return path.resolve(baseDir, "typebox-compiler-compat.ts");
-}
-
 function getAliases(): Record<string, string> {
 	if (_aliases) return _aliases;
 
@@ -84,7 +73,6 @@ function getAliases(): Record<string, string> {
 	const typeboxEntry = require.resolve("typebox");
 	const typeboxCompileEntry = require.resolve("typebox/compile");
 	const typeboxValueEntry = require.resolve("typebox/value");
-	const typeboxCompilerCompat = resolveTypeboxCompilerCompatPath(__dirname);
 
 	const packagesRoot = path.resolve(__dirname, "../../../../");
 	const resolveWorkspaceOrImport = (workspaceRelativePath: string, specifier: string): string => {
@@ -104,11 +92,9 @@ function getAliases(): Record<string, string> {
 		typebox: typeboxEntry,
 		"typebox/compile": typeboxCompileEntry,
 		"typebox/value": typeboxValueEntry,
-		"typebox/compiler": typeboxCompilerCompat,
 		"@sinclair/typebox": typeboxEntry,
 		"@sinclair/typebox/compile": typeboxCompileEntry,
 		"@sinclair/typebox/value": typeboxValueEntry,
-		"@sinclair/typebox/compiler": typeboxCompilerCompat,
 	};
 
 	return _aliases;
