@@ -1661,6 +1661,14 @@ export class DefaultPackageManager implements PackageManager {
 		await this.runCommand(npmCommand.command, [...npmCommand.args, ...args], options);
 	}
 
+	private getGitDependencyInstallArgs(): string[] {
+		const configuredCommand = this.settingsManager.getNpmCommand();
+		if (configuredCommand && configuredCommand.length > 0) {
+			return ["install"];
+		}
+		return ["install", "--omit=dev"];
+	}
+
 	private runNpmCommandSync(args: string[]): string {
 		const npmCommand = this.getNpmCommand();
 		return this.runCommandSync(npmCommand.command, [...npmCommand.args, ...args]);
@@ -1705,7 +1713,7 @@ export class DefaultPackageManager implements PackageManager {
 		}
 		const packageJsonPath = join(targetDir, "package.json");
 		if (existsSync(packageJsonPath)) {
-			await this.runNpmCommand(["install", "--omit=dev"], { cwd: targetDir });
+			await this.runNpmCommand(this.getGitDependencyInstallArgs(), { cwd: targetDir });
 		}
 	}
 
@@ -1740,7 +1748,7 @@ export class DefaultPackageManager implements PackageManager {
 
 		const packageJsonPath = join(targetDir, "package.json");
 		if (existsSync(packageJsonPath)) {
-			await this.runNpmCommand(["install", "--omit=dev"], { cwd: targetDir });
+			await this.runNpmCommand(this.getGitDependencyInstallArgs(), { cwd: targetDir });
 		}
 	}
 

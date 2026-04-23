@@ -127,7 +127,7 @@ When a provider requests a retry delay longer than `maxDelayMs` (e.g., Google's 
 }
 ```
 
-`npmCommand` is used for all npm package-manager operations, including `npm root -g`, installs, uninstalls, and `npm install` inside git packages. Use argv-style entries exactly as the process should be launched.
+`npmCommand` is used for all npm package-manager operations, including `npm root -g`, installs, uninstalls, and dependency installs inside git packages. Use argv-style entries exactly as the process should be launched. When `npmCommand` is configured, git package dependency installs use plain `install` to avoid npm-specific flags in wrappers or alternate package managers.
 
 ### Sessions
 
