@@ -9,6 +9,7 @@ import {
 } from "@mariozechner/pi-tui";
 import type { AuthStorage } from "../../../core/auth-storage.js";
 import { theme } from "../theme/theme.js";
+import { getAuthSelectorIndicator } from "./auth-selector-status.js";
 import { DynamicBorder } from "./dynamic-border.js";
 
 export type AuthSelectorProvider = {
@@ -114,11 +115,7 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 
 			const isSelected = i === this.selectedIndex;
 
-			// Check if user is configured for this provider
-			const credentials = this.authStorage.get(provider.id);
-			const statusIndicator = credentials
-				? theme.fg("success", " ✓ configured")
-				: theme.fg("muted", " • unconfigured");
+			const statusIndicator = this.formatStatusIndicator(provider);
 			let line = "";
 			if (isSelected) {
 				const prefix = theme.fg("accent", "→ ");
@@ -147,6 +144,32 @@ export class OAuthSelectorComponent extends Container implements Focusable {
 					: "No matching providers";
 			this.listContainer.addChild(new TruncatedText(theme.fg("muted", `  ${message}`), 0, 0));
 		}
+	}
+
+	private formatStatusIndicator(provider: AuthSelectorProvider): string {
+		const status = provider.authType === "api_key" ? this.authStorage.getAuthStatus(provider.id) : undefined;
+		const indicator = getAuthSelectorIndicator(provider.authType, this.authStorage.get(provider.id), status);
+
+		if (indicator.kind === "configured") {
+			return theme.fg("success", ` ✓ ${indicator.label}`);
+		}
+
+		if (indicator.kind === "configured-other") {
+			return theme.fg("muted", " • ") + theme.fg("warning", indicator.label);
+		}
+
+		const base = theme.fg("muted", " • unconfigured");
+		if (indicator.kind === "environment") {
+			return base + theme.fg("success", ` · env: ${indicator.label}`);
+		}
+		if (indicator.kind === "runtime") {
+			return base + theme.fg("success", " · runtime API key");
+		}
+		if (indicator.kind === "fallback") {
+			return base + theme.fg("success", " · custom API key");
+		}
+
+		return base;
 	}
 
 	handleInput(keyData: string): void {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getEnvApiKey } from "../src/env-api-keys.js";
+import { getEnvApiKey, getEnvApiKeyInfo } from "../src/env-api-keys.js";
 import { getModel } from "../src/models.js";
 
 const originalFireworksApiKey = process.env.FIREWORKS_API_KEY;
@@ -45,5 +45,9 @@ describe("Fireworks models", () => {
 		process.env.FIREWORKS_API_KEY = "test-fireworks-key";
 
 		expect(getEnvApiKey("fireworks")).toBe("test-fireworks-key");
+		expect(getEnvApiKeyInfo("fireworks")).toEqual({
+			value: "test-fireworks-key",
+			label: "FIREWORKS_API_KEY",
+		});
 	});
 });

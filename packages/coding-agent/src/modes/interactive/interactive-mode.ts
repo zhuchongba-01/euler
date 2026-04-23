@@ -8,7 +8,14 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { AssistantMessage, ImageContent, Message, Model, OAuthProviderId } from "@mariozechner/pi-ai";
+import {
+	type AssistantMessage,
+	getProviders,
+	type ImageContent,
+	type Message,
+	type Model,
+	type OAuthProviderId,
+} from "@mariozechner/pi-ai";
 import type {
 	AutocompleteItem,
 	AutocompleteProvider,
@@ -168,7 +175,8 @@ function hasDefaultModelProvider(providerId: string): providerId is keyof typeof
 	return providerId in defaultModelPerProvider;
 }
 
-const API_KEY_PROVIDER_NAMES: Record<string, string> = {
+const API_KEY_LOGIN_PROVIDERS: Record<string, string> = {
+	anthropic: "Anthropic",
 	"azure-openai-responses": "Azure OpenAI Responses",
 	cerebras: "Cerebras",
 	fireworks: "Fireworks",
@@ -189,10 +197,25 @@ const API_KEY_PROVIDER_NAMES: Record<string, string> = {
 	zai: "ZAI",
 };
 
-const API_KEY_LOGIN_PROVIDER_BLOCKLIST = new Set(["amazon-bedrock", "llama.cpp", "lmstudio", "ollama"]);
+const BUILT_IN_API_KEY_LOGIN_PROVIDERS = new Set(Object.keys(API_KEY_LOGIN_PROVIDERS));
+const BUILT_IN_MODEL_PROVIDERS = new Set<string>(getProviders());
 
-function getApiKeyProviderDisplayName(providerId: string): string {
-	return API_KEY_PROVIDER_NAMES[providerId] ?? providerId;
+export function isApiKeyLoginProvider(
+	providerId: string,
+	oauthProviderIds: ReadonlySet<string>,
+	builtInProviderIds: ReadonlySet<string> = BUILT_IN_MODEL_PROVIDERS,
+): boolean {
+	if (BUILT_IN_API_KEY_LOGIN_PROVIDERS.has(providerId)) {
+		return true;
+	}
+	if (builtInProviderIds.has(providerId)) {
+		return false;
+	}
+	return !oauthProviderIds.has(providerId);
+}
+
+export function getApiKeyProviderDisplayName(providerId: string): string {
+	return API_KEY_LOGIN_PROVIDERS[providerId] ?? providerId;
 }
 
 /**
@@ -4325,7 +4348,7 @@ export class InteractiveMode {
 
 		const modelProviders = new Set(this.session.modelRegistry.getAll().map((model) => model.provider));
 		for (const providerId of modelProviders) {
-			if (oauthProviderIds.has(providerId) || API_KEY_LOGIN_PROVIDER_BLOCKLIST.has(providerId)) {
+			if (!isApiKeyLoginProvider(providerId, oauthProviderIds)) {
 				continue;
 			}
 			options.push({
