@@ -9,7 +9,6 @@
 import {
 	findEnvKeys,
 	getEnvApiKey,
-	hasEnvAuth,
 	type OAuthCredentials,
 	type OAuthLoginCallbacks,
 	type OAuthProviderId,
@@ -332,7 +331,7 @@ export class AuthStorage {
 	hasAuth(provider: string): boolean {
 		if (this.runtimeOverrides.has(provider)) return true;
 		if (this.data[provider]) return true;
-		if (hasEnvAuth(provider)) return true;
+		if (getEnvApiKey(provider)) return true;
 		if (this.fallbackResolver?.(provider)) return true;
 		return false;
 	}

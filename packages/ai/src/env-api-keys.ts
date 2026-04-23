@@ -108,30 +108,6 @@ export function findEnvKeys(provider: string): string[] | undefined {
 }
 
 /**
- * Check if a provider has environment-backed authentication available.
- *
- * This includes non-API-key credential sources such as AWS credentials for Bedrock.
- */
-export function hasEnvAuth(provider: KnownProvider): boolean;
-export function hasEnvAuth(provider: string): boolean;
-export function hasEnvAuth(provider: string): boolean {
-	if (findEnvKeys(provider)) return true;
-
-	if (provider === "amazon-bedrock") {
-		return !!(
-			process.env.AWS_PROFILE ||
-			(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ||
-			process.env.AWS_BEARER_TOKEN_BEDROCK ||
-			process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI ||
-			process.env.AWS_CONTAINER_CREDENTIALS_FULL_URI ||
-			process.env.AWS_WEB_IDENTITY_TOKEN_FILE
-		);
-	}
-
-	return false;
-}
-
-/**
  * Get API key for provider from known environment variables, e.g. OPENAI_API_KEY.
  *
  * Will not return API keys for providers that require OAuth tokens.
@@ -150,6 +126,26 @@ export function getEnvApiKey(provider: string): string | undefined {
 		const hasLocation = !!process.env.GOOGLE_CLOUD_LOCATION;
 
 		if (hasCredentials && hasProject && hasLocation) {
+			return "<authenticated>";
+		}
+	}
+
+	if (provider === "amazon-bedrock") {
+		// Amazon Bedrock supports multiple credential sources:
+		// 1. AWS_PROFILE - named profile from ~/.aws/credentials
+		// 2. AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY - standard IAM keys
+		// 3. AWS_BEARER_TOKEN_BEDROCK - Bedrock bearer token
+		// 4. AWS_CONTAINER_CREDENTIALS_RELATIVE_URI - ECS task roles
+		// 5. AWS_CONTAINER_CREDENTIALS_FULL_URI - ECS task roles (full URI)
+		// 6. AWS_WEB_IDENTITY_TOKEN_FILE - IRSA (IAM Roles for Service Accounts)
+		if (
+			process.env.AWS_PROFILE ||
+			(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ||
+			process.env.AWS_BEARER_TOKEN_BEDROCK ||
+			process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI ||
+			process.env.AWS_CONTAINER_CREDENTIALS_FULL_URI ||
+			process.env.AWS_WEB_IDENTITY_TOKEN_FILE
+		) {
 			return "<authenticated>";
 		}
 	}
