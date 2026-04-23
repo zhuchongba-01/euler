@@ -21,10 +21,12 @@
 
 ### Changed
 
+- Updated default model selection across providers to current recommended models.
 - Improved stale extension context errors after session replacement or reload to tell extension authors to avoid captured `pi`/command `ctx` and use `withSession` for post-replacement work.
 
 ### Fixed
 
+- Added Amazon Bedrock setup guidance to `/login` and updated `/model` copy to refer to configured providers instead of only API keys.
 - Improved no-model and missing-auth warnings to point users to `/login` for OAuth or API key setup.
 - Fixed `/quit` shutdown ordering to stop the TUI before extension UI teardown can repaint, preserving the final rendered frame while still emitting `session_shutdown` before process exit.
 - Fixed `SettingsManager.inMemory()` initial settings being lost after reloads triggered by SDK resource loading ([#3616](https://github.com/badlogic/pi-mono/issues/3616))
