@@ -552,6 +552,41 @@ describe("openai-completions tool_choice", () => {
 		expect(toolCall).not.toHaveProperty("partialArgs");
 	});
 
+	it("does not double-count reasoning tokens in completion usage", async () => {
+		mockState.chunks = [
+			{
+				id: "chatcmpl-reasoning-usage",
+				choices: [{ delta: {}, finish_reason: "stop" }],
+				usage: {
+					prompt_tokens: 10,
+					completion_tokens: 33,
+					prompt_tokens_details: { cached_tokens: 0 },
+					completion_tokens_details: { reasoning_tokens: 21 },
+				},
+			},
+		];
+
+		const { compat: _compat, ...baseModel } = getModel("openai", "gpt-4o-mini")!;
+		const model = { ...baseModel, api: "openai-completions" } as const;
+		const response = await streamSimple(
+			model,
+			{
+				messages: [
+					{
+						role: "user",
+						content: "Use reasoning.",
+						timestamp: Date.now(),
+					},
+				],
+			},
+			{ apiKey: "test" },
+		).result();
+
+		expect(response.usage.input).toBe(10);
+		expect(response.usage.output).toBe(33);
+		expect(response.usage.totalTokens).toBe(43);
+	});
+
 	it("preserves prompt_tokens_details.cache_write_tokens from chunk usage", async () => {
 		mockState.chunks = [
 			{

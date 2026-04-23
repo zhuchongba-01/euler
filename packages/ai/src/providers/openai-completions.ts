@@ -465,15 +465,18 @@ function buildParams(
 	cacheRetention: CacheRetention = resolveCacheRetention(options?.cacheRetention),
 ) {
 	const messages = convertMessages(model, context, compat);
-	const cacheControl = getCompatCacheControl(model, compat, cacheRetention);
+	const cacheControl = getCompatCacheControl(compat, cacheRetention);
 
 	const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
 		model: model.id,
 		messages,
 		stream: true,
 		prompt_cache_key:
-			model.baseUrl.includes("api.openai.com") && cacheRetention !== "none" ? options?.sessionId : undefined,
-		prompt_cache_retention: model.baseUrl.includes("api.openai.com") && cacheRetention === "long" ? "24h" : undefined,
+			(model.baseUrl.includes("api.openai.com") && cacheRetention !== "none") ||
+			(cacheRetention === "long" && compat.supportsLongCacheRetention)
+				? options?.sessionId
+				: undefined,
+		prompt_cache_retention: cacheRetention === "long" && compat.supportsLongCacheRetention ? "24h" : undefined,
 	};
 
 	if (compat.supportsUsageInStreaming !== false) {
@@ -565,7 +568,6 @@ function mapReasoningEffort(
 }
 
 function getCompatCacheControl(
-	model: Model<"openai-completions">,
 	compat: ResolvedOpenAICompletionsCompat,
 	cacheRetention: CacheRetention,
 ): OpenAICompatCacheControl | undefined {
@@ -573,7 +575,7 @@ function getCompatCacheControl(
 		return undefined;
 	}
 
-	const ttl = cacheRetention === "long" && model.baseUrl.includes("api.anthropic.com") ? "1h" : undefined;
+	const ttl = cacheRetention === "long" && compat.supportsLongCacheRetention ? "1h" : undefined;
 	return { type: "ephemeral", ...(ttl ? { ttl } : {}) };
 }
 
@@ -937,14 +939,12 @@ function parseChunkUsage(
 		prompt_tokens?: number;
 		completion_tokens?: number;
 		prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
-		completion_tokens_details?: { reasoning_tokens?: number };
 	},
 	model: Model<"openai-completions">,
 ): AssistantMessage["usage"] {
 	const promptTokens = rawUsage.prompt_tokens || 0;
 	const reportedCachedTokens = rawUsage.prompt_tokens_details?.cached_tokens || 0;
 	const cacheWriteTokens = rawUsage.prompt_tokens_details?.cache_write_tokens || 0;
-	const reasoningTokens = rawUsage.completion_tokens_details?.reasoning_tokens || 0;
 
 	// Normalize to pi-ai semantics:
 	// - cacheRead: hits from cache created by previous requests only
@@ -955,9 +955,8 @@ function parseChunkUsage(
 		cacheWriteTokens > 0 ? Math.max(0, reportedCachedTokens - cacheWriteTokens) : reportedCachedTokens;
 
 	const input = Math.max(0, promptTokens - cacheReadTokens - cacheWriteTokens);
-	// Compute totalTokens ourselves since we add reasoning_tokens to output
-	// and some providers (e.g., Groq) don't include them in total_tokens
-	const outputTokens = (rawUsage.completion_tokens || 0) + reasoningTokens;
+	// OpenAI completion_tokens already includes reasoning_tokens.
+	const outputTokens = rawUsage.completion_tokens || 0;
 	const usage: AssistantMessage["usage"] = {
 		input,
 		output: outputTokens,
@@ -1055,6 +1054,7 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 		supportsStrictMode: true,
 		cacheControlFormat,
 		sendSessionAffinityHeaders: false,
+		supportsLongCacheRetention: true,
 	};
 }
 
@@ -1084,5 +1084,6 @@ function getCompat(model: Model<"openai-completions">): ResolvedOpenAICompletion
 		supportsStrictMode: model.compat.supportsStrictMode ?? detected.supportsStrictMode,
 		cacheControlFormat: model.compat.cacheControlFormat ?? detected.cacheControlFormat,
 		sendSessionAffinityHeaders: model.compat.sendSessionAffinityHeaders ?? detected.sendSessionAffinityHeaders,
+		supportsLongCacheRetention: model.compat.supportsLongCacheRetention ?? detected.supportsLongCacheRetention,
 	};
 }
