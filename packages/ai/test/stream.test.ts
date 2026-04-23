@@ -1135,12 +1135,12 @@ describe("Generate E2E Tests", () => {
 			await handleStreaming(llm, { apiKey: openaiCodexToken });
 		});
 
-		it.skipIf(!openaiCodexToken)("should handle thinking with reasoningEffort high", { retry: 3 }, async () => {
-			await handleThinking(llm, { apiKey: openaiCodexToken, reasoningEffort: "high" });
+		it.skipIf(!openaiCodexToken)("should handle thinking with reasoningEffort xhigh", { retry: 3 }, async () => {
+			await handleThinking(llm, { apiKey: openaiCodexToken, reasoningEffort: "xhigh" });
 		});
 
 		it.skipIf(!openaiCodexToken)("should handle multi-turn with thinking and tools", { retry: 3 }, async () => {
-			await multiTurn(llm, { apiKey: openaiCodexToken, reasoningEffort: "high" });
+			await multiTurn(llm, { apiKey: openaiCodexToken, reasoningEffort: "xhigh" });
 		});
 
 		it.skipIf(!openaiCodexToken)("should handle image input", { retry: 3 }, async () => {
@@ -1164,12 +1164,12 @@ describe("Generate E2E Tests", () => {
 			await handleStreaming(llm, wsOptions);
 		});
 
-		it.skipIf(!openaiCodexToken)("should handle thinking with reasoningEffort high", { retry: 3 }, async () => {
-			await handleThinking(llm, { ...wsOptions, reasoningEffort: "high" });
+		it.skipIf(!openaiCodexToken)("should handle thinking with reasoningEffort xhigh", { retry: 3 }, async () => {
+			await handleThinking(llm, { ...wsOptions, reasoningEffort: "xhigh" });
 		});
 
 		it.skipIf(!openaiCodexToken)("should handle multi-turn with thinking and tools", { retry: 3 }, async () => {
-			await multiTurn(llm, { ...wsOptions, reasoningEffort: "high" });
+			await multiTurn(llm, { ...wsOptions, reasoningEffort: "xhigh" });
 		});
 
 		it.skipIf(!openaiCodexToken)("should handle image input", { retry: 3 }, async () => {
