@@ -7,8 +7,9 @@
  */
 
 import {
+	findEnvKeys,
 	getEnvApiKey,
-	getEnvApiKeyInfo,
+	hasEnvAuth,
 	type OAuthCredentials,
 	type OAuthLoginCallbacks,
 	type OAuthProviderId,
@@ -331,7 +332,7 @@ export class AuthStorage {
 	hasAuth(provider: string): boolean {
 		if (this.runtimeOverrides.has(provider)) return true;
 		if (this.data[provider]) return true;
-		if (getEnvApiKey(provider)) return true;
+		if (hasEnvAuth(provider)) return true;
 		if (this.fallbackResolver?.(provider)) return true;
 		return false;
 	}
@@ -348,9 +349,9 @@ export class AuthStorage {
 			return { configured: false, source: "runtime", label: "--api-key" };
 		}
 
-		const envKey = getEnvApiKeyInfo(provider);
-		if (envKey) {
-			return { configured: false, source: "environment", label: envKey.label };
+		const envKeys = findEnvKeys(provider);
+		if (envKeys?.[0]) {
+			return { configured: false, source: "environment", label: envKeys[0] };
 		}
 
 		if (this.fallbackResolver?.(provider)) {
