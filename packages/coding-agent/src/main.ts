@@ -366,10 +366,11 @@ function buildSessionOptions(
 
 	// Tools
 	if (parsed.noTools) {
-		// --no-tools: start with no built-in tools
-		// --tools can still add specific ones back, including extension tools.
-		options.tools = parsed.tools && parsed.tools.length > 0 ? [...parsed.tools] : [];
-	} else if (parsed.tools) {
+		options.noTools = "all";
+	} else if (parsed.noBuiltinTools) {
+		options.noTools = "builtin";
+	}
+	if (parsed.tools) {
 		options.tools = [...parsed.tools];
 	}
 
