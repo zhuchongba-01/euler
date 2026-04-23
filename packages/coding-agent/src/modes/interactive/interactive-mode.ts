@@ -1572,7 +1572,7 @@ export class InteractiveMode {
 
 		const extensionRunner = this.session.extensionRunner;
 		this.setupExtensionShortcuts(extensionRunner);
-		this.showLoadedResources({ force: false });
+		this.showLoadedResources({ force: false, showDiagnosticsWhenQuiet: true });
 		this.showStartupNoticesIfNeeded();
 	}
 
