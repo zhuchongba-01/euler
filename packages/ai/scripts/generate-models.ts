@@ -3,7 +3,13 @@
 import { writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { Api, KnownProvider, Model, type OpenAICompletionsCompat } from "../src/types.js";
+import {
+	Api,
+	type AnthropicMessagesCompat,
+	KnownProvider,
+	Model,
+	type OpenAICompletionsCompat,
+} from "../src/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,6 +66,13 @@ const KIMI_STATIC_HEADERS = {
 const AI_GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1";
 const AI_GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh";
 const ZAI_TOOL_STREAM_UNSUPPORTED_MODELS = new Set(["glm-4.5", "glm-4.5-air", "glm-4.5-flash", "glm-4.5v"]);
+const EAGER_TOOL_INPUT_STREAMING_UNSUPPORTED_ANTHROPIC_MODELS = new Set(["github-copilot:claude-haiku-4.5"]);
+
+function getAnthropicMessagesCompat(provider: string, modelId: string): AnthropicMessagesCompat | undefined {
+	return EAGER_TOOL_INPUT_STREAMING_UNSUPPORTED_ANTHROPIC_MODELS.has(`${provider}:${modelId}`)
+		? { supportsEagerToolInputStreaming: false }
+		: undefined;
+}
 
 function getBedrockBaseUrl(modelId: string): string {
 	return modelId.startsWith("eu.")
@@ -582,6 +595,9 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 						? "openai-responses"
 						: "openai-completions";
 
+				const anthropicCompat =
+					api === "anthropic-messages" ? getAnthropicMessagesCompat("github-copilot", modelId) : undefined;
+
 				const copilotModel: Model<any> = {
 					id: modelId,
 					name: m.name || modelId,
@@ -599,6 +615,7 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					contextWindow: m.limit?.context || 128000,
 					maxTokens: m.limit?.output || 8192,
 					headers: { ...COPILOT_STATIC_HEADERS },
+					...(anthropicCompat ? { compat: anthropicCompat } : {}),
 					// compat only applies to openai-completions
 					...(api === "openai-completions" ? {
 						compat: {

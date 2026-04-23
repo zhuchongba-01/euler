@@ -304,6 +304,18 @@ export interface OpenAIResponsesCompat {
 	sendSessionIdHeader?: boolean;
 }
 
+/** Compatibility settings for Anthropic Messages-compatible APIs. */
+export interface AnthropicMessagesCompat {
+	/**
+	 * Whether the provider accepts per-tool `eager_input_streaming`.
+	 * When false, the Anthropic provider omits `tools[].eager_input_streaming`
+	 * and sends the legacy `fine-grained-tool-streaming-2025-05-14` beta header
+	 * for tool-enabled requests.
+	 * Default: true.
+	 */
+	supportsEagerToolInputStreaming?: boolean;
+}
+
 /**
  * OpenRouter provider routing preferences.
  * Controls which upstream providers OpenRouter routes requests to.
@@ -414,5 +426,7 @@ export interface Model<TApi extends Api> {
 		? OpenAICompletionsCompat
 		: TApi extends "openai-responses"
 			? OpenAIResponsesCompat
-			: never;
+			: TApi extends "anthropic-messages"
+				? AnthropicMessagesCompat
+				: never;
 }
