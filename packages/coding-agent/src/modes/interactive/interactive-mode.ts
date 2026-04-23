@@ -279,9 +279,6 @@ export class InteractiveMode {
 	// Tool execution tracking: toolCallId -> component
 	private pendingTools = new Map<string, ToolExecutionComponent>();
 
-	// Track first user message to avoid leading spacer at top of chat
-	private isFirstUserMessage = true;
-
 	// Tool output expansion state
 	private toolOutputExpanded = false;
 
@@ -3035,7 +3032,7 @@ export class InteractiveMode {
 			case "user": {
 				const textContent = this.getUserMessageText(message);
 				if (textContent) {
-					if (!this.isFirstUserMessage) {
+					if (this.chatContainer.children.length > 0) {
 						this.chatContainer.addChild(new Spacer(1));
 					}
 					const skillBlock = parseSkillBlock(textContent);
@@ -3059,7 +3056,6 @@ export class InteractiveMode {
 						const userComponent = new UserMessageComponent(textContent, this.getMarkdownThemeWithSettings());
 						this.chatContainer.addChild(userComponent);
 					}
-					this.isFirstUserMessage = false;
 					if (options?.populateHistory) {
 						this.editor.addToHistory?.(textContent);
 					}
@@ -3097,7 +3093,6 @@ export class InteractiveMode {
 		options: { updateFooter?: boolean; populateHistory?: boolean } = {},
 	): void {
 		this.pendingTools.clear();
-		this.isFirstUserMessage = true;
 
 		if (options.updateFooter) {
 			this.footer.invalidate();
