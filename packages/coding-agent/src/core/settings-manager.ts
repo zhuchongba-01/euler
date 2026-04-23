@@ -289,7 +289,9 @@ export class SettingsManager {
 	/** Create an in-memory SettingsManager (no file I/O) */
 	static inMemory(settings: Partial<Settings> = {}): SettingsManager {
 		const storage = new InMemorySettingsStorage();
-		return new SettingsManager(storage, settings, {});
+		const initialSettings = SettingsManager.migrateSettings(structuredClone(settings) as Record<string, unknown>);
+		storage.withLock("global", () => JSON.stringify(initialSettings, null, 2));
+		return SettingsManager.fromStorage(storage);
 	}
 
 	private static loadFromStorage(storage: SettingsStorage, scope: SettingsScope): Settings {
