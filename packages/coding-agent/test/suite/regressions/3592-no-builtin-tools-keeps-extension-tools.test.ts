@@ -4,6 +4,10 @@ import { join } from "node:path";
 import { getModel } from "@mariozechner/pi-ai";
 import { Type } from "typebox";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+	createAgentSessionFromServices,
+	createAgentSessionServices,
+} from "../../../src/core/agent-session-services.js";
 import { DefaultResourceLoader } from "../../../src/core/resource-loader.js";
 import { createAgentSession } from "../../../src/core/sdk.js";
 import { SessionManager } from "../../../src/core/session-manager.js";
@@ -88,6 +92,28 @@ describe("regression #3592: no-builtin-tools keeps extension tools enabled", () 
 		expect(session.getAllTools()).toEqual([]);
 		expect(session.getActiveToolNames()).toEqual([]);
 		expect(session.systemPrompt).toContain("Available tools:\n(none)");
+		session.dispose();
+	});
+
+	it("propagates noTools through service-based session creation", async () => {
+		const settingsManager = SettingsManager.create(tempDir, agentDir);
+		const sessionManager = SessionManager.inMemory(tempDir);
+		const services = await createAgentSessionServices({
+			cwd: tempDir,
+			agentDir,
+			settingsManager,
+		});
+
+		const { session } = await createAgentSessionFromServices({
+			services,
+			sessionManager,
+			model: getModel("anthropic", "claude-sonnet-4-5")!,
+			noTools: "builtin",
+		});
+
+		expect(session.getActiveToolNames()).toEqual([]);
+		expect(session.systemPrompt).toContain("Available tools:\n(none)");
+		expect(session.systemPrompt).not.toContain("- read:");
 		session.dispose();
 	});
 });
