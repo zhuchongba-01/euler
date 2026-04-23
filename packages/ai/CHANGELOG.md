@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Fixed `openai-responses` compatibility by adding `compat.sendSessionIdHeader: false`, allowing strict OpenAI-compatible proxies to omit the underscore-containing `session_id` header while still sending other session-affinity headers ([#3579](https://github.com/badlogic/pi-mono/issues/3579))
 - Fixed `anthropic-messages` tool streaming compatibility by adding `compat.supportsEagerToolInputStreaming`, allowing Anthropic-compatible providers to omit per-tool `eager_input_streaming` and use the legacy fine-grained tool streaming beta header instead ([#3575](https://github.com/badlogic/pi-mono/issues/3575))
 - Fixed `supportsXhigh()` to recognize `openai-codex` `gpt-5.5`, preserving `xhigh` reasoning requests instead of clamping them to `high`.
 - Fixed `openai-completions` streamed tool-call assembly to coalesce deltas by stable tool index when OpenAI-compatible gateways mutate tool call IDs mid-stream, preventing malformed Kimi K2.6/OpenCode tool streams from splitting one call into multiple bogus tool calls ([#3576](https://github.com/badlogic/pi-mono/issues/3576))

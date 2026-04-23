@@ -180,7 +180,9 @@ function createClient(
 	}
 
 	if (sessionId) {
-		headers.session_id = sessionId;
+		if (model.compat?.sendSessionIdHeader !== false) {
+			headers.session_id = sessionId;
+		}
 		headers["x-client-request-id"] = sessionId;
 	}
 

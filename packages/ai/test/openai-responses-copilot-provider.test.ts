@@ -108,6 +108,18 @@ describe("openai-responses provider defaults", () => {
 		expect(captured).toEqual({ sessionId: "session-123", clientRequestId: "session-123" });
 	});
 
+	it("can omit the session_id header while preserving other cache-affinity headers", async () => {
+		const proxyModel: Model<"openai-responses"> = {
+			...getModel("openai", "gpt-5.4"),
+			provider: "opencode",
+			baseUrl: "https://proxy.example.com/v1",
+			compat: { sendSessionIdHeader: false },
+		};
+		const captured = await captureOpenAIResponseHeaders({ sessionId: "session-123" }, proxyModel);
+
+		expect(captured).toEqual({ sessionId: null, clientRequestId: "session-123" });
+	});
+
 	it("lets explicit headers override the default OpenAI cache-affinity headers", async () => {
 		const captured = await captureOpenAIResponseHeaders({
 			sessionId: "session-123",
