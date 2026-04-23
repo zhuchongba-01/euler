@@ -111,14 +111,17 @@ const OpenAICompletionsCompatSchema = Type.Object({
 	openRouterRouting: Type.Optional(OpenRouterRoutingSchema),
 	vercelGatewayRouting: Type.Optional(VercelGatewayRoutingSchema),
 	supportsStrictMode: Type.Optional(Type.Boolean()),
+	supportsLongCacheRetention: Type.Optional(Type.Boolean()),
 });
 
 const OpenAIResponsesCompatSchema = Type.Object({
-	// Reserved for future use
+	sendSessionIdHeader: Type.Optional(Type.Boolean()),
+	supportsLongCacheRetention: Type.Optional(Type.Boolean()),
 });
 
 const AnthropicMessagesCompatSchema = Type.Object({
 	supportsEagerToolInputStreaming: Type.Optional(Type.Boolean()),
+	supportsLongCacheRetention: Type.Optional(Type.Boolean()),
 });
 
 const ProviderCompatSchema = Type.Union([

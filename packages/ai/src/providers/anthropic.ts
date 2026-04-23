@@ -51,14 +51,14 @@ function resolveCacheRetention(cacheRetention?: CacheRetention): CacheRetention 
 }
 
 function getCacheControl(
-	baseUrl: string,
+	model: Model<"anthropic-messages">,
 	cacheRetention?: CacheRetention,
 ): { retention: CacheRetention; cacheControl?: CacheControlEphemeral } {
 	const retention = resolveCacheRetention(cacheRetention);
 	if (retention === "none") {
 		return { retention };
 	}
-	const ttl = retention === "long" && baseUrl.includes("api.anthropic.com") ? "1h" : undefined;
+	const ttl = retention === "long" && getAnthropicCompat(model).supportsLongCacheRetention ? "1h" : undefined;
 	return {
 		retention,
 		cacheControl: { type: "ephemeral", ...(ttl && { ttl }) },
@@ -166,6 +166,7 @@ const INTERLEAVED_THINKING_BETA = "interleaved-thinking-2025-05-14";
 function getAnthropicCompat(model: Model<"anthropic-messages">): Required<AnthropicMessagesCompat> {
 	return {
 		supportsEagerToolInputStreaming: model.compat?.supportsEagerToolInputStreaming ?? true,
+		supportsLongCacheRetention: model.compat?.supportsLongCacheRetention ?? true,
 	};
 }
 
@@ -833,7 +834,7 @@ function buildParams(
 	isOAuthToken: boolean,
 	options?: AnthropicOptions,
 ): MessageCreateParamsStreaming {
-	const { cacheControl } = getCacheControl(model.baseUrl, options?.cacheRetention);
+	const { cacheControl } = getCacheControl(model, options?.cacheRetention);
 	const params: MessageCreateParamsStreaming = {
 		model: model.id,
 		messages: convertMessages(context.messages, model, isOAuthToken, cacheControl),

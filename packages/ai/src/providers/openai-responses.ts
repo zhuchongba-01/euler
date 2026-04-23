@@ -8,6 +8,7 @@ import type {
 	CacheRetention,
 	Context,
 	Model,
+	OpenAIResponsesCompat,
 	SimpleStreamOptions,
 	StreamFunction,
 	StreamOptions,
@@ -35,18 +36,18 @@ function resolveCacheRetention(cacheRetention?: CacheRetention): CacheRetention 
 	return "short";
 }
 
-/**
- * Get prompt cache retention based on cacheRetention and base URL.
- * Only applies to direct OpenAI API calls (api.openai.com).
- */
-function getPromptCacheRetention(baseUrl: string, cacheRetention: CacheRetention): "24h" | undefined {
-	if (cacheRetention !== "long") {
-		return undefined;
-	}
-	if (baseUrl.includes("api.openai.com")) {
-		return "24h";
-	}
-	return undefined;
+function getCompat(model: Model<"openai-responses">): Required<OpenAIResponsesCompat> {
+	return {
+		sendSessionIdHeader: model.compat?.sendSessionIdHeader ?? true,
+		supportsLongCacheRetention: model.compat?.supportsLongCacheRetention ?? true,
+	};
+}
+
+function getPromptCacheRetention(
+	compat: Required<OpenAIResponsesCompat>,
+	cacheRetention: CacheRetention,
+): "24h" | undefined {
+	return cacheRetention === "long" && compat.supportsLongCacheRetention ? "24h" : undefined;
 }
 
 // OpenAI Responses-specific options
@@ -169,6 +170,7 @@ function createClient(
 		apiKey = process.env.OPENAI_API_KEY;
 	}
 
+	const compat = getCompat(model);
 	const headers = { ...model.headers };
 	if (model.provider === "github-copilot") {
 		const hasImages = hasCopilotVisionInput(context.messages);
@@ -180,7 +182,7 @@ function createClient(
 	}
 
 	if (sessionId) {
-		if (model.compat?.sendSessionIdHeader !== false) {
+		if (compat.sendSessionIdHeader) {
 			headers.session_id = sessionId;
 		}
 		headers["x-client-request-id"] = sessionId;
@@ -203,12 +205,13 @@ function buildParams(model: Model<"openai-responses">, context: Context, options
 	const messages = convertResponsesMessages(model, context, OPENAI_TOOL_CALL_PROVIDERS);
 
 	const cacheRetention = resolveCacheRetention(options?.cacheRetention);
+	const compat = getCompat(model);
 	const params: ResponseCreateParamsStreaming = {
 		model: model.id,
 		input: messages,
 		stream: true,
 		prompt_cache_key: cacheRetention === "none" ? undefined : options?.sessionId,
-		prompt_cache_retention: getPromptCacheRetention(model.baseUrl, cacheRetention),
+		prompt_cache_retention: getPromptCacheRetention(compat, cacheRetention),
 		store: false,
 	};
 

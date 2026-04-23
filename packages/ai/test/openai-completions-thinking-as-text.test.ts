@@ -38,6 +38,7 @@ const compat = {
 	supportsStrictMode: true,
 	cacheControlFormat: undefined,
 	sendSessionAffinityHeaders: false,
+	supportsLongCacheRetention: true,
 } satisfies Required<Omit<OpenAICompletionsCompat, "cacheControlFormat">> & {
 	cacheControlFormat?: OpenAICompletionsCompat["cacheControlFormat"];
 };
