@@ -55,6 +55,8 @@ function getProbePriority(model: Model<"anthropic-messages">): number {
 	// stale Claude 3.x aliases that can remain in catalogs after upstream removal.
 	if (modelId.includes("haiku") && (modelId.includes("4-5") || modelId.includes("4.5"))) {
 		priority -= 1000;
+	} else if (modelId.includes("sonnet") && (modelId.includes("4-") || modelId.includes("4."))) {
+		priority -= 750;
 	} else if (modelId.includes("claude") && (modelId.includes("4-") || modelId.includes("4."))) {
 		priority -= 500;
 	}
@@ -78,7 +80,10 @@ function selectOneCasePerProvider(cases: AnthropicEagerE2ECase[]): AnthropicEage
 	);
 }
 
-const probeCases = selectOneCasePerProvider(anthropicMessagesCases);
+const generatedCompatCases = selectOneCasePerProvider(anthropicMessagesCases);
+const forcedEagerProbeCases = selectOneCasePerProvider(
+	anthropicMessagesCases.filter((testCase) => testCase.model.compat?.supportsEagerToolInputStreaming !== false),
+);
 
 function withEagerToolInputStreaming(model: Model<"anthropic-messages">): Model<"anthropic-messages"> {
 	return {
@@ -127,8 +132,16 @@ describe("Anthropic Messages eager tool input streaming E2E", () => {
 		expect(anthropicMessagesCases.map((testCase) => testCase.name).sort()).toEqual(expectedModels.sort());
 	});
 
+	describe("generated compatibility settings", () => {
+		for (const testCase of generatedCompatCases) {
+			it.skipIf(!testCase.apiKey)(`${testCase.name} accepts configured tool streaming`, { retry: 2 }, async () => {
+				await expectToolEnabledRequestAccepted(testCase.model, testCase.apiKey);
+			});
+		}
+	});
+
 	describe("forced eager_input_streaming probe", () => {
-		for (const testCase of probeCases) {
+		for (const testCase of forcedEagerProbeCases) {
 			const model = withEagerToolInputStreaming(testCase.model);
 
 			it.skipIf(!testCase.apiKey)(
