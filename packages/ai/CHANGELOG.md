@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added GPT-5.5 to OpenAI Codex model generation.
+
 ### Fixed
 
 - Fixed `openai-completions` streamed tool-call assembly to coalesce deltas by stable tool index when OpenAI-compatible gateways mutate tool call IDs mid-stream, preventing malformed Kimi K2.6/OpenCode tool streams from splitting one call into multiple bogus tool calls ([#3576](https://github.com/badlogic/pi-mono/issues/3576))
