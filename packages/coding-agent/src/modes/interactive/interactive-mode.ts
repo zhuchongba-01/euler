@@ -362,6 +362,9 @@ export class InteractiveMode {
 		private options: InteractiveModeOptions = {},
 	) {
 		this.runtimeHost = runtimeHost;
+		this.runtimeHost.setBeforeSessionInvalidate(() => {
+			this.resetExtensionUI();
+		});
 		this.runtimeHost.setRebindSession(async () => {
 			await this.rebindCurrentSession();
 		});
@@ -1594,7 +1597,6 @@ export class InteractiveMode {
 	}
 
 	private async rebindCurrentSession(): Promise<void> {
-		this.resetExtensionUI();
 		this.unsubscribe?.();
 		this.unsubscribe = undefined;
 		this.applyRuntimeSettings();
@@ -3219,7 +3221,6 @@ export class InteractiveMode {
 		if (this.isShuttingDown) return;
 		this.isShuttingDown = true;
 		this.unregisterSignalHandlers();
-		this.resetExtensionUI();
 		await this.runtimeHost.dispose();
 
 		// Wait for any pending renders to complete
