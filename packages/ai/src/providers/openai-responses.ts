@@ -106,7 +106,7 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses", OpenAIRes
 
 			await processResponsesStream(openaiStream, output, stream, model, {
 				serviceTier: options?.serviceTier,
-				applyServiceTierPricing,
+				applyServiceTierPricing: (usage, serviceTier) => applyServiceTierPricing(usage, serviceTier, model),
 			});
 
 			if (options?.signal?.aborted) {
@@ -246,19 +246,26 @@ function buildParams(model: Model<"openai-responses">, context: Context, options
 	return params;
 }
 
-function getServiceTierCostMultiplier(serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined): number {
+function getServiceTierCostMultiplier(
+	model: Pick<Model<"openai-responses">, "id">,
+	serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined,
+): number {
 	switch (serviceTier) {
 		case "flex":
 			return 0.5;
 		case "priority":
-			return 2;
+			return model.id === "gpt-5.5" ? 2.5 : 2;
 		default:
 			return 1;
 	}
 }
 
-function applyServiceTierPricing(usage: Usage, serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined) {
-	const multiplier = getServiceTierCostMultiplier(serviceTier);
+function applyServiceTierPricing(
+	usage: Usage,
+	serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined,
+	model: Pick<Model<"openai-responses">, "id">,
+) {
+	const multiplier = getServiceTierCostMultiplier(model, serviceTier);
 	if (multiplier === 1) return;
 
 	usage.cost.input *= multiplier;
