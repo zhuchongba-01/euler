@@ -42,7 +42,7 @@ export class LoginDialogComponent extends Container implements Focusable {
 		this.addChild(new DynamicBorder());
 
 		// Title
-		this.addChild(new Text(theme.fg("warning", `Login to ${providerName}`), 1, 0));
+		this.addChild(new Text(theme.fg("accent", theme.bold(`Login to ${providerName}`)), 1, 0));
 
 		// Dynamic content area
 		this.contentContainer = new Container();
