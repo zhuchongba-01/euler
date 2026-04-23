@@ -2594,7 +2594,9 @@ export class InteractiveMode {
 
 		switch (event.type) {
 			case "agent_start":
-				this.ui.terminal.setProgress(true);
+				if (this.settingsManager.getShowTerminalProgress()) {
+					this.ui.terminal.setProgress(true);
+				}
 				// Restore main escape handler if retry handler is still active
 				// (retry success event fires later, but we need main handler now)
 				if (this.retryEscapeHandler) {
@@ -2769,7 +2771,9 @@ export class InteractiveMode {
 			}
 
 			case "agent_end":
-				this.ui.terminal.setProgress(false);
+				if (this.settingsManager.getShowTerminalProgress()) {
+					this.ui.terminal.setProgress(false);
+				}
 				if (this.loadingAnimation) {
 					this.loadingAnimation.stop();
 					this.loadingAnimation = undefined;
@@ -2788,7 +2792,9 @@ export class InteractiveMode {
 				break;
 
 			case "compaction_start": {
-				this.ui.terminal.setProgress(true);
+				if (this.settingsManager.getShowTerminalProgress()) {
+					this.ui.terminal.setProgress(true);
+				}
 				// Keep editor active; submissions are queued during compaction.
 				this.autoCompactionEscapeHandler = this.defaultEditor.onEscape;
 				this.defaultEditor.onEscape = () => {
@@ -2812,7 +2818,9 @@ export class InteractiveMode {
 			}
 
 			case "compaction_end": {
-				this.ui.terminal.setProgress(false);
+				if (this.settingsManager.getShowTerminalProgress()) {
+					this.ui.terminal.setProgress(false);
+				}
 				if (this.autoCompactionEscapeHandler) {
 					this.defaultEditor.onEscape = this.autoCompactionEscapeHandler;
 					this.autoCompactionEscapeHandler = undefined;
@@ -3711,6 +3719,7 @@ export class InteractiveMode {
 					autocompleteMaxVisible: this.settingsManager.getAutocompleteMaxVisible(),
 					quietStartup: this.settingsManager.getQuietStartup(),
 					clearOnShrink: this.settingsManager.getClearOnShrink(),
+					showTerminalProgress: this.settingsManager.getShowTerminalProgress(),
 				},
 				{
 					onAutoCompactChange: (enabled) => {
@@ -3820,6 +3829,9 @@ export class InteractiveMode {
 					onClearOnShrinkChange: (enabled) => {
 						this.settingsManager.setClearOnShrink(enabled);
 						this.ui.setClearOnShrink(enabled);
+					},
+					onShowTerminalProgressChange: (enabled) => {
+						this.settingsManager.setShowTerminalProgress(enabled);
 					},
 					onCancel: () => {
 						done();
@@ -5329,7 +5341,9 @@ export class InteractiveMode {
 
 	stop(): void {
 		this.unregisterSignalHandlers();
-		this.ui.terminal.setProgress(false);
+		if (this.settingsManager.getShowTerminalProgress()) {
+			this.ui.terminal.setProgress(false);
+		}
 		if (this.loadingAnimation) {
 			this.loadingAnimation.stop();
 			this.loadingAnimation = undefined;
