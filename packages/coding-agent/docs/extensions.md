@@ -1432,7 +1432,7 @@ pi.registerFlag("plan", {
 });
 
 // Check value
-if (pi.getFlag("--plan")) {
+if (pi.getFlag("plan")) {
   // Plan mode enabled
 }
 ```
