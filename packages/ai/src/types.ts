@@ -102,6 +102,16 @@ export interface StreamOptions {
 	 */
 	headers?: Record<string, string>;
 	/**
+	 * HTTP request timeout in milliseconds for providers/SDKs that support it.
+	 * For example, OpenAI and Anthropic SDK clients default to 10 minutes.
+	 */
+	timeoutMs?: number;
+	/**
+	 * Maximum retry attempts for providers/SDKs that support client-side retries.
+	 * For example, OpenAI and Anthropic SDK clients default to 2.
+	 */
+	maxRetries?: number;
+	/**
 	 * Maximum delay in milliseconds to wait for a retry when the server requests a long wait.
 	 * If the server's requested delay exceeds this value, the request fails immediately
 	 * with an error containing the requested delay, allowing higher-level retry logic

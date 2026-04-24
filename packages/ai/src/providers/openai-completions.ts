@@ -145,7 +145,11 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 				params = nextParams as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming;
 			}
 			const { data: openaiStream, response } = await client.chat.completions
-				.create(params, { signal: options?.signal })
+				.create(params, {
+					signal: options?.signal,
+					timeout: options?.timeoutMs,
+					maxRetries: options?.maxRetries,
+				})
 				.withResponse();
 			await options?.onResponse?.({ status: response.status, headers: headersToRecord(response.headers) }, model);
 			stream.push({ type: "start", partial: output });

@@ -99,7 +99,11 @@ export const streamOpenAIResponses: StreamFunction<"openai-responses", OpenAIRes
 				params = nextParams as ResponseCreateParamsStreaming;
 			}
 			const { data: openaiStream, response } = await client.responses
-				.create(params, options?.signal ? { signal: options.signal } : undefined)
+				.create(params, {
+					signal: options?.signal,
+					timeout: options?.timeoutMs,
+					maxRetries: options?.maxRetries,
+				})
 				.withResponse();
 			await options?.onResponse?.({ status: response.status, headers: headersToRecord(response.headers) }, model);
 			stream.push({ type: "start", partial: output });

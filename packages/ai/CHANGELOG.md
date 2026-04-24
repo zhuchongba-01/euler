@@ -10,6 +10,7 @@
 
 - Fixed DeepSeek V4 session replay 400 errors by adding `thinkingFormat: "deepseek"` (sends `thinking: { type }` + `reasoning_effort`), a `reasoningEffortMap`, and `requiresReasoningContentOnAssistantMessages` compat that injects empty `reasoning_content` on all replayed assistant messages when reasoning is enabled ([#3636](https://github.com/badlogic/pi-mono/issues/3636))
 - Fixed GPT-5.5 generated context window metadata to use the observed 272k limit.
+- Fixed provider request controls to expose `timeoutMs` and `maxRetries` in stream options and forward them through OpenAI/Azure/Anthropic request options, preventing unconfigurable SDK timeout/retry defaults on long-running local inference requests ([#3627](https://github.com/badlogic/pi-mono/issues/3627))
 
 ## [0.70.0] - 2026-04-23
 
