@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed GPT-5.5 generated context window metadata to use the observed 272k limit.
+
 ## [0.70.0] - 2026-04-23
 
 ### Added
