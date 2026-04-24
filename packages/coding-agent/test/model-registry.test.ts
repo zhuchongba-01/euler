@@ -1164,6 +1164,64 @@ describe("ModelRegistry", () => {
 				expect(count).toBe(2);
 			});
 
+			test("provider auth status reports apiKey environment variables from models.json", () => {
+				const envVarName = "TEST_API_KEY_STATUS_TEST_98765";
+				const originalEnv = process.env[envVarName];
+
+				try {
+					process.env[envVarName] = "status-test-key";
+
+					writeRawModelsJson({
+						"custom-provider": providerWithApiKey(envVarName),
+					});
+
+					const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+
+					expect(registry.getProviderAuthStatus("custom-provider")).toEqual({
+						configured: true,
+						source: "environment",
+						label: envVarName,
+					});
+				} finally {
+					if (originalEnv === undefined) {
+						delete process.env[envVarName];
+					} else {
+						process.env[envVarName] = originalEnv;
+					}
+				}
+			});
+
+			test("provider auth status reports non-env apiKey values from models.json as a config key", () => {
+				writeRawModelsJson({
+					"custom-provider": providerWithApiKey("literal_api_key_value"),
+				});
+
+				const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+
+				expect(registry.getProviderAuthStatus("custom-provider")).toEqual({
+					configured: true,
+					source: "models_json_key",
+				});
+			});
+
+			test("provider auth status reports command apiKey values from models.json without executing them", () => {
+				const counterFile = join(tempDir, "status-counter");
+				writeFileSync(counterFile, "0");
+				const counterPath = toShPath(counterFile);
+				const command = `!sh -c 'echo 1 > "${counterPath}"; echo key-value'`;
+				writeRawModelsJson({
+					"custom-provider": providerWithApiKey(command),
+				});
+
+				const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+
+				expect(registry.getProviderAuthStatus("custom-provider")).toEqual({
+					configured: true,
+					source: "models_json_command",
+				});
+				expect(readFileSync(counterFile, "utf-8")).toBe("0");
+			});
+
 			test("environment variables are not cached (changes are picked up)", async () => {
 				const envVarName = "TEST_API_KEY_CACHE_TEST_98765";
 				const originalEnv = process.env[envVarName];

@@ -25,7 +25,7 @@ import { type Static, Type } from "typebox";
 import { Compile } from "typebox/compile";
 import type { TLocalizedValidationError } from "typebox/error";
 import { getAgentDir } from "../config.js";
-import type { AuthStorage } from "./auth-storage.js";
+import type { AuthStatus, AuthStorage } from "./auth-storage.js";
 import {
 	clearConfigValueCache,
 	resolveConfigValueOrThrow,
@@ -699,6 +699,32 @@ export class ModelRegistry {
 				error: error instanceof Error ? error.message : String(error),
 			};
 		}
+	}
+
+	/**
+	 * Return auth status for a provider, including request auth configured in models.json.
+	 * This intentionally does not execute command-backed config values.
+	 */
+	getProviderAuthStatus(provider: string): AuthStatus {
+		const authStatus = this.authStorage.getAuthStatus(provider);
+		if (authStatus.source) {
+			return authStatus;
+		}
+
+		const providerApiKey = this.providerRequestConfigs.get(provider)?.apiKey;
+		if (!providerApiKey) {
+			return authStatus;
+		}
+
+		if (providerApiKey.startsWith("!")) {
+			return { configured: true, source: "models_json_command" };
+		}
+
+		if (process.env[providerApiKey]) {
+			return { configured: true, source: "environment", label: providerApiKey };
+		}
+
+		return { configured: true, source: "models_json_key" };
 	}
 
 	/**
