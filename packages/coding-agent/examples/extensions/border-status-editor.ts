@@ -7,30 +7,36 @@ import {
 import type { Component, EditorTheme, TUI } from "@mariozechner/pi-tui";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 
-function fitBorder(left: string, right: string, width: number, fill: (text: string) => string): string {
+function fitBorder(
+	left: string,
+	right: string,
+	width: number,
+	border: (text: string) => string,
+	fill: (text: string) => string = border,
+): string {
 	if (width <= 0) return "";
-	if (width === 1) return fill("─");
+	if (width === 1) return border("─");
 
 	let leftText = left;
 	let rightText = right;
-	const edgeWidth = 1;
-	const minimumGap = 1;
+	const fixedWidth = 2;
+	const minimumGap = 3;
 
 	while (
-		edgeWidth * 2 + visibleWidth(leftText) + visibleWidth(rightText) + minimumGap > width &&
+		fixedWidth + visibleWidth(leftText) + visibleWidth(rightText) + minimumGap > width &&
 		visibleWidth(rightText) > 0
 	) {
 		rightText = truncateToWidth(rightText, Math.max(0, visibleWidth(rightText) - 1), "");
 	}
 	while (
-		edgeWidth * 2 + visibleWidth(leftText) + visibleWidth(rightText) + minimumGap > width &&
+		fixedWidth + visibleWidth(leftText) + visibleWidth(rightText) + minimumGap > width &&
 		visibleWidth(leftText) > 0
 	) {
 		leftText = truncateToWidth(leftText, Math.max(0, visibleWidth(leftText) - 1), "");
 	}
 
-	const gapWidth = Math.max(0, width - edgeWidth * 2 - visibleWidth(leftText) - visibleWidth(rightText));
-	return `${fill("─")}${leftText}${fill("─".repeat(gapWidth))}${rightText}${fill("─")}`;
+	const gapWidth = Math.max(0, width - fixedWidth - visibleWidth(leftText) - visibleWidth(rightText));
+	return `${border("─")}${leftText}${fill("─".repeat(gapWidth))}${rightText}${border("─")}`;
 }
 
 function formatCwd(cwd: string): string {
@@ -43,20 +49,15 @@ function formatCwd(cwd: string): string {
 
 function formatContext(ctx: ExtensionContext): string {
 	const usage = ctx.getContextUsage();
-	if (!usage || usage.tokens === null || usage.percent === null) {
-		return "context unknown";
+	const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow;
+	if (!contextWindow || !usage || usage.percent === null) {
+		return "ctx ?";
 	}
-	return `${Math.round(usage.percent)}% of ${(usage.contextWindow / 1000).toFixed(1)}k`;
+	return `ctx ${Math.round(usage.percent)}%/${(contextWindow / 1000).toFixed(0)}k`;
 }
 
-function formatSessionCost(ctx: ExtensionContext): string {
-	let totalCost = 0;
-	for (const entry of ctx.sessionManager.getEntries()) {
-		if (entry.type === "message" && entry.message.role === "assistant") {
-			totalCost += entry.message.usage.cost.total;
-		}
-	}
-	return `$${totalCost.toFixed(3)}`;
+function formatThinking(level: string): string {
+	return level === "off" ? "off" : level;
 }
 
 class EmptyFooter implements Component {
@@ -127,18 +128,19 @@ export default function (pi: ExtensionAPI) {
 				if (lines.length < 2) return lines;
 
 				const thm = ctx.ui.theme;
-				const model = ctx.model ? `(${ctx.model.provider}) ${ctx.model.id}` : "no model";
+				const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "no model";
 				const thinking = pi.getThinkingLevel();
-				const workingText = isWorking ? `${spinnerFrames[spinnerIndex]} working` : "idle";
-				const topLeft = thm.fg("muted", ` ${formatContext(ctx)} · ${formatSessionCost(ctx)} `);
-				const topRight = thm.fg("muted", ` ${model} · ${thinking} `);
-				const bottomLeft = isWorking ? thm.fg("accent", ` ${workingText} `) : thm.fg("muted", ` ${workingText} `);
-				const bottomRight = thm.fg("muted", ` ${formatCwd(ctx.cwd)}${branch ? ` (${branch})` : ""} `);
-
-				lines[0] = fitBorder(topLeft, topRight, width, (text) => this.borderColor(text.replace(/ /g, "─")));
-				lines[lines.length - 1] = fitBorder(bottomLeft, bottomRight, width, (text) =>
-					this.borderColor(text.replace(/ /g, "─")),
+				const topLeft = isWorking ? thm.fg("accent", ` ${spinnerFrames[spinnerIndex]} `) : "";
+				const topRight = "";
+				const bottomLeft = thm.fg("muted", ` ${model} · ${formatThinking(thinking)} `);
+				const bottomRight = thm.fg(
+					"muted",
+					` ${formatContext(ctx)} · ${formatCwd(ctx.cwd)}${branch ? ` (${branch})` : ""} `,
 				);
+				const borderColor = (text: string) => this.borderColor(text);
+
+				lines[0] = fitBorder(topLeft, topRight, width, borderColor);
+				lines[lines.length - 1] = fitBorder(bottomLeft, bottomRight, width, borderColor);
 				return lines;
 			}
 		}
