@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added DeepSeek as a built-in OpenAI-compatible provider with V4 Flash and V4 Pro models and `DEEPSEEK_API_KEY` authentication.
+
 ### Fixed
 
+- Fixed DeepSeek V4 session replay 400 errors by adding `thinkingFormat: "deepseek"` (sends `thinking: { type }` + `reasoning_effort`), a `reasoningEffortMap`, and `requiresReasoningContentOnAssistantMessages` compat that injects empty `reasoning_content` on all replayed assistant messages when reasoning is enabled ([#3636](https://github.com/badlogic/pi-mono/issues/3636))
 - Fixed GPT-5.5 generated context window metadata to use the observed 272k limit.
 
 ## [0.70.0] - 2026-04-23
