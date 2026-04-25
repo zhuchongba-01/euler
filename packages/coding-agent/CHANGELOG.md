@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Fixed `/tree` cancellation via `session_before_tree` leaving the session stuck in compaction state ([#3688](https://github.com/badlogic/pi-mono/issues/3688))
 - Fixed Escape interrupt handling when extensions hide the built-in working loader row ([#3674](https://github.com/badlogic/pi-mono/issues/3674))
 - Fixed coding-agent test expectations for current default models and missing-auth guidance.
 
