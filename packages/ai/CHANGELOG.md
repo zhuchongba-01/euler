@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Changed OpenAI Codex Responses default text verbosity to `low` when no verbosity is specified.
+
 ### Fixed
 
 - Fixed OpenAI-compatible prompt cache tests to cover proxies that explicitly disable long cache retention.
