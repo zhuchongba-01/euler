@@ -555,7 +555,7 @@
     }
 
     .ansi-line {
-      white-space: pre-wrap;
+      white-space: pre;
     }
 
     .tool-images {
