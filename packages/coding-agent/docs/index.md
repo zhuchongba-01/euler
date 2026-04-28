@@ -27,8 +27,7 @@ For the full first-run flow, see [Quickstart](quickstart.md).
 - [Providers](providers.md) - subscription and API-key setup for built-in providers.
 - [Settings](settings.md) - global and project settings.
 - [Keybindings](keybindings.md) - default shortcuts and custom keybindings.
-- [Sessions](session.md) - session storage format and session files.
-- [Session tree](tree.md) - branching and navigating previous turns.
+- [Sessions](sessions.md) - session management, branching, and tree navigation.
 - [Compaction](compaction.md) - context compaction and branch summarization.
 
 ## Customization
@@ -47,6 +46,10 @@ For the full first-run flow, see [Quickstart](quickstart.md).
 - [RPC mode](rpc.md) - integrate over stdin/stdout JSONL.
 - [JSON event stream mode](json.md) - print mode with structured events.
 - [TUI components](tui.md) - build custom terminal UI for extensions.
+
+## Reference
+
+- [Session format](session-format.md) - JSONL session file format, entry types, and SessionManager API.
 
 ## Platform setup
 

@@ -88,7 +88,7 @@ Useful session commands:
 - `/clone` duplicates the current active branch into a new session file.
 - `/compact` summarizes older messages to free context.
 
-See [Sessions](session.md), [Session Tree](tree.md), and [Compaction](compaction.md) for details.
+See [Sessions](sessions.md) and [Compaction](compaction.md) for details.
 
 ## Context Files
 
