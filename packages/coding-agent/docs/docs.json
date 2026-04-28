@@ -8,6 +8,14 @@
           "path": "index.md"
         },
         {
+          "title": "Quickstart",
+          "path": "quickstart.md"
+        },
+        {
+          "title": "Using Pi",
+          "path": "usage.md"
+        },
+        {
           "title": "Providers",
           "path": "providers.md"
         },
