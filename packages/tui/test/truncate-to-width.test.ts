@@ -59,4 +59,11 @@ describe("visibleWidth", () => {
 	it("counts tabs inline and skips ANSI inline", () => {
 		assert.strictEqual(visibleWidth("\t\x1b[31m界\x1b[0m"), 5);
 	});
+
+	it("counts isolated Thai and Lao AM clusters conservatively", () => {
+		assert.strictEqual(visibleWidth("ำ"), 2);
+		assert.strictEqual(visibleWidth("ຳ"), 2);
+		assert.strictEqual(visibleWidth("กำ"), 2);
+		assert.strictEqual(visibleWidth("ກຳ"), 2);
+	});
 });
