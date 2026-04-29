@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { truncateToWidth, visibleWidth } from "../src/utils.js";
+import { normalizeTerminalOutput, truncateToWidth, visibleWidth } from "../src/utils.js";
 
 describe("truncateToWidth", () => {
 	it("keeps output within width for very large unicode input", () => {
@@ -60,10 +60,17 @@ describe("visibleWidth", () => {
 		assert.strictEqual(visibleWidth("\t\x1b[31m界\x1b[0m"), 5);
 	});
 
-	it("counts isolated Thai and Lao AM clusters conservatively", () => {
-		assert.strictEqual(visibleWidth("ำ"), 2);
-		assert.strictEqual(visibleWidth("ຳ"), 2);
+	it("keeps Thai and Lao AM clusters at their normal cell width", () => {
+		assert.strictEqual(visibleWidth("ำ"), 1);
+		assert.strictEqual(visibleWidth("ຳ"), 1);
 		assert.strictEqual(visibleWidth("กำ"), 2);
 		assert.strictEqual(visibleWidth("ກຳ"), 2);
+	});
+
+	it("normalizes Thai and Lao AM vowels only for terminal output", () => {
+		assert.strictEqual(normalizeTerminalOutput("ำ"), "ํา");
+		assert.strictEqual(normalizeTerminalOutput("ຳ"), "ໍາ");
+		assert.strictEqual(visibleWidth(normalizeTerminalOutput("ำabc")), visibleWidth("ำabc"));
+		assert.strictEqual(visibleWidth(normalizeTerminalOutput("ຳabc")), visibleWidth("ຳabc"));
 	});
 });

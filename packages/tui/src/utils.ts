@@ -178,16 +178,6 @@ function graphemeWidth(segment: string): number {
 		return 2;
 	}
 
-	// Thai SARA AM (U+0E33) and Lao VOWEL SIGN AM (U+0EB3) are encoded as
-	// spacing letters, but terminals commonly render isolated occurrences as
-	// mark-like clusters (compat decomposition: nonspacing niggahita + vowel).
-	// Count isolated clusters conservatively to avoid cursor drift and stale
-	// cells during differential rendering. When attached to a base consonant,
-	// the base code point is first and normal per-codepoint width below applies.
-	if (cp === 0x0e33 || cp === 0x0eb3) {
-		return 2;
-	}
-
 	let width = eastAsianWidth(cp);
 
 	// Trailing halfwidth/fullwidth forms and AM vowels that segment with a base.
@@ -263,6 +253,16 @@ export function visibleWidth(str: string): number {
 	widthCache.set(str, width);
 
 	return width;
+}
+
+/**
+ * Normalize text for terminal output without changing logical editor content.
+ * Some terminals render precomposed Thai/Lao AM vowels inconsistently during
+ * differential repaint. Their compatibility decompositions have the same cell
+ * width but avoid stale-cell artifacts in terminal renderers.
+ */
+export function normalizeTerminalOutput(str: string): string {
+	return str.replace(/\u0e33/g, "\u0e4d\u0e32").replace(/\u0eb3/g, "\u0ecd\u0eb2");
 }
 
 /**
