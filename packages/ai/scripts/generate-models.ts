@@ -1095,7 +1095,13 @@ async function generateModels() {
 		if (candidate.api === "openai-completions" && candidate.id.includes("deepseek-v4")) {
 			candidate.compat = {
 				...candidate.compat,
-				requiresReasoningContentOnAssistantMessages: true,
+				...(candidate.provider === "openrouter"
+					? {
+							requiresReasoningContentOnAssistantMessages:
+								deepseekCompat.requiresReasoningContentOnAssistantMessages,
+							reasoningEffortMap: deepseekCompat.reasoningEffortMap,
+						}
+					: deepseekCompat),
 			};
 		}
 	}

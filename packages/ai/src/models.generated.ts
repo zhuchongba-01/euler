@@ -7536,7 +7536,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "opencode-go",
 			baseUrl: "https://opencode.ai/zen/go/v1",
-			compat: {"requiresReasoningContentOnAssistantMessages":true},
+			compat: {"requiresReasoningContentOnAssistantMessages":true,"thinkingFormat":"deepseek","reasoningEffortMap":{"minimal":"high","low":"high","medium":"high","high":"high","xhigh":"max"}},
 			reasoning: true,
 			input: ["text"],
 			cost: {
@@ -7554,7 +7554,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "opencode-go",
 			baseUrl: "https://opencode.ai/zen/go/v1",
-			compat: {"requiresReasoningContentOnAssistantMessages":true},
+			compat: {"requiresReasoningContentOnAssistantMessages":true,"thinkingFormat":"deepseek","reasoningEffortMap":{"minimal":"high","low":"high","medium":"high","high":"high","xhigh":"max"}},
 			reasoning: true,
 			input: ["text"],
 			cost: {
@@ -8509,7 +8509,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "openrouter",
 			baseUrl: "https://openrouter.ai/api/v1",
-			compat: {"requiresReasoningContentOnAssistantMessages":true},
+			compat: {"requiresReasoningContentOnAssistantMessages":true,"reasoningEffortMap":{"minimal":"high","low":"high","medium":"high","high":"high","xhigh":"max"}},
 			reasoning: true,
 			input: ["text"],
 			cost: {
@@ -8527,7 +8527,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "openrouter",
 			baseUrl: "https://openrouter.ai/api/v1",
-			compat: {"requiresReasoningContentOnAssistantMessages":true},
+			compat: {"requiresReasoningContentOnAssistantMessages":true,"reasoningEffortMap":{"minimal":"high","low":"high","medium":"high","high":"high","xhigh":"max"}},
 			reasoning: true,
 			input: ["text"],
 			cost: {
