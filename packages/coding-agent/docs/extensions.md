@@ -1515,6 +1515,7 @@ If you need to discover models from a remote endpoint, prefer an async extension
 ```typescript
 // Register a new provider with custom models
 pi.registerProvider("my-proxy", {
+  name: "My Proxy",
   baseUrl: "https://proxy.example.com",
   apiKey: "PROXY_API_KEY",  // env var name or literal
   api: "anthropic-messages",
@@ -1561,6 +1562,7 @@ pi.registerProvider("corporate-ai", {
 ```
 
 **Config options:**
+- `name` - Display name for the provider in UI such as `/login`.
 - `baseUrl` - API endpoint URL. Required when defining models.
 - `apiKey` - API key or environment variable name. Required when defining models (unless `oauth` provided).
 - `api` - API type: `"anthropic-messages"`, `"openai-completions"`, `"openai-responses"`, etc.
