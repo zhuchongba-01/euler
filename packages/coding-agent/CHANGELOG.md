@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed idle follow-up submission to clear the editor like normal message submission ([#3926](https://github.com/badlogic/pi-mono/issues/3926)).
 - Updated the sandbox extension example lockfile to resolve the vulnerable `lodash-es` transitive dependency ([#3901](https://github.com/badlogic/pi-mono/issues/3901)).
 
 ## [0.70.6] - 2026-04-28
