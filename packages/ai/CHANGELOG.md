@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `AssistantMessage.responseModel` on the openai-completions path: surfaces the concrete `chunk.model` when it differs from the requested id (e.g. OpenRouter `auto` -> `anthropic/...`).
+
 ### Fixed
 
 - Fixed DeepSeek V4 Flash `xhigh` thinking support so requests preserve `xhigh` and map it to DeepSeek's `max` reasoning effort ([#3944](https://github.com/badlogic/pi-mono/issues/3944)).
