@@ -20,7 +20,6 @@ import type {
 	AutocompleteItem,
 	AutocompleteProvider,
 	EditorComponent,
-	EditorTheme,
 	Keybinding,
 	KeyId,
 	MarkdownTheme,
@@ -60,6 +59,7 @@ import { type AgentSession, type AgentSessionEvent, parseSkillBlock } from "../.
 import { type AgentSessionRuntime, SessionImportFileNotFoundError } from "../../core/agent-session-runtime.js";
 import type {
 	AutocompleteProviderFactory,
+	EditorFactory,
 	ExtensionCommandContext,
 	ExtensionContext,
 	ExtensionRunner,
@@ -251,6 +251,7 @@ export class InteractiveMode {
 	private statusContainer: Container;
 	private defaultEditor: CustomEditor;
 	private editor: EditorComponent;
+	private editorComponentFactory: EditorFactory | undefined;
 	private autocompleteProvider: AutocompleteProvider | undefined;
 	private autocompleteProviderWrappers: AutocompleteProviderFactory[] = [];
 	private fdPath: string | undefined;
@@ -1985,6 +1986,7 @@ export class InteractiveMode {
 				this.setupAutocompleteProvider();
 			},
 			setEditorComponent: (factory) => this.setCustomEditorComponent(factory),
+			getEditorComponent: () => this.editorComponentFactory,
 			get theme() {
 				return theme;
 			},
@@ -2182,9 +2184,9 @@ export class InteractiveMode {
 	 * Set a custom editor component from an extension.
 	 * Pass undefined to restore the default editor.
 	 */
-	private setCustomEditorComponent(
-		factory: ((tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => EditorComponent) | undefined,
-	): void {
+	private setCustomEditorComponent(factory: EditorFactory | undefined): void {
+		this.editorComponentFactory = factory;
+
 		// Save text from current editor before switching
 		const currentText = this.editor.getText();
 

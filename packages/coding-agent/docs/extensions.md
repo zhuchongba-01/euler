@@ -2225,6 +2225,10 @@ ctx.ui.setToolsExpanded(wasExpanded);
 
 // Custom editor (vim mode, emacs mode, etc.)
 ctx.ui.setEditorComponent((tui, theme, keybindings) => new VimEditor(tui, theme, keybindings));
+const currentEditor = ctx.ui.getEditorComponent();
+ctx.ui.setEditorComponent((tui, theme, keybindings) =>
+  new WrappedEditor(tui, theme, keybindings, currentEditor?.(tui, theme, keybindings))
+);
 ctx.ui.setEditorComponent(undefined);  // Restore default editor
 
 // Theme management (see themes.md for creating themes)
@@ -2379,7 +2383,17 @@ export default function (pi: ExtensionAPI) {
 - Extend `CustomEditor` (not base `Editor`) to get app keybindings (escape to abort, ctrl+d, model switching)
 - Call `super.handleInput(data)` for keys you don't handle
 - Factory receives `theme` and `keybindings` from the app
+- Use `ctx.ui.getEditorComponent()` before `setEditorComponent()` to wrap the previously configured custom editor
 - Pass `undefined` to restore default: `ctx.ui.setEditorComponent(undefined)`
+
+To compose with another extension that already replaced the editor, capture the previous factory before setting yours:
+
+```typescript
+const previous = ctx.ui.getEditorComponent();
+ctx.ui.setEditorComponent((tui, theme, keybindings) =>
+  new MyEditor(tui, theme, keybindings, { base: previous?.(tui, theme, keybindings) })
+);
+```
 
 See [tui.md](tui.md) Pattern 7 for a complete example with mode indicator.
 

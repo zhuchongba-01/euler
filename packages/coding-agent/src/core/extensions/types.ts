@@ -115,6 +115,7 @@ export interface WorkingIndicatorOptions {
 
 /** Wrap the current autocomplete provider with additional behavior. */
 export type AutocompleteProviderFactory = (current: AutocompleteProvider) => AutocompleteProvider;
+export type EditorFactory = (tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => EditorComponent;
 
 /**
  * UI context for extensions to request interactive UI.
@@ -249,9 +250,10 @@ export interface ExtensionUIContext {
 	 * );
 	 * ```
 	 */
-	setEditorComponent(
-		factory: ((tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => EditorComponent) | undefined,
-	): void;
+	setEditorComponent(factory: EditorFactory | undefined): void;
+
+	/** Get the currently configured custom editor factory, or undefined when using the default editor. */
+	getEditorComponent(): EditorFactory | undefined;
 
 	/** Get the current theme for styling. */
 	readonly theme: Theme;
