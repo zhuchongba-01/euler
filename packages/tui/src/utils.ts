@@ -261,8 +261,12 @@ export function visibleWidth(str: string): number {
  * differential repaint. Their compatibility decompositions have the same cell
  * width but avoid stale-cell artifacts in terminal renderers.
  */
+const THAI_LAO_AM_REGEX = /[\u0e33\u0eb3]/;
+const THAI_LAO_AM_GLOBAL_REGEX = /[\u0e33\u0eb3]/g;
+
 export function normalizeTerminalOutput(str: string): string {
-	return str.replace(/\u0e33/g, "\u0e4d\u0e32").replace(/\u0eb3/g, "\u0ecd\u0eb2");
+	if (!THAI_LAO_AM_REGEX.test(str)) return str;
+	return str.replace(THAI_LAO_AM_GLOBAL_REGEX, (char) => (char === "\u0e33" ? "\u0e4d\u0e32" : "\u0ecd\u0eb2"));
 }
 
 /**
