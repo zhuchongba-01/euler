@@ -102,12 +102,12 @@ async function fetchOpenRouterModels(): Promise<Model<any>[]> {
 
 		const models: Model<any>[] = [];
 
-			// Parse provider from model ID
-			let provider: KnownProvider = "openrouter";
-			let modelKey = model.id;
-
-			modelKey = model.id; // Keep full ID for OpenRouter
 		for (const model of combinedModels.values()) {
+			// OpenRouter model IDs already include the upstream provider prefix.
+			// Keep the full ID (e.g. "google/gemini-2.5-flash-image").
+			const provider: KnownProvider = "openrouter";
+			const modelKey = model.id;
+
 			const supportsTools = model.supported_parameters?.includes("tools");
 			const supportsImageOutput = model.architecture?.output_modalities?.includes("image");
 			if (!supportsTools && !supportsImageOutput) continue;
