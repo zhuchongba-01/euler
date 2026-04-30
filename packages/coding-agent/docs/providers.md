@@ -15,26 +15,25 @@ Pi supports subscription-based providers via OAuth and API key providers via env
 
 Use `/login` in interactive mode, then select a provider:
 
-- Claude Pro/Max
 - ChatGPT Plus/Pro (Codex)
+- Claude Pro/Max
 - GitHub Copilot
 
 Use `/logout` to clear credentials. Tokens are stored in `~/.pi/agent/auth.json` and auto-refresh when expired.
+
+### OpenAI Codex
+
+- Requires ChatGPT Plus or Pro subscription
+- Officially endorsed by OpenAI: [Codex for OSS](https://developers.openai.com/community/codex-for-oss)
+
+### Claude Pro/Max
+
+Anthropic subscription auth is active for Claude Pro/Max accounts. Third-party harness usage draws from [extra usage](https://claude.ai/settings/usage) and is billed per token, not against Claude plan limits.
 
 ### GitHub Copilot
 
 - Press Enter for github.com, or enter your GitHub Enterprise Server domain
 - If you get "model not supported", enable it in VS Code: Copilot Chat → model selector → select model → "Enable"
-
-### Google Providers
-
-- Both free with any Google account, subject to rate limits
-- For paid Cloud Code Assist: set `GOOGLE_CLOUD_PROJECT` env var
-
-### OpenAI Codex
-
-- Requires ChatGPT Plus or Pro subscription
-- Personal use only; for production, use the OpenAI Platform API
 
 ## API Keys
 
