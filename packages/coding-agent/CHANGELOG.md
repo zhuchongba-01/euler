@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Removed built-in Google Gemini CLI and Google Antigravity support. Existing configurations using those providers must switch to another supported provider.
+
 ### New Features
 
 - Moonshot AI provider support with `MOONSHOT_API_KEY`, default model resolution, and `/login` display.
