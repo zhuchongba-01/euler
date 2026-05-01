@@ -9124,7 +9124,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "openrouter",
 			baseUrl: "https://openrouter.ai/api/v1",
-			compat: {"requiresReasoningContentOnAssistantMessages":true,"reasoningEffortMap":{"minimal":"high","low":"high","medium":"high","high":"high","xhigh":"max"}},
+			compat: {"requiresReasoningContentOnAssistantMessages":true,"thinkingFormat":"deepseek"},
 			reasoning: true,
 			input: ["text"],
 			cost: {
@@ -9142,7 +9142,7 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "openrouter",
 			baseUrl: "https://openrouter.ai/api/v1",
-			compat: {"requiresReasoningContentOnAssistantMessages":true,"reasoningEffortMap":{"minimal":"high","low":"high","medium":"high","high":"high","xhigh":"max"}},
+			compat: {"requiresReasoningContentOnAssistantMessages":true,"thinkingFormat":"deepseek"},
 			reasoning: true,
 			input: ["text"],
 			cost: {
@@ -9185,7 +9185,7 @@ export const MODELS = {
 				cacheRead: 0.024999999999999998,
 				cacheWrite: 0.08333333333333334,
 			},
-			contextWindow: 1000000,
+			contextWindow: 1048576,
 			maxTokens: 8192,
 		} satisfies Model<"openai-completions">,
 		"google/gemini-2.0-flash-lite-001": {
