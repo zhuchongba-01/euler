@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed `pi.registerProvider()` to honor per-model `baseUrl` overrides ([#4063](https://github.com/badlogic/pi-mono/issues/4063)).
+
 ## [0.71.1] - 2026-05-01
 
 ### Added

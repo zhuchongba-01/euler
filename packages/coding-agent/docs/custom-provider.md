@@ -595,6 +595,9 @@ interface ProviderModelConfig {
   /** API type override for this specific model. */
   api?: Api;
 
+  /** API endpoint URL override for this specific model. */
+  baseUrl?: string;
+
   /** Whether the model supports extended thinking. */
   reasoning: boolean;
 

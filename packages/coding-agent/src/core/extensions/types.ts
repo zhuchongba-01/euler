@@ -1355,6 +1355,8 @@ export interface ProviderModelConfig {
 	name: string;
 	/** API type override for this model. */
 	api?: Api;
+	/** API endpoint URL override for this model. */
+	baseUrl?: string;
 	/** Whether the model supports extended thinking. */
 	reasoning: boolean;
 	/** Supported input types. */

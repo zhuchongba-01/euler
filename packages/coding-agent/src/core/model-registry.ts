@@ -876,7 +876,7 @@ export class ModelRegistry {
 					name: modelDef.name,
 					api: api as Api,
 					provider: providerName,
-					baseUrl: config.baseUrl!,
+					baseUrl: modelDef.baseUrl ?? config.baseUrl!,
 					reasoning: modelDef.reasoning,
 					input: modelDef.input as ("text" | "image")[],
 					cost: modelDef.cost,
