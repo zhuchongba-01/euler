@@ -57,11 +57,6 @@ export function detectInstallMethod(): InstallMethod {
 	return "unknown";
 }
 
-function getNpmCommand(npmCommand?: string[]): { command: string; args: string[] } {
-	const [command = "npm", ...args] = npmCommand ?? [];
-	return { command, args };
-}
-
 function getInferredNpmInstall(packageName: string): { root: string; prefix: string } | undefined {
 	const packageDir = getPackageDir();
 	const path = process.platform === "win32" || packageDir.includes("\\") ? win32 : { basename, dirname };
@@ -101,11 +96,11 @@ function getSelfUpdateCommandForMethod(
 		case "bun":
 			return { command: "bun", args: ["install", "-g", packageName], display: `bun install -g ${packageName}` };
 		case "npm": {
-			const npm = getNpmCommand(npmCommand);
+			const [command = "npm", ...npmArgs] = npmCommand ?? [];
 			const inferred = npmCommand?.length ? undefined : getInferredNpmInstall(packageName);
-			const args = [...npm.args, ...(inferred ? ["--prefix", inferred.prefix] : []), "install", "-g", packageName];
-			const display = [npm.command, ...args].map((arg) => (/\s/.test(arg) ? `"${arg}"` : arg)).join(" ");
-			return { command: npm.command, args, display };
+			const args = [...npmArgs, ...(inferred ? ["--prefix", inferred.prefix] : []), "install", "-g", packageName];
+			const display = [command, ...args].map((arg) => (/\s/.test(arg) ? `"${arg}"` : arg)).join(" ");
+			return { command, args, display };
 		}
 		case "unknown":
 			return undefined;
@@ -133,10 +128,10 @@ function readCommandOutput(
 function getGlobalPackageRoots(method: InstallMethod, packageName: string, npmCommand?: string[]): string[] {
 	switch (method) {
 		case "npm": {
-			const npm = getNpmCommand(npmCommand);
 			const configured = !!npmCommand?.length;
-			if (configured && npm.command === "bun") {
-				const bunBin = readCommandOutput(npm.command, [...npm.args, "pm", "bin", "-g"], {
+			const [command = "npm", ...npmArgs] = npmCommand ?? [];
+			if (configured && command === "bun") {
+				const bunBin = readCommandOutput(command, [...npmArgs, "pm", "bin", "-g"], {
 					requireSuccess: true,
 				});
 				const roots = [join(homedir(), ".bun", "install", "global", "node_modules")];
@@ -145,7 +140,7 @@ function getGlobalPackageRoots(method: InstallMethod, packageName: string, npmCo
 				}
 				return roots;
 			}
-			const root = readCommandOutput(npm.command, [...npm.args, "root", "-g"], {
+			const root = readCommandOutput(command, [...npmArgs, "root", "-g"], {
 				requireSuccess: configured,
 			});
 			const inferred = configured ? undefined : getInferredNpmInstall(packageName);
