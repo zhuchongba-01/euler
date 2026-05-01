@@ -2,17 +2,28 @@
 
 ## [Unreleased]
 
-<<<<<<< feat/add-xiaomi-provider
+### Breaking Changes
+
+- Replaced `OpenAICompletionsCompat.reasoningEffortMap` with top-level `Model.thinkingLevelMap` for model-specific thinking controls ([#3208](https://github.com/badlogic/pi-mono/issues/3208)). Migration: move mappings from `model.compat.reasoningEffortMap` to `model.thinkingLevelMap`. See `packages/ai/README.md#custom-models` and `packages/coding-agent/docs/models.md#thinking-level-map`. Map values keep the same provider-specific string semantics, and `null` marks a pi thinking level unsupported. Example:
+  ```ts
+  // Before
+  compat: { reasoningEffortMap: { high: "high", xhigh: "max" } }
+
+  // After
+  thinkingLevelMap: { minimal: null, low: null, medium: null, high: "high", xhigh: "max" }
+  ```
+- Removed `supportsXhigh()`. Migration: use `getSupportedThinkingLevels(model).includes("xhigh")` or `clampThinkingLevel(model, requestedLevel)` instead ([#3208](https://github.com/badlogic/pi-mono/issues/3208)).
+
 ### Added
 
 - Added Xiaomi MiMo provider (openai-completions compatible) with `XIAOMI_API_KEY` authentication.
-=======
+- Added `Model.thinkingLevelMap`, `getSupportedThinkingLevels()`, and `clampThinkingLevel()` so model metadata can describe supported thinking levels and provider-specific level values ([#3208](https://github.com/badlogic/pi-mono/issues/3208)).
+
 ## [0.71.1] - 2026-05-01
 
 ### Added
 
 - Added `websocket-cached` transport support for OpenAI Codex Responses used with ChatGPT subscription auth. This keeps the same WebSocket open for a session and, after the first request, sends only new conversation items instead of resending the full chat history when possible.
->>>>>>> main
 
 ## [0.71.0] - 2026-04-30
 
