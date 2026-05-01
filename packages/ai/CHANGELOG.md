@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `websocket-cached` transport support for OpenAI Codex Responses used with ChatGPT subscription auth. This keeps the same WebSocket open for a session and, after the first request, sends only new conversation items instead of resending the full chat history when possible.
+
 ## [0.71.0] - 2026-04-30
 
 ### Breaking Changes
