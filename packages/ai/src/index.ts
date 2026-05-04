@@ -3,6 +3,8 @@ export { Type } from "typebox";
 
 export * from "./api-registry.js";
 export * from "./env-api-keys.js";
+export * from "./images.js";
+export * from "./images-api-registry.js";
 export * from "./models.js";
 export type { BedrockOptions, BedrockThinkingDisplay } from "./providers/amazon-bedrock.js";
 export type { AnthropicEffort, AnthropicOptions, AnthropicThinkingDisplay } from "./providers/anthropic.js";
@@ -16,6 +18,7 @@ export type { OpenAICodexResponsesOptions } from "./providers/openai-codex-respo
 export type { OpenAICompletionsOptions } from "./providers/openai-completions.js";
 export type { OpenAIResponsesOptions } from "./providers/openai-responses.js";
 export * from "./providers/register-builtins.js";
+export * from "./providers/register-images-builtins.js";
 export * from "./stream.js";
 export * from "./types.js";
 export * from "./utils/event-stream.js";

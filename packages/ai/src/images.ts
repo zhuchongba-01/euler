@@ -1,3 +1,5 @@
+import "./providers/register-images-builtins.js";
+
 import { getImagesApiProvider } from "./images-api-registry.js";
 import type {
 	AssistantImages,
