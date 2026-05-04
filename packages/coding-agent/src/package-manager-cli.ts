@@ -7,9 +7,13 @@ import {
 	getSelfUpdateCommand,
 	getSelfUpdateUnavailableInstruction,
 	PACKAGE_NAME,
+	type SelfUpdateCommand,
+	VERSION,
 } from "./config.js";
 import { DefaultPackageManager } from "./core/package-manager.js";
 import { SettingsManager } from "./core/settings-manager.js";
+import { shouldUseWindowsShell } from "./utils/child-process.js";
+import { getLatestPiVersion, isNewerPackageVersion } from "./utils/version-check.js";
 
 export type PackageCommand = "install" | "remove" | "update" | "list";
 
@@ -20,6 +24,7 @@ interface PackageCommandOptions {
 	source?: string;
 	updateTarget?: UpdateTarget;
 	local: boolean;
+	force: boolean;
 	help: boolean;
 	invalidOption?: string;
 	invalidArgument?: string;
@@ -44,7 +49,7 @@ function getPackageCommandUsage(command: PackageCommand): string {
 		case "remove":
 			return `${APP_NAME} remove <source> [-l]`;
 		case "update":
-			return `${APP_NAME} update [source|self|pi] [--self] [--extensions] [--extension <source>]`;
+			return `${APP_NAME} update [source|self|pi] [--self] [--extensions] [--extension <source>] [--force]`;
 		case "list":
 			return `${APP_NAME} list`;
 	}
@@ -97,6 +102,7 @@ Options:
   --self                  Update pi only
   --extensions            Update installed packages only
   --extension <source>    Update one package only
+  --force                 Reinstall pi even if the current version is latest
 
 Short forms:
   ${APP_NAME} update                Update pi and all extensions
@@ -128,6 +134,7 @@ function parsePackageCommand(args: string[]): PackageCommandOptions | undefined 
 	}
 
 	let local = false;
+	let force = false;
 	let help = false;
 	let invalidOption: string | undefined;
 	let invalidArgument: string | undefined;
@@ -166,6 +173,15 @@ function parsePackageCommand(args: string[]): PackageCommandOptions | undefined 
 		if (arg === "--extensions") {
 			if (command === "update") {
 				extensionsFlag = true;
+			} else {
+				invalidOption = invalidOption ?? arg;
+			}
+			continue;
+		}
+
+		if (arg === "--force") {
+			if (command === "update") {
+				force = true;
 			} else {
 				invalidOption = invalidOption ?? arg;
 			}
@@ -240,6 +256,7 @@ function parsePackageCommand(args: string[]): PackageCommandOptions | undefined 
 		source,
 		updateTarget,
 		local,
+		force,
 		help,
 		invalidOption,
 		invalidArgument,
@@ -256,13 +273,9 @@ function updateTargetIncludesExtensions(target: UpdateTarget): boolean {
 	return target.type === "all" || target.type === "extensions";
 }
 
-function canSelfUpdate(): boolean {
-	return getSelfUpdateCommand(PACKAGE_NAME) !== undefined;
-}
-
-function printSelfUpdateUnavailable(): void {
+function printSelfUpdateUnavailable(npmCommand?: string[]): void {
 	console.error(`error: ${APP_NAME} cannot self-update this installation.`);
-	console.error(getSelfUpdateUnavailableInstruction(PACKAGE_NAME));
+	console.error(getSelfUpdateUnavailableInstruction(PACKAGE_NAME, npmCommand));
 
 	const entrypoint = process.argv[1];
 	if (entrypoint) {
@@ -271,25 +284,38 @@ function printSelfUpdateUnavailable(): void {
 	}
 }
 
-function printSelfUpdateFallback(): void {
-	const command = getSelfUpdateCommand(PACKAGE_NAME);
-	if (!command) return;
+function printSelfUpdateFallback(command: SelfUpdateCommand): void {
 	console.error(chalk.dim(`If this keeps failing, run this command yourself: ${command.display}`));
 }
 
-async function runSelfUpdate(): Promise<void> {
-	const command = getSelfUpdateCommand(PACKAGE_NAME);
-	if (!command) {
-		throw new Error(
-			`${APP_NAME} cannot self-update this installation. ${getSelfUpdateUnavailableInstruction(PACKAGE_NAME)}`,
-		);
+async function shouldRunSelfUpdate(force: boolean): Promise<boolean> {
+	if (force) {
+		return true;
 	}
 
+	let latestVersion: string | undefined;
+	try {
+		latestVersion = await getLatestPiVersion(VERSION);
+	} catch {
+		return true;
+	}
+
+	if (!latestVersion || isNewerPackageVersion(latestVersion, VERSION)) {
+		return true;
+	}
+
+	console.log(chalk.green(`${APP_NAME} is already up to date (v${VERSION})`));
+	return false;
+}
+
+async function runSelfUpdate(command: SelfUpdateCommand): Promise<void> {
 	console.log(chalk.dim(`Updating ${APP_NAME} with ${command.display}...`));
 	await new Promise<void>((resolve, reject) => {
-		// Windows package managers are commonly .cmd shims. Use the shell so Node can execute them;
-		// command and args come from getSelfUpdateCommandForMethod(), not user input.
-		const child = spawn(command.command, command.args, { stdio: "inherit", shell: process.platform === "win32" });
+		// Windows package managers are commonly .cmd shims. Use the shell so Node can execute them.
+		const child = spawn(command.command, command.args, {
+			stdio: "inherit",
+			shell: shouldUseWindowsShell(command.command),
+		});
 		child.on("error", (error) => {
 			reject(error);
 		});
@@ -374,16 +400,12 @@ export async function handlePackageCommand(args: string[]): Promise<boolean> {
 		return true;
 	}
 
-	if (options.command === "update" && options.updateTarget?.type === "self" && !canSelfUpdate()) {
-		printSelfUpdateUnavailable();
-		process.exitCode = 1;
-		return true;
-	}
-
 	const cwd = process.cwd();
 	const agentDir = getAgentDir();
 	const settingsManager = SettingsManager.create(cwd, agentDir);
 	reportSettingsErrors(settingsManager, "package command");
+	const selfUpdateNpmCommand = settingsManager.getGlobalSettings().npmCommand;
+
 	const packageManager = new DefaultPackageManager({ cwd, agentDir, settingsManager });
 
 	packageManager.setProgressCallback((event) => {
@@ -458,21 +480,25 @@ export async function handlePackageCommand(args: string[]): Promise<boolean> {
 					}
 				}
 				if (updateTargetIncludesSelf(target)) {
-					if (canSelfUpdate()) {
-						try {
-							await runSelfUpdate();
-						} catch (error: unknown) {
-							const message = error instanceof Error ? error.message : "Unknown package command error";
-							console.error(chalk.red(`Error: ${message}`));
-							printSelfUpdateFallback();
-							process.exitCode = 1;
-							return true;
-						}
-						console.log(chalk.green(`Updated ${APP_NAME}`));
-					} else {
-						printSelfUpdateUnavailable();
+					const selfUpdateCommand = getSelfUpdateCommand(PACKAGE_NAME, selfUpdateNpmCommand);
+					if (!selfUpdateCommand) {
+						printSelfUpdateUnavailable(selfUpdateNpmCommand);
 						process.exitCode = 1;
+						return true;
 					}
+					if (!(await shouldRunSelfUpdate(options.force))) {
+						return true;
+					}
+					try {
+						await runSelfUpdate(selfUpdateCommand);
+					} catch (error: unknown) {
+						const message = error instanceof Error ? error.message : "Unknown package command error";
+						console.error(chalk.red(`Error: ${message}`));
+						printSelfUpdateFallback(selfUpdateCommand);
+						process.exitCode = 1;
+						return true;
+					}
+					console.log(chalk.green(`Updated ${APP_NAME}`));
 				}
 				return true;
 			}

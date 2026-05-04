@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { Agent, type AgentMessage, type ThinkingLevel } from "@mariozechner/pi-agent-core";
-import { type Message, type Model, streamSimple } from "@mariozechner/pi-ai";
+import { clampThinkingLevel, type Message, type Model, streamSimple } from "@mariozechner/pi-ai";
 import { getAgentDir } from "../config.js";
 import { AgentSession } from "./agent-session.js";
 import { formatNoModelsAvailableMessage } from "./auth-guidance.js";
@@ -141,7 +141,12 @@ function getAttributionHeaders(
 		};
 	}
 
-	if (model.provider === "cloudflare-workers-ai" || model.baseUrl.includes("api.cloudflare.com")) {
+	if (
+		model.provider === "cloudflare-workers-ai" ||
+		model.provider === "cloudflare-ai-gateway" ||
+		model.baseUrl.includes("api.cloudflare.com") ||
+		model.baseUrl.includes("gateway.ai.cloudflare.com")
+	) {
 		return {
 			"User-Agent": "pi-coding-agent",
 		};
@@ -257,8 +262,10 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 	}
 
 	// Clamp to model capabilities
-	if (!model || !model.reasoning) {
+	if (!model) {
 		thinkingLevel = "off";
+	} else {
+		thinkingLevel = clampThinkingLevel(model, thinkingLevel) as ThinkingLevel;
 	}
 
 	const defaultActiveToolNames: ToolName[] = ["read", "bash", "edit", "write"];

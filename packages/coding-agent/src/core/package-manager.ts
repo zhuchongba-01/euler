@@ -27,7 +27,8 @@ import type { Readable } from "node:stream";
 import { globSync } from "glob";
 import ignore from "ignore";
 import { minimatch } from "minimatch";
-import { CONFIG_DIR_NAME, isBunRuntime } from "../config.js";
+import { CONFIG_DIR_NAME } from "../config.js";
+import { shouldUseWindowsShell } from "../utils/child-process.js";
 import { type GitSource, parseGitUrl } from "../utils/git.js";
 import { canonicalizePath, isLocalPath } from "../utils/paths.js";
 import { isStdoutTakenOver } from "./output-guard.js";
@@ -1843,8 +1844,9 @@ export class DefaultPackageManager implements PackageManager {
 		if (this.globalNpmRoot && this.globalNpmRootCommandKey === commandKey) {
 			return this.globalNpmRoot;
 		}
-		if (isBunRuntime) {
-			const binDir = this.runCommandSync("bun", ["pm", "bin", "-g"]).trim();
+		const isBunPackageManager = npmCommand.command === "bun";
+		if (isBunPackageManager) {
+			const binDir = this.runNpmCommandSync(["pm", "bin", "-g"]).trim();
 			this.globalNpmRoot = join(dirname(binDir), "install", "global", "node_modules");
 		} else {
 			this.globalNpmRoot = this.runNpmCommandSync(["root", "-g"]).trim();
@@ -2328,28 +2330,11 @@ export class DefaultPackageManager implements PackageManager {
 		};
 	}
 
-	private shouldUseWindowsShell(command: string): boolean {
-		if (process.platform !== "win32") {
-			return false;
-		}
-		const commandName = basename(command).toLowerCase();
-		return (
-			commandName === "npm" ||
-			commandName === "npx" ||
-			commandName === "pnpm" ||
-			commandName === "yarn" ||
-			commandName === "yarnpkg" ||
-			commandName === "corepack" ||
-			commandName.endsWith(".cmd") ||
-			commandName.endsWith(".bat")
-		);
-	}
-
 	private spawnCommand(command: string, args: string[], options?: { cwd?: string }): ChildProcess {
 		return spawn(command, args, {
 			cwd: options?.cwd,
 			stdio: isStdoutTakenOver() ? ["ignore", 2, 2] : "inherit",
-			shell: this.shouldUseWindowsShell(command),
+			shell: shouldUseWindowsShell(command),
 			env: getEnv(),
 		});
 	}
@@ -2363,7 +2348,7 @@ export class DefaultPackageManager implements PackageManager {
 		return spawn(command, args, {
 			cwd: options?.cwd,
 			stdio: ["ignore", "pipe", "pipe"],
-			shell: this.shouldUseWindowsShell(command),
+			shell: shouldUseWindowsShell(command),
 			env: options?.env ? { ...baseEnv, ...options.env } : baseEnv,
 		});
 	}
@@ -2430,7 +2415,7 @@ export class DefaultPackageManager implements PackageManager {
 		const result = spawnSync(command, args, {
 			stdio: ["ignore", "pipe", "pipe"],
 			encoding: "utf-8",
-			shell: this.shouldUseWindowsShell(command),
+			shell: shouldUseWindowsShell(command),
 			env: getEnv(),
 		});
 		if (result.error || result.status !== 0) {

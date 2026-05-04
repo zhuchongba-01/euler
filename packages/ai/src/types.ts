@@ -1,3 +1,4 @@
+import type { AssistantMessageDiagnostic } from "./utils/diagnostics.js";
 import type { AssistantImagesEventStream, AssistantMessageEventStream } from "./utils/event-stream.js";
 
 export type {
@@ -14,7 +15,6 @@ export type KnownApi =
 	| "anthropic-messages"
 	| "bedrock-converse-stream"
 	| "google-generative-ai"
-	| "google-gemini-cli"
 	| "google-vertex";
 
 export type Api = KnownApi | (string & {});
@@ -27,8 +27,6 @@ export type KnownProvider =
 	| "amazon-bedrock"
 	| "anthropic"
 	| "google"
-	| "google-gemini-cli"
-	| "google-antigravity"
 	| "google-vertex"
 	| "openai"
 	| "azure-openai-responses"
@@ -44,12 +42,19 @@ export type KnownProvider =
 	| "mistral"
 	| "minimax"
 	| "minimax-cn"
+	| "moonshotai"
+	| "moonshotai-cn"
 	| "huggingface"
 	| "fireworks"
 	| "opencode"
 	| "opencode-go"
 	| "kimi-coding"
-	| "cloudflare-workers-ai";
+	| "cloudflare-workers-ai"
+	| "cloudflare-ai-gateway"
+	| "xiaomi"
+	| "xiaomi-token-plan-cn"
+	| "xiaomi-token-plan-ams"
+	| "xiaomi-token-plan-sgp";
 export type Provider = KnownProvider | string;
 
 export type KnownImagesProvider = "openrouter";
@@ -57,6 +62,8 @@ export type KnownImagesProvider = "openrouter";
 export type ImagesProvider = KnownImagesProvider | string;
 
 export type ThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ModelThinkingLevel = "off" | ThinkingLevel;
+export type ThinkingLevelMap = Partial<Record<ModelThinkingLevel, string | null>>;
 
 /** Token budgets for each thinking level (token-based providers only) */
 export interface ThinkingBudgets {
@@ -69,7 +76,7 @@ export interface ThinkingBudgets {
 // Base options all providers share
 export type CacheRetention = "none" | "short" | "long";
 
-export type Transport = "sse" | "websocket" | "auto";
+export type Transport = "sse" | "websocket" | "websocket-cached" | "auto";
 
 export interface ProviderResponse {
 	status: number;
@@ -275,7 +282,9 @@ export interface AssistantMessage {
 	api: Api;
 	provider: Provider;
 	model: string;
+	responseModel?: string; // Concrete `chunk.model` when different from the requested `model` (e.g. OpenRouter `auto` -> `anthropic/...`)
 	responseId?: string; // Provider-specific response/message identifier when the upstream API exposes one
+	diagnostics?: AssistantMessageDiagnostic[]; // Redacted provider/runtime diagnostics for failures and recoveries.
 	usage: Usage;
 	stopReason: StopReason;
 	errorMessage?: string;
@@ -369,8 +378,6 @@ export interface OpenAICompletionsCompat {
 	supportsDeveloperRole?: boolean;
 	/** Whether the provider supports `reasoning_effort`. Default: auto-detected from URL. */
 	supportsReasoningEffort?: boolean;
-	/** Optional mapping from pi-ai reasoning levels to provider/model-specific `reasoning_effort` values. */
-	reasoningEffortMap?: Partial<Record<ThinkingLevel, string>>;
 	/** Whether the provider supports `stream_options: { include_usage: true }` for token usage in streaming responses. Default: true. */
 	supportsUsageInStreaming?: boolean;
 	/** Which field to use for max tokens. Default: auto-detected from URL. */
@@ -518,6 +525,11 @@ export interface Model<TApi extends Api> {
 	provider: Provider;
 	baseUrl: string;
 	reasoning: boolean;
+	/**
+	 * Maps pi thinking levels to provider/model-specific values.
+	 * Missing keys use provider defaults. null marks a level as unsupported.
+	 */
+	thinkingLevelMap?: ThinkingLevelMap;
 	input: ("text" | "image")[];
 	cost: {
 		input: number; // $/million tokens

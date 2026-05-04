@@ -16,6 +16,7 @@
 - Always ask before removing functionality or code that appears to be intentional
 - Do not preserve backward compatibility unless the user explicitly asks for it
 - Never hardcode key checks with, eg. `matchesKey(keyData, "ctrl+x")`. All keybindings must be configurable. Add default to matching object (`DEFAULT_EDITOR_KEYBINDINGS` or `DEFAULT_APP_KEYBINDINGS`)
+- NEVER modify `packages/ai/src/models.generated.ts` directly. Update `packages/ai/scripts/generate-models.ts` instead.
 
 ## Commands
 
@@ -43,7 +44,7 @@
 When creating issues:
 
 - Add `pkg:*` labels to indicate which package(s) the issue affects
-  - Available labels: `pkg:agent`, `pkg:ai`, `pkg:coding-agent`, `pkg:mom`, `pkg:pods`, `pkg:tui`, `pkg:web-ui`
+  - Available labels: `pkg:agent`, `pkg:ai`, `pkg:coding-agent`, `pkg:tui`, `pkg:web-ui`
 - If an issue spans multiple packages, add all relevant labels
 
 When posting issue/PR comments:
@@ -161,7 +162,7 @@ Create provider file exporting:
 ### 6. Coding Agent (`packages/coding-agent/`)
 
 - `src/core/model-resolver.ts`: Add default model ID to `defaultModelPerProvider`
-- `src/modes/interactive/interactive-mode.ts`: Add API-key login display name to `API_KEY_LOGIN_PROVIDERS` so `/login` shows the provider for built-in API-key auth.
+- `src/core/provider-display-names.ts`: Add API-key login display name so `/login` and related UI show the provider for built-in API-key auth.
 - `src/cli/args.ts`: Add env var documentation
 - `README.md`: Add provider setup instructions
 - `docs/providers.md`: Add setup instructions, env var, and `auth.json` key

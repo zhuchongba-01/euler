@@ -10,10 +10,7 @@ import { hasBedrockCredentials } from "./bedrock-utils.js";
 import { resolveApiKey } from "./oauth.js";
 
 // Resolve OAuth tokens at module level (async, runs before tests)
-const [geminiCliToken, openaiCodexToken] = await Promise.all([
-	resolveApiKey("google-gemini-cli"),
-	resolveApiKey("openai-codex"),
-]);
+const [openaiCodexToken] = await Promise.all([resolveApiKey("openai-codex")]);
 
 async function testAbortSignal<TApi extends Api>(llm: Model<TApi>, options: StreamOptionsWithExtras = {}) {
 	const context: Context = {
@@ -193,6 +190,54 @@ describe("AI Providers Abort Tests", () => {
 		});
 	});
 
+	describe.skipIf(!process.env.XIAOMI_API_KEY)("Xiaomi MiMo (API billing) Provider Abort", () => {
+		const llm = getModel("xiaomi", "mimo-v2.5-pro");
+
+		it("should abort mid-stream", { retry: 3 }, async () => {
+			await testAbortSignal(llm);
+		});
+
+		it("should handle immediate abort", { retry: 3 }, async () => {
+			await testImmediateAbort(llm);
+		});
+	});
+
+	describe.skipIf(!process.env.XIAOMI_TOKEN_PLAN_CN_API_KEY)("Xiaomi MiMo Token Plan (CN) Provider Abort", () => {
+		const llm = getModel("xiaomi-token-plan-cn", "mimo-v2.5-pro");
+
+		it("should abort mid-stream", { retry: 3 }, async () => {
+			await testAbortSignal(llm);
+		});
+
+		it("should handle immediate abort", { retry: 3 }, async () => {
+			await testImmediateAbort(llm);
+		});
+	});
+
+	describe.skipIf(!process.env.XIAOMI_TOKEN_PLAN_AMS_API_KEY)("Xiaomi MiMo Token Plan (AMS) Provider Abort", () => {
+		const llm = getModel("xiaomi-token-plan-ams", "mimo-v2.5-pro");
+
+		it("should abort mid-stream", { retry: 3 }, async () => {
+			await testAbortSignal(llm);
+		});
+
+		it("should handle immediate abort", { retry: 3 }, async () => {
+			await testImmediateAbort(llm);
+		});
+	});
+
+	describe.skipIf(!process.env.XIAOMI_TOKEN_PLAN_SGP_API_KEY)("Xiaomi MiMo Token Plan (SGP) Provider Abort", () => {
+		const llm = getModel("xiaomi-token-plan-sgp", "mimo-v2.5-pro");
+
+		it("should abort mid-stream", { retry: 3 }, async () => {
+			await testAbortSignal(llm);
+		});
+
+		it("should handle immediate abort", { retry: 3 }, async () => {
+			await testImmediateAbort(llm);
+		});
+	});
+
 	describe.skipIf(!process.env.KIMI_API_KEY)("Kimi For Coding Provider Abort", () => {
 		const llm = getModel("kimi-coding", "kimi-k2-thinking");
 
@@ -214,19 +259,6 @@ describe("AI Providers Abort Tests", () => {
 
 		it("should handle immediate abort", { retry: 3 }, async () => {
 			await testImmediateAbort(llm);
-		});
-	});
-
-	// Google Gemini CLI / Antigravity share the same provider, so one test covers both
-	describe("Google Gemini CLI Provider Abort", () => {
-		it.skipIf(!geminiCliToken)("should abort mid-stream", { retry: 3 }, async () => {
-			const llm = getModel("google-gemini-cli", "gemini-2.5-flash");
-			await testAbortSignal(llm, { apiKey: geminiCliToken });
-		});
-
-		it.skipIf(!geminiCliToken)("should handle immediate abort", { retry: 3 }, async () => {
-			const llm = getModel("google-gemini-cli", "gemini-2.5-flash");
-			await testImmediateAbort(llm, { apiKey: geminiCliToken });
 		});
 	});
 

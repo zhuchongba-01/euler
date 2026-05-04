@@ -481,25 +481,33 @@ function handleContentBlockStop(
  * Checks both model ID and model name to support application inference profiles
  * whose ARNs don't contain the model name.
  */
+function getModelMatchCandidates(modelId: string, modelName?: string): string[] {
+	const values = modelName ? [modelId, modelName] : [modelId];
+	return values.flatMap((value) => {
+		const lower = value.toLowerCase();
+		return [lower, lower.replace(/[\s_.:]+/g, "-")];
+	});
+}
+
 function supportsAdaptiveThinking(modelId: string, modelName?: string): boolean {
-	const candidates = modelName ? [modelId, modelName] : [modelId];
-	return candidates.some(
-		(s) =>
-			s.includes("opus-4-6") ||
-			s.includes("opus-4.6") ||
-			s.includes("opus-4-7") ||
-			s.includes("opus-4.7") ||
-			s.includes("sonnet-4-6") ||
-			s.includes("sonnet-4.6"),
-	);
+	const candidates = getModelMatchCandidates(modelId, modelName);
+	return candidates.some((s) => s.includes("opus-4-6") || s.includes("opus-4-7") || s.includes("sonnet-4-6"));
+}
+
+function supportsNativeXhighEffort(model: Model<"bedrock-converse-stream">): boolean {
+	const candidates = getModelMatchCandidates(model.id, model.name);
+	return candidates.some((s) => s.includes("opus-4-7"));
 }
 
 function mapThinkingLevelToEffort(
+	model: Model<"bedrock-converse-stream">,
 	level: SimpleStreamOptions["reasoning"],
-	modelId: string,
-	modelName?: string,
 ): "low" | "medium" | "high" | "xhigh" | "max" {
-	const candidates = modelName ? [modelId, modelName] : [modelId];
+	if (level === "xhigh" && supportsNativeXhighEffort(model)) return "xhigh";
+
+	const mapped = level ? model.thinkingLevelMap?.[level] : undefined;
+	if (typeof mapped === "string") return mapped as "low" | "medium" | "high" | "xhigh" | "max";
+
 	switch (level) {
 		case "minimal":
 		case "low":
@@ -507,14 +515,6 @@ function mapThinkingLevelToEffort(
 		case "medium":
 			return "medium";
 		case "high":
-			return "high";
-		case "xhigh":
-			if (candidates.some((s) => s.includes("opus-4-6") || s.includes("opus-4.6"))) {
-				return "max";
-			}
-			if (candidates.some((s) => s.includes("opus-4-7") || s.includes("opus-4.7"))) {
-				return "xhigh";
-			}
 			return "high";
 		default:
 			return "high";
@@ -565,10 +565,7 @@ function isAnthropicClaudeModel(model: Model<"bedrock-converse-stream">): boolea
  * Amazon Nova models have automatic caching and don't need explicit cache points.
  */
 function supportsPromptCaching(model: Model<"bedrock-converse-stream">): boolean {
-	const candidates = [model.id.toLowerCase()];
-	if (model.name) {
-		candidates.push(model.name.toLowerCase());
-	}
+	const candidates = getModelMatchCandidates(model.id, model.name);
 
 	const hasClaudeRef = candidates.some((s) => s.includes("claude"));
 	if (!hasClaudeRef) {
@@ -578,7 +575,7 @@ function supportsPromptCaching(model: Model<"bedrock-converse-stream">): boolean
 		return false;
 	}
 	// Claude 4.x models (opus-4, sonnet-4, haiku-4)
-	if (candidates.some((s) => s.includes("-4-") || s.includes("-4."))) return true;
+	if (candidates.some((s) => s.includes("-4-"))) return true;
 	// Claude 3.7 Sonnet
 	if (candidates.some((s) => s.includes("claude-3-7-sonnet"))) return true;
 	// Claude 3.5 Haiku
@@ -895,7 +892,7 @@ function buildAdditionalModelRequestFields(
 		const result: Record<string, any> = supportsAdaptiveThinking(model.id, model.name)
 			? {
 					thinking: { type: "adaptive", ...(display !== undefined ? { display } : {}) },
-					output_config: { effort: mapThinkingLevelToEffort(options.reasoning, model.id, model.name) },
+					output_config: { effort: mapThinkingLevelToEffort(model, options.reasoning) },
 				}
 			: (() => {
 					const defaultBudgets: Record<ThinkingLevel, number> = {
