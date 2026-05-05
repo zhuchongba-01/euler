@@ -1,4 +1,4 @@
-import "./providers/register-images-builtins.js";
+import "./providers/images/register-builtins.js";
 
 import { getImagesApiProvider } from "./images-api-registry.js";
 import type {

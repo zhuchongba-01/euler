@@ -14,6 +14,7 @@ export * from "./providers/faux.js";
 export type { GoogleOptions } from "./providers/google.js";
 export type { GoogleThinkingLevel } from "./providers/google-shared.js";
 export type { GoogleVertexOptions } from "./providers/google-vertex.js";
+export * from "./providers/images/register-builtins.js";
 export type { MistralOptions } from "./providers/mistral.js";
 export type {
 	OpenAICodexResponsesOptions,
@@ -22,7 +23,6 @@ export type {
 export type { OpenAICompletionsOptions } from "./providers/openai-completions.js";
 export type { OpenAIResponsesOptions } from "./providers/openai-responses.js";
 export * from "./providers/register-builtins.js";
-export * from "./providers/register-images-builtins.js";
 export * from "./session-resources.js";
 export * from "./stream.js";
 export * from "./types.js";
