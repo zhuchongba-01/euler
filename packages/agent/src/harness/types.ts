@@ -1,5 +1,6 @@
 import type { ImageContent, Model, TextContent } from "@mariozechner/pi-ai";
 import type { Agent, AgentEvent, AgentMessage, ThinkingLevel } from "../index.js";
+import type { Session } from "./session/session.js";
 
 export type SourceScope = "user" | "project" | "temporary";
 export type SourceOrigin = "package" | "top-level";
@@ -183,43 +184,7 @@ export interface SessionStorage<TMetadata extends SessionMetadata = SessionMetad
 	getEntries(): Promise<SessionTreeEntry[]>;
 }
 
-export interface Session<TMetadata extends SessionMetadata = SessionMetadata> {
-	getMetadata(): Promise<TMetadata>;
-	getStorage(): SessionStorage<TMetadata>;
-
-	getLeafId(): Promise<string | null>;
-	getEntry(id: string): Promise<SessionTreeEntry | undefined>;
-	getEntries(): Promise<SessionTreeEntry[]>;
-	getBranch(fromId?: string): Promise<SessionTreeEntry[]>;
-	buildContext(): Promise<SessionContext>;
-	getLabel(id: string): Promise<string | undefined>;
-	getSessionName(): Promise<string | undefined>;
-
-	appendMessage(message: AgentMessage): Promise<string>;
-	appendThinkingLevelChange(thinkingLevel: string): Promise<string>;
-	appendModelChange(provider: string, modelId: string): Promise<string>;
-	appendCompaction<T = unknown>(
-		summary: string,
-		firstKeptEntryId: string,
-		tokensBefore: number,
-		details?: T,
-		fromHook?: boolean,
-	): Promise<string>;
-	appendCustomEntry(customType: string, data?: unknown): Promise<string>;
-	appendCustomMessageEntry<T = unknown>(
-		customType: string,
-		content: string | (TextContent | ImageContent)[],
-		display: boolean,
-		details?: T,
-	): Promise<string>;
-	appendLabel(targetId: string, label: string | undefined): Promise<string>;
-	appendSessionName(name: string): Promise<string>;
-
-	moveTo(
-		entryId: string | null,
-		summary?: { summary: string; details?: unknown; fromHook?: boolean },
-	): Promise<string | undefined>;
-}
+export type { Session } from "./session/session.js";
 
 export interface SessionCreateOptions {
 	id?: string;
@@ -554,7 +519,6 @@ export interface BranchSummaryResult {
 }
 
 export interface AgentHarnessOptions {
-	agent: Agent;
 	env: ExecutionEnv;
 	session: Session;
 	promptTemplates?: PromptTemplate[];

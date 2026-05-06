@@ -1,11 +1,11 @@
 import { DefaultAgentHarness } from "./agent-harness.js";
-import { DefaultSession } from "./session/session.js";
-import type { AgentHarness, AgentHarnessOptions, Session, SessionMetadata, SessionStorage } from "./types.js";
+import { Session } from "./session/session.js";
+import type { AgentHarness, AgentHarnessOptions, SessionMetadata, SessionStorage } from "./types.js";
 
 export function createSession<TMetadata extends SessionMetadata>(
 	storage: SessionStorage<TMetadata>,
 ): Session<TMetadata> {
-	return new DefaultSession(storage);
+	return new Session(storage);
 }
 
 export function createAgentHarness(options: AgentHarnessOptions): AgentHarness {

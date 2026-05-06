@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { ImageContent, Model } from "@mariozechner/pi-ai";
-import type { Agent } from "../agent.js";
+import { Agent } from "../agent.js";
 import type { AgentEvent, AgentMessage, AgentTool, ThinkingLevel } from "../types.js";
 import { collectEntriesForBranchSummary, generateBranchSummary } from "./compaction/branch-summarization.js";
 import { compact, DEFAULT_COMPACTION_SETTINGS, prepareCompaction } from "./compaction/compaction.js";
@@ -68,7 +68,7 @@ export class DefaultAgentHarness implements AgentHarness {
 	>();
 
 	constructor(options: AgentHarnessOptions) {
-		this.agent = options.agent;
+		this.agent = new Agent({});
 		this.env = options.env;
 		this.session = options.session;
 		this.promptTemplates = options.promptTemplates ?? [];

@@ -9,7 +9,6 @@ import type {
 	LabelEntry,
 	MessageEntry,
 	ModelChangeEntry,
-	Session,
 	SessionContext,
 	SessionInfoEntry,
 	SessionMetadata,
@@ -75,7 +74,7 @@ export function buildSessionContext(pathEntries: SessionTreeEntry[]): SessionCon
 	return { messages, thinkingLevel, model };
 }
 
-export class DefaultSession<TMetadata extends SessionMetadata = SessionMetadata> implements Session<TMetadata> {
+export class Session<TMetadata extends SessionMetadata = SessionMetadata> {
 	private storage: SessionStorage<TMetadata>;
 
 	constructor(storage: SessionStorage<TMetadata>) {

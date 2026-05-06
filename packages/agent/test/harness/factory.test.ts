@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { Agent } from "../../src/agent.js";
 import { NodeExecutionEnv } from "../../src/harness/execution-env.js";
 import { createAgentHarness, createSession } from "../../src/harness/factory.js";
 import { InMemorySessionStorage } from "../../src/harness/session/storage/memory.js";
@@ -17,9 +16,8 @@ describe("harness factories", () => {
 	it("creates agent harnesses", () => {
 		const session = createSession(new InMemorySessionStorage());
 		const env = new NodeExecutionEnv({ cwd: process.cwd() });
-		const agent = new Agent();
-		const harness = createAgentHarness({ agent, env, session });
-		expect(harness.agent).toBe(agent);
+		const harness = createAgentHarness({ env, session });
+		expect(harness.env).toBe(env);
 		expect(harness.conversation.session).toBe(session);
 	});
 });

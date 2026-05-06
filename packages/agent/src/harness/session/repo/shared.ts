@@ -1,6 +1,6 @@
 import { v7 as uuidv7 } from "uuid";
-import type { Session, SessionMetadata, SessionStorage, SessionTreeEntry } from "../../types.js";
-import { DefaultSession } from "../session.js";
+import type { SessionMetadata, SessionStorage, SessionTreeEntry } from "../../types.js";
+import { Session } from "../session.js";
 
 export function createSessionId(): string {
 	return uuidv7();
@@ -11,7 +11,7 @@ export function createTimestamp(): string {
 }
 
 export function toSession<TMetadata extends SessionMetadata>(storage: SessionStorage<TMetadata>): Session<TMetadata> {
-	return new DefaultSession(storage);
+	return new Session(storage);
 }
 
 export async function getEntriesToFork(
