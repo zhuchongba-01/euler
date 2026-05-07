@@ -10,11 +10,13 @@ const DEFAULT_SESSIONS_DIR = path.join(homedir(), ".pi/agent/sessions");
 const DEFAULT_ACTIVE_READ_TOOL_PATH = path.join(process.cwd(), "packages/coding-agent/src/core/tools/read.ts");
 const DEFAULT_TOP = 20;
 const CHART_WIDTH = 40;
+const REPORT_TIME_ZONE = "Europe/Berlin";
 
 function parseArgs(argv) {
 	const options = {
 		sessionsDir: DEFAULT_SESSIONS_DIR,
 		json: false,
+		text: false,
 		includeRecords: false,
 		modelFilter: undefined,
 		top: DEFAULT_TOP,
@@ -29,6 +31,7 @@ function parseArgs(argv) {
 		const arg = argv[i];
 		if (arg === "--help" || arg === "-h") options.help = true;
 		else if (arg === "--json") options.json = true;
+		else if (arg === "--text") options.text = true;
 		else if (arg === "--include-records") options.includeRecords = true;
 		else if (arg === "--model") options.modelFilter = argv[++i];
 		else if (arg === "--top") {
@@ -60,7 +63,8 @@ Options:
   --all-sessions         Disable the automatic since filter
   --auto-since-path <p>  Use birth time of this file for the automatic since filter
   --bucket <day|week>    Time bucket for trend chart (default: week)
-  --json                 Print JSON summary instead of human report
+  --json                 Print JSON summary instead of HTML report
+  --text                 Print plain text report instead of HTML
   --include-records      Include raw records in JSON output
   -h, --help             Show this help
 `);
@@ -79,21 +83,40 @@ function formatIso(ms) {
 	return new Date(ms).toISOString();
 }
 
-function formatDay(ms) {
-	return new Date(ms).toISOString().slice(0, 10);
+function getTimeZoneParts(ms) {
+	const parts = new Intl.DateTimeFormat("en-CA", {
+		timeZone: REPORT_TIME_ZONE,
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		hourCycle: "h23",
+		weekday: "short",
+	}).formatToParts(new Date(ms));
+	return Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
 }
 
-function startOfUtcWeek(date) {
-	const day = date.getUTCDay();
-	const daysSinceMonday = day === 0 ? 6 : day - 1;
-	const start = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-	return new Date(start - daysSinceMonday * 24 * 60 * 60 * 1000);
+function formatDay(ms) {
+	const parts = getTimeZoneParts(ms);
+	return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function startOfReportTimeZoneWeek(ms) {
+	const parts = getTimeZoneParts(ms);
+	const dayIndex = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(parts.weekday ?? "Mon");
+	const localMidnightAsUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+	return localMidnightAsUtc - Math.max(dayIndex, 0) * 24 * 60 * 60 * 1000;
 }
 
 function getTimeBucket(ms, bucket) {
 	if (!Number.isFinite(ms)) return "[unknown]";
 	if (bucket === "day") return formatDay(ms);
-	return formatDay(startOfUtcWeek(new Date(ms)).getTime());
+	return formatDay(startOfReportTimeZoneWeek(ms));
+}
+
+function getHourOfDayBucket(ms) {
+	if (!Number.isFinite(ms)) return "[unknown]";
+	return `${getTimeZoneParts(ms).hour}:00`;
 }
 
 async function resolveAutoSinceMs(options) {
@@ -173,9 +196,13 @@ function summarizeTimeBuckets(records, bucket) {
 }
 
 function summarizeNormalizedTimeBuckets(records, bucket) {
+	return summarizeNormalizedTimeBucketsByKey(records, (record) => getTimeBucket(record.timestampMs, bucket));
+}
+
+function summarizeNormalizedTimeBucketsByKey(records, keyFn) {
 	const bucketGroups = new Map();
 	for (const record of records) {
-		const bucketKey = getTimeBucket(record.timestampMs, bucket);
+		const bucketKey = keyFn(record);
 		if (!bucketGroups.has(bucketKey)) bucketGroups.set(bucketKey, []);
 		bucketGroups.get(bucketKey).push(record);
 	}
@@ -235,6 +262,8 @@ function buildSummary(records, meta, options) {
 	const providerStats = summarizeGroups(records, (record) => record.providerModel);
 	const timeStats = summarizeTimeBuckets(records, options.bucket);
 	const normalizedTimeStats = summarizeNormalizedTimeBuckets(records, options.bucket);
+	const timeOfDayStats = summarizeGroups(records, (record) => getHourOfDayBucket(record.timestampMs)).sort((a, b) => a.key.localeCompare(b.key));
+	const normalizedTimeOfDayStats = summarizeNormalizedTimeBucketsByKey(records, (record) => getHourOfDayBucket(record.timestampMs));
 	const timeStatsByProvider = providerStats.map((provider) => ({
 		providerModel: provider.key,
 		...provider,
@@ -245,6 +274,14 @@ function buildSummary(records, meta, options) {
 		normalizedTimeStats: summarizeNormalizedTimeBuckets(
 			records.filter((record) => record.providerModel === provider.key),
 			options.bucket
+		),
+		timeOfDayStats: summarizeGroups(
+			records.filter((record) => record.providerModel === provider.key),
+			(record) => getHourOfDayBucket(record.timestampMs)
+		).sort((a, b) => a.key.localeCompare(b.key)),
+		normalizedTimeOfDayStats: summarizeNormalizedTimeBucketsByKey(
+			records.filter((record) => record.providerModel === provider.key),
+			(record) => getHourOfDayBucket(record.timestampMs)
 		),
 	}));
 	return {
@@ -269,14 +306,45 @@ function buildSummary(records, meta, options) {
 		providerStats,
 		timeStats,
 		normalizedTimeStats,
+		timeOfDayStats,
+		normalizedTimeOfDayStats,
 		timeStatsByProvider,
 		examples: records.slice(0, options.top),
 	};
 }
 
+function buildHumanReport(summary) {
+	const lines = [];
+	const originalLog = console.log;
+	console.log = (line = "") => lines.push(String(line));
+	try {
+		printHumanReport(summary);
+	} finally {
+		console.log = originalLog;
+	}
+	return lines.join("\n") + "\n";
+}
+
+function escapeHtml(text) {
+	return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function printHtmlReport(summary) {
+	const text = buildHumanReport(summary);
+	console.log(`<!doctype html>
+<meta charset="utf-8">
+<title>Read tool stats</title>
+<style>
+body { margin: 24px; background: #fff; color: #111; }
+pre { font: 13px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; }
+</style>
+<pre>${escapeHtml(text)}</pre>`);
+}
+
 function printHumanReport(summary) {
-	const { scan, counts, timeStats, normalizedTimeStats, timeStatsByProvider, filters, examples } = summary;
+	const { scan, counts, timeStats, normalizedTimeStats, timeOfDayStats, normalizedTimeOfDayStats, timeStatsByProvider, filters } = summary;
 	console.log(`Scanned ${formatInt(scan.sessionFilesIncluded)} session files in ${scan.sessionsDir}`);
+	console.log(`Report timezone: ${REPORT_TIME_ZONE} (CET/CEST)`);
 	if (scan.since) {
 		console.log(`Session filter: files created at or after ${scan.since.iso} (${scan.since.source})`);
 		console.log(`Skipped older session files: ${formatInt(scan.sessionFilesSkippedOlderThanSince)} of ${formatInt(scan.sessionFilesScanned)}`);
@@ -292,6 +360,20 @@ function printHumanReport(summary) {
 	for (const group of timeStats) {
 		console.log(
 			`  ${group.key} reads=${formatInt(group.reads).padStart(5)} full=${formatPercent(group.full, group.reads).padStart(6)} partial=${formatPercent(group.partial, group.reads).padStart(6)} ${bar(group.partial, group.reads)}`
+		);
+	}
+
+	console.log("\nBy time of day");
+	for (const group of timeOfDayStats) {
+		console.log(
+			`  ${group.key} reads=${formatInt(group.reads).padStart(5)} full=${formatPercent(group.full, group.reads).padStart(6)} partial=${formatPercent(group.partial, group.reads).padStart(6)} ${bar(group.partial, group.reads)}`
+		);
+	}
+
+	console.log("\nBy time of day, session-normalized");
+	for (const group of normalizedTimeOfDayStats) {
+		console.log(
+			`  ${group.key} sessions=${formatInt(group.sessions).padStart(4)} reads/session=${formatRate(group.readsPerSession).padStart(5)} full/session=${formatRate(group.fullPerSession).padStart(5)} partial/session=${formatRate(group.partialPerSession).padStart(5)} medianSessionPartial=${group.medianSessionPartialRate === null ? "n/a" : formatPercent(group.medianSessionPartialRate, 1).padStart(6)} ${bar(group.medianSessionPartialRate ?? 0, 1)}`
 		);
 	}
 
@@ -320,14 +402,18 @@ function printHumanReport(summary) {
 				`    ${bucket.key} sessions=${formatInt(bucket.sessions).padStart(4)} reads/session=${formatRate(bucket.readsPerSession).padStart(5)} full/session=${formatRate(bucket.fullPerSession).padStart(5)} partial/session=${formatRate(bucket.partialPerSession).padStart(5)} medianSessionPartial=${bucket.medianSessionPartialRate === null ? "n/a" : formatPercent(bucket.medianSessionPartialRate, 1).padStart(6)} ${bar(bucket.medianSessionPartialRate ?? 0, 1)}`
 			);
 		}
-	}
-
-	console.log(`\nFirst ${formatInt(examples.length)} read calls`);
-	for (let i = 0; i < examples.length; i++) {
-		const example = examples[i];
-		const range = example.mode === "full" ? "full" : `partial offset=${example.offset ?? "unset"} limit=${example.limit ?? "unset"}`;
-		console.log(`  ${i + 1}. ${example.providerModel} ${range}`);
-		console.log(`     path: ${example.path}`);
+		console.log("  By time of day");
+		for (const bucket of group.timeOfDayStats) {
+			console.log(
+				`    ${bucket.key} reads=${formatInt(bucket.reads).padStart(5)} full=${formatPercent(bucket.full, bucket.reads).padStart(6)} partial=${formatPercent(bucket.partial, bucket.reads).padStart(6)} ${bar(bucket.partial, bucket.reads)}`
+			);
+		}
+		console.log("  By time of day, session-normalized");
+		for (const bucket of group.normalizedTimeOfDayStats) {
+			console.log(
+				`    ${bucket.key} sessions=${formatInt(bucket.sessions).padStart(4)} reads/session=${formatRate(bucket.readsPerSession).padStart(5)} full/session=${formatRate(bucket.fullPerSession).padStart(5)} partial/session=${formatRate(bucket.partialPerSession).padStart(5)} medianSessionPartial=${bucket.medianSessionPartialRate === null ? "n/a" : formatPercent(bucket.medianSessionPartialRate, 1).padStart(6)} ${bar(bucket.medianSessionPartialRate ?? 0, 1)}`
+			);
+		}
 	}
 
 	if (scan.malformedLines > 0) {
@@ -406,7 +492,11 @@ async function main() {
 		console.log(JSON.stringify(options.includeRecords ? { summary, records: filteredRecords } : { summary }, null, 2));
 		return;
 	}
-	printHumanReport(summary);
+	if (options.text) {
+		printHumanReport(summary);
+		return;
+	}
+	printHtmlReport(summary);
 }
 
 main().catch((error) => {
