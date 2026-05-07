@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed wrapped OSC 8 hyperlinks to preserve BEL terminators so OAuth login URLs remain clickable on every wrapped line.
+
+## [0.73.0] - 2026-05-04
+
+### Fixed
+
+- Fixed fuzzy ranking to prioritize exact matches in selector and autocomplete results.
+
 ## [0.72.1] - 2026-05-02
 
 ## [0.72.0] - 2026-05-01
