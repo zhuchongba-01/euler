@@ -1,26 +1,19 @@
-import type {
-	AssistantImagesEventStream,
-	ImagesApi,
-	ImagesContext,
-	ImagesFunction,
-	ImagesModel,
-	ImagesOptions,
-} from "./types.js";
+import type { AssistantImages, ImagesApi, ImagesContext, ImagesFunction, ImagesModel, ImagesOptions } from "./types.js";
 
 export type ImagesApiFunction = (
 	model: ImagesModel<ImagesApi>,
 	context: ImagesContext,
 	options?: ImagesOptions,
-) => AssistantImagesEventStream;
+) => Promise<AssistantImages>;
 
 export interface ImagesApiProvider<TApi extends ImagesApi = ImagesApi, TOptions extends ImagesOptions = ImagesOptions> {
 	api: TApi;
-	images: ImagesFunction<TApi, TOptions>;
+	generateImages: ImagesFunction<TApi, TOptions>;
 }
 
 interface ImagesApiProviderInternal {
 	api: ImagesApi;
-	images: ImagesApiFunction;
+	generateImages: ImagesApiFunction;
 }
 
 type RegisteredImagesApiProvider = {
@@ -30,15 +23,15 @@ type RegisteredImagesApiProvider = {
 
 const imagesApiProviderRegistry = new Map<string, RegisteredImagesApiProvider>();
 
-function wrapImages<TApi extends ImagesApi, TOptions extends ImagesOptions>(
+function wrapGenerateImages<TApi extends ImagesApi, TOptions extends ImagesOptions>(
 	api: TApi,
-	images: ImagesFunction<TApi, TOptions>,
+	generateImages: ImagesFunction<TApi, TOptions>,
 ): ImagesApiFunction {
 	return (model, context, options) => {
 		if (model.api !== api) {
 			throw new Error(`Mismatched api: ${model.api} expected ${api}`);
 		}
-		return images(model as ImagesModel<TApi>, context, options as TOptions);
+		return generateImages(model as ImagesModel<TApi>, context, options as TOptions);
 	};
 }
 
@@ -49,7 +42,7 @@ export function registerImagesApiProvider<TApi extends ImagesApi, TOptions exten
 	imagesApiProviderRegistry.set(provider.api, {
 		provider: {
 			api: provider.api,
-			images: wrapImages(provider.api, provider.images),
+			generateImages: wrapGenerateImages(provider.api, provider.generateImages),
 		},
 		sourceId,
 	});

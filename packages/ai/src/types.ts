@@ -1,10 +1,7 @@
 import type { AssistantMessageDiagnostic } from "./utils/diagnostics.js";
-import type { AssistantImagesEventStream, AssistantMessageEventStream } from "./utils/event-stream.js";
+import type { AssistantMessageEventStream } from "./utils/event-stream.js";
 
-export type {
-	AssistantImagesEventStream,
-	AssistantMessageEventStream,
-} from "./utils/event-stream.js";
+export type { AssistantMessageEventStream } from "./utils/event-stream.js";
 
 export type KnownApi =
 	| "openai-completions"
@@ -215,7 +212,7 @@ export type ImagesFunction<TApi extends ImagesApi = ImagesApi, TOptions extends 
 	model: ImagesModel<TApi>,
 	context: ImagesContext,
 	options?: TOptions,
-) => AssistantImagesEventStream;
+) => Promise<AssistantImages>;
 
 export interface TextSignatureV1 {
 	v: 1;
@@ -359,13 +356,6 @@ export type AssistantMessageEvent =
 	| { type: "toolcall_end"; contentIndex: number; toolCall: ToolCall; partial: AssistantMessage }
 	| { type: "done"; reason: Extract<StopReason, "stop" | "length" | "toolUse">; message: AssistantMessage }
 	| { type: "error"; reason: Extract<StopReason, "aborted" | "error">; error: AssistantMessage };
-
-export type AssistantImagesEvent =
-	| { type: "start"; partial: AssistantImages }
-	| { type: "image_start"; contentIndex: number; partial: AssistantImages }
-	| { type: "image_end"; contentIndex: number; image: ImageContent; partial: AssistantImages }
-	| { type: "done"; reason: Extract<ImagesStopReason, "stop">; images: AssistantImages }
-	| { type: "error"; reason: Extract<ImagesStopReason, "aborted" | "error">; error: AssistantImages };
 
 /**
  * Compatibility settings for OpenAI-compatible completions APIs.

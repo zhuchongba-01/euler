@@ -18,7 +18,6 @@ Unified LLM API with automatic model discovery, provider configuration, token an
 - [Image Input](#image-input)
 - [Image Generation](#image-generation)
   - [Basic Image Generation](#basic-image-generation)
-  - [Streaming Image Events](#streaming-image-events)
   - [Notes and Limitations](#notes-and-limitations)
 - [Thinking/Reasoning](#thinkingreasoning)
   - [Unified Interface](#unified-interface-streamsimplecompletesimple)
@@ -425,9 +424,9 @@ for (const block of response.content) {
 
 ## Image Generation
 
-Image generation uses a separate API surface from text/chat generation. Use `getImageModel()` / `getImageModels()` / `getImageProviders()` to discover image-generation models, `images()` to stream events, and `generateImages()` to get the final result.
+Image generation uses a separate API surface from text/chat generation. Use `getImageModel()` / `getImageModels()` / `getImageProviders()` to discover image-generation models, and `generateImages()` to get the final result.
 
-Do not use `stream()` or `complete()` for image generation. Request options, error handling, and event/result flow follow the same overall pattern as the streaming APIs, but use image-specific types and events.
+Do not use `stream()` or `complete()` for image generation. Image generation is a one-shot API: `generateImages()` waits for the provider response and returns the final `AssistantImages` result.
 
 ### Basic Image Generation
 
@@ -475,59 +474,12 @@ console.log(model.input);   // ['text', 'image']
 console.log(model.output);  // ['image'] or ['image', 'text']
 ```
 
-### Streaming Image Events
-
-`images()` returns an `AssistantImagesEventStream` with image-specific events:
-
-```typescript
-import { getImageModel, images } from '@mariozechner/pi-ai';
-
-const model = getImageModel('openrouter', 'google/gemini-2.5-flash-image');
-const s = images(model, {
-  input: [{ type: 'text', text: 'Generate a simple green triangle.' }]
-}, {
-  apiKey: process.env.OPENROUTER_API_KEY
-});
-
-for await (const event of s) {
-  switch (event.type) {
-    case 'start':
-      console.log(`Starting image generation with ${event.partial.model}`);
-      break;
-    case 'image_start':
-      console.log(`Image block started at index ${event.contentIndex}`);
-      break;
-    case 'image_end':
-      console.log(`Image block complete: ${event.image.mimeType}`);
-      break;
-    case 'done':
-      console.log(`Finished: ${event.reason}`);
-      break;
-    case 'error':
-      console.error(`Error: ${event.error.errorMessage}`);
-      break;
-  }
-}
-
-const finalResult = await s.result();
-```
-
-| Event Type | Description | Key Properties |
-|------------|-------------|----------------|
-| `start` | Stream begins | `partial`: Initial `AssistantImages` structure |
-| `image_start` | Image block starts | `contentIndex`: Position in output array |
-| `image_end` | Image block complete | `image`: Final `ImageContent`, `contentIndex`: Position |
-| `done` | Stream complete | `reason`: Stop reason (`"stop"`), `images`: Final `AssistantImages` |
-| `error` | Error occurred | `reason`: Error type (`"error"` or `"aborted"`), `error`: Final `AssistantImages` |
-
-Text output, if the model returns any, is available on the final `AssistantImages.output` array.
-
 ### Notes and Limitations
 
 - Use `getImageModel(...)`, not `getModel(...)`.
-- Use `images()` / `generateImages()`, not `stream()` / `complete()`.
+- Use `generateImages()`, not `stream()` / `complete()`.
 - Image-generation models do not participate in tool calling.
-- Outputs are returned as base64-encoded `ImageContent` blocks in `AssistantImages.output`.
+- Outputs are returned in `AssistantImages.output` and can include both base64-encoded `ImageContent` blocks and `TextContent` blocks.
 - Some models return only images, others return images plus text. Check `model.output`.
 - Some models accept image input, others are text-to-image only. Check `model.input`.
 - Like the streaming APIs, image generation supports options such as `apiKey`, `signal`, `headers`, `onPayload`, and `onResponse`, and results may include `stopReason`, `responseId`, and `usage`.

@@ -1,17 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { generateImages, images } from "../src/images.js";
+import { generateImages } from "../src/images.js";
 import type { ImagesContext, ImagesModel } from "../src/types.js";
 
 const mockState = vi.hoisted(() => ({
 	lastParams: undefined as unknown,
+	lastRequestOptions: undefined as unknown,
 }));
 
 vi.mock("openai", () => {
 	class FakeOpenAI {
 		chat = {
 			completions: {
-				create: (params: unknown) => {
+				create: (params: unknown, requestOptions?: unknown) => {
 					mockState.lastParams = params;
+					mockState.lastRequestOptions = requestOptions;
+					const signal = (requestOptions as { signal?: AbortSignal } | undefined)?.signal;
+					if (signal?.aborted) {
+						const error = new Error("Request aborted");
+						return {
+							withResponse: async () => {
+								throw error;
+							},
+						};
+					}
 					const response = {
 						id: "img-1",
 						usage: {
@@ -50,9 +61,10 @@ vi.mock("openai", () => {
 describe("openrouter images", () => {
 	beforeEach(() => {
 		mockState.lastParams = undefined;
+		mockState.lastRequestOptions = undefined;
 	});
 
-	it("emits image events and returns text plus images in final output", async () => {
+	it("returns text plus images in final output", async () => {
 		const model: ImagesModel<"openrouter-images"> = {
 			id: "google/gemini-3.1-flash-image-preview",
 			name: "Gemini 3.1 Flash Image Preview",
@@ -68,14 +80,8 @@ describe("openrouter images", () => {
 			input: [{ type: "text", text: "Generate a dog" }],
 		};
 
-		const result = images(model, context, { apiKey: "test" });
-		const eventTypes: string[] = [];
-		for await (const event of result) {
-			eventTypes.push(event.type);
-		}
-
-		const output = await result.result();
-		expect(eventTypes).toEqual(["start", "image_start", "image_end", "done"]);
+		const output = await generateImages(model, context, { apiKey: "test" });
+		expect(output.stopReason).toBe("stop");
 		expect(output.responseId).toBe("img-1");
 		expect(output.output[0]).toMatchObject({ type: "text", text: "Here is your image." });
 		expect(output.output[1]).toMatchObject({ type: "image", mimeType: "image/png", data: "ZmFrZS1wbmc=" });
@@ -88,6 +94,29 @@ describe("openrouter images", () => {
 		expect(params.stream).toBe(false);
 		expect(params.modalities).toEqual(["image", "text"]);
 		expect(params.messages?.[0]?.content?.[0]).toMatchObject({ type: "text", text: "Generate a dog" });
+	});
+
+	it("passes through abort signal and returns aborted result", async () => {
+		const model: ImagesModel<"openrouter-images"> = {
+			id: "black-forest-labs/flux.2-pro",
+			name: "FLUX.2 Pro",
+			api: "openrouter-images",
+			provider: "openrouter",
+			baseUrl: "https://openrouter.ai/api/v1",
+			input: ["text", "image"],
+			output: ["image"],
+			cost: { input: 0.015, output: 0.03, cacheRead: 0, cacheWrite: 0 },
+		};
+		const context: ImagesContext = {
+			input: [{ type: "text", text: "Generate a dog" }],
+		};
+		const controller = new AbortController();
+		controller.abort();
+
+		const output = await generateImages(model, context, { apiKey: "test", signal: controller.signal });
+		expect(output.stopReason).toBe("aborted");
+		expect(output.errorMessage).toBe("Request aborted");
+		expect(mockState.lastRequestOptions).toMatchObject({ signal: controller.signal });
 	});
 
 	it("generateImages resolves the final assistant images result", async () => {

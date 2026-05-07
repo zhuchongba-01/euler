@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { getImageModel } from "../src/image-models.js";
-import { generateImages, images } from "../src/images.js";
+import { generateImages } from "../src/images.js";
 import type { ImageContent, ImagesContext, ImagesModel, ProviderImagesOptions } from "../src/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,36 +22,6 @@ async function basicImageGeneration<TApi extends string>(model: ImagesModel<TApi
 	expect(response.errorMessage).toBeFalsy();
 	expect(response.output.some((item) => item.type === "image")).toBe(true);
 	expect(response.timestamp).toBeGreaterThan(0);
-}
-
-async function handleStreaming<TApi extends string>(model: ImagesModel<TApi>, options?: ImagesOptionsWithExtras) {
-	const context: ImagesContext = {
-		input: [{ type: "text", text: "Generate a simple blue square on a plain white background. No text." }],
-	};
-
-	const s = images(model, context, options);
-	let started = false;
-	let imageStarted = false;
-	let imageCompleted = false;
-
-	for await (const event of s) {
-		if (event.type === "start") {
-			started = true;
-		} else if (event.type === "image_start") {
-			imageStarted = true;
-		} else if (event.type === "image_end") {
-			imageCompleted = true;
-			expect(event.image.type).toBe("image");
-			expect(event.image.data.length).toBeGreaterThan(0);
-		}
-	}
-
-	const response = await s.result();
-	expect(response.stopReason, `Error: ${response.errorMessage}`).toBe("stop");
-	expect(started).toBe(true);
-	expect(imageStarted).toBe(true);
-	expect(imageCompleted).toBe(true);
-	expect(response.output.some((item) => item.type === "image")).toBe(true);
 }
 
 async function handleTextAndImageOutput<TApi extends string>(
@@ -106,10 +76,6 @@ describe("Images E2E Tests", () => {
 
 			it("should generate a basic image", { retry: 3 }, async () => {
 				await basicImageGeneration(model);
-			});
-
-			it("should handle image streaming", { retry: 3 }, async () => {
-				await handleStreaming(model);
 			});
 
 			it("should handle text plus image output", { retry: 3 }, async () => {
