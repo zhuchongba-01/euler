@@ -27,7 +27,6 @@ export class Image implements Component {
 	private theme: ImageTheme;
 	private options: ImageOptions;
 	private imageId?: number;
-	private readonly explicitImageId?: number;
 
 	private cachedLines?: string[];
 	private cachedWidth?: number;
@@ -44,13 +43,12 @@ export class Image implements Component {
 		this.theme = theme;
 		this.options = options;
 		this.dimensions = dimensions || getImageDimensions(base64Data, mimeType) || { widthPx: 800, heightPx: 600 };
-		this.explicitImageId = options.imageId;
 		this.imageId = options.imageId;
 	}
 
-	/** Get the explicit Kitty image ID configured for this image (if any). */
+	/** Get the Kitty image ID used by this image (if any). */
 	getImageId(): number | undefined {
-		return this.explicitImageId;
+		return this.imageId;
 	}
 
 	invalidate(): void {
