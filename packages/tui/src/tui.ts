@@ -11,21 +11,26 @@ import type { Terminal } from "./terminal.js";
 import { deleteKittyImage, getCapabilities, isImageLine, setCellDimensions } from "./terminal-image.js";
 import { extractSegments, normalizeTerminalOutput, sliceByColumn, sliceWithWidth, visibleWidth } from "./utils.js";
 
-const KITTY_SEQUENCE_PATTERN = /\x1b_G([^;\x1b]*);/g;
+const KITTY_SEQUENCE_PREFIX = "\x1b_G";
 
 function extractKittyImageIds(line: string): number[] {
-	const ids: number[] = [];
-	for (const match of line.matchAll(KITTY_SEQUENCE_PATTERN)) {
-		for (const param of match[1].split(",")) {
-			const [key, value] = param.split("=", 2);
-			if (key !== "i" || value === undefined) continue;
-			const id = Number(value);
-			if (Number.isInteger(id) && id > 0 && id <= 0xffffffff && !ids.includes(id)) {
-				ids.push(id);
-			}
+	const sequenceStart = line.indexOf(KITTY_SEQUENCE_PREFIX);
+	if (sequenceStart === -1) return [];
+
+	const paramsStart = sequenceStart + KITTY_SEQUENCE_PREFIX.length;
+	const paramsEnd = line.indexOf(";", paramsStart);
+	if (paramsEnd === -1) return [];
+
+	const params = line.slice(paramsStart, paramsEnd);
+	for (const param of params.split(",")) {
+		const [key, value] = param.split("=", 2);
+		if (key !== "i" || value === undefined) continue;
+		const id = Number(value);
+		if (Number.isInteger(id) && id > 0 && id <= 0xffffffff) {
+			return [id];
 		}
 	}
-	return ids;
+	return [];
 }
 
 /**
