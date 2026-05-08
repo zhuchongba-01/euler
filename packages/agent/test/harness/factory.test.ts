@@ -1,4 +1,4 @@
-import { getModel } from "@mariozechner/pi-ai";
+import { getModel } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 import { NodeExecutionEnv } from "../../src/harness/execution-env.js";
 import { createAgentHarness, createSession } from "../../src/harness/factory.js";

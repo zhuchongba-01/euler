@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { getModel } from "@mariozechner/pi-ai";
+import { getModel } from "@earendil-works/pi-ai";
 import { InMemorySessionStorage } from "../../src/harness/session/storage/memory.js";
 import {
 	createAgentHarness,

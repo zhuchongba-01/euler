@@ -1,4 +1,4 @@
-import type { ImageContent, Model, TextContent } from "@mariozechner/pi-ai";
+import type { ImageContent, Model, TextContent } from "@earendil-works/pi-ai";
 import type { AgentEvent, AgentMessage, AgentTool, ThinkingLevel } from "../index.js";
 import type { Session } from "./session/session.js";
 
