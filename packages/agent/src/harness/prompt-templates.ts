@@ -52,19 +52,26 @@ export async function loadPromptTemplates(
  * Source values are preserved exactly and attached to every loaded prompt template and diagnostic. The agent package does
  * not interpret source values; applications define their own provenance shape.
  */
-export async function loadSourcedPromptTemplates<TSource>(
+export async function loadSourcedPromptTemplates<TSource, TPromptTemplate extends PromptTemplate = PromptTemplate>(
 	env: ExecutionEnv,
 	inputs: Array<{ path: string; source: TSource }>,
+	mapPromptTemplate?: (promptTemplate: PromptTemplate, source: TSource) => TPromptTemplate,
 ): Promise<{
-	promptTemplates: Array<{ promptTemplate: PromptTemplate; source: TSource }>;
+	promptTemplates: Array<{ promptTemplate: TPromptTemplate; source: TSource }>;
 	diagnostics: Array<PromptTemplateDiagnostic & { source: TSource }>;
 }> {
-	const promptTemplates: Array<{ promptTemplate: PromptTemplate; source: TSource }> = [];
+	const promptTemplates: Array<{ promptTemplate: TPromptTemplate; source: TSource }> = [];
 	const diagnostics: Array<PromptTemplateDiagnostic & { source: TSource }> = [];
 	for (const input of inputs) {
 		const result = await loadPromptTemplates(env, input.path);
-		for (const promptTemplate of result.promptTemplates)
-			promptTemplates.push({ promptTemplate, source: input.source });
+		for (const promptTemplate of result.promptTemplates) {
+			promptTemplates.push({
+				promptTemplate: mapPromptTemplate
+					? mapPromptTemplate(promptTemplate, input.source)
+					: (promptTemplate as TPromptTemplate),
+				source: input.source,
+			});
+		}
 		for (const diagnostic of result.diagnostics) diagnostics.push({ ...diagnostic, source: input.source });
 	}
 	return { promptTemplates, diagnostics };

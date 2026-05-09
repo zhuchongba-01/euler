@@ -17,7 +17,9 @@ import type {
 	ExecutionEnv,
 	NavigateTreeResult,
 	PendingSessionWrite,
+	PromptTemplate,
 	Session,
+	Skill,
 } from "./types.js";
 
 function createUserMessage(text: string, images?: ImageContent[]): UserMessage {
@@ -26,7 +28,11 @@ function createUserMessage(text: string, images?: ImageContent[]): UserMessage {
 	return { role: "user", content, timestamp: Date.now() };
 }
 
-export class AgentHarness {
+export class AgentHarness<
+	TSkill extends Skill = Skill,
+	TPromptTemplate extends PromptTemplate = PromptTemplate,
+	TTool extends AgentTool = AgentTool,
+> {
 	readonly agent: Agent;
 	readonly env: ExecutionEnv;
 	private session: Session;
@@ -38,14 +44,16 @@ export class AgentHarness {
 	private steerQueue: UserMessage[] = [];
 	private followUpQueue: UserMessage[] = [];
 	private pendingSessionWrites: PendingSessionWrite[] = [];
-	private resources: AgentHarnessResources;
-	private systemPrompt: AgentHarnessOptions["systemPrompt"];
+	private resources: AgentHarnessResources<TSkill, TPromptTemplate>;
+	private systemPrompt: AgentHarnessOptions<TSkill, TPromptTemplate, TTool>["systemPrompt"];
 	private getApiKeyAndHeaders?: AgentHarnessOptions["getApiKeyAndHeaders"];
-	private tools = new Map<string, AgentTool>();
-	private listeners = new Set<(event: AgentHarnessEvent, signal?: AbortSignal) => Promise<void> | void>();
+	private tools = new Map<string, TTool>();
+	private listeners = new Set<
+		(event: AgentHarnessEvent<TSkill, TPromptTemplate>, signal?: AbortSignal) => Promise<void> | void
+	>();
 	private hooks = new Map<keyof AgentHarnessEventResultMap, Set<(event: any) => Promise<any> | any>>();
 
-	constructor(options: AgentHarnessOptions) {
+	constructor(options: AgentHarnessOptions<TSkill, TPromptTemplate, TTool>) {
 		this.agent = new Agent({
 			initialState: {
 				model: options.model,
@@ -60,12 +68,12 @@ export class AgentHarness {
 		this.resources = options.resources ?? {};
 		this.systemPrompt = options.systemPrompt;
 		this.getApiKeyAndHeaders = options.getApiKeyAndHeaders;
-		for (const tool of this.agent.state.tools) {
+		for (const tool of options.tools ?? []) {
 			this.tools.set(tool.name, tool);
 		}
 		this.model = options.model;
 		this.thinkingLevel = options.thinkingLevel ?? this.agent.state.thinkingLevel;
-		this.activeToolNames = options.activeToolNames ?? this.agent.state.tools.map((tool) => tool.name);
+		this.activeToolNames = options.activeToolNames ?? (options.tools ?? []).map((tool) => tool.name);
 		this.agent.state.model = this.model;
 		this.agent.state.thinkingLevel = this.thinkingLevel;
 		this.agent.getApiKey = async (provider) => {
@@ -127,13 +135,13 @@ export class AgentHarness {
 		});
 	}
 
-	private async emitOwn(event: AgentHarnessOwnEvent, signal?: AbortSignal): Promise<void> {
+	private async emitOwn(event: AgentHarnessOwnEvent<TSkill, TPromptTemplate>, signal?: AbortSignal): Promise<void> {
 		for (const listener of this.listeners) {
 			await listener(event, signal);
 		}
 	}
 
-	private async emitAny(event: AgentHarnessEvent, signal?: AbortSignal): Promise<void> {
+	private async emitAny(event: AgentHarnessEvent<TSkill, TPromptTemplate>, signal?: AbortSignal): Promise<void> {
 		for (const listener of this.listeners) {
 			await listener(event, signal);
 		}
@@ -163,13 +171,13 @@ export class AgentHarness {
 		});
 	}
 
-	private async createTurnState(): Promise<AgentHarnessTurnState> {
+	private async createTurnState(): Promise<AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>> {
 		const context = await this.session.buildContext();
 		const resources = this.getResources();
 		const tools = [...this.tools.values()];
 		const activeTools = this.activeToolNames
 			.map((name) => this.tools.get(name))
-			.filter((tool): tool is AgentTool => tool !== undefined);
+			.filter((tool): tool is TTool => tool !== undefined);
 		let systemPrompt = "You are a helpful assistant.";
 		if (typeof this.systemPrompt === "string") {
 			systemPrompt = this.systemPrompt;
@@ -194,7 +202,7 @@ export class AgentHarness {
 		};
 	}
 
-	private applyTurnState(turnState: AgentHarnessTurnState): void {
+	private applyTurnState(turnState: AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>): void {
 		this.agent.state.messages = turnState.messages;
 		this.agent.state.systemPrompt = turnState.systemPrompt;
 		this.agent.state.model = turnState.model;
@@ -263,7 +271,7 @@ export class AgentHarness {
 	}
 
 	private async executeTurn(
-		turnState: AgentHarnessTurnState,
+		turnState: AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>,
 		text: string,
 		options?: { images?: ImageContent[] },
 	): Promise<AssistantMessage> {
@@ -578,22 +586,23 @@ export class AgentHarness {
 		this.agent.followUpMode = mode;
 	}
 
-	getResources(): AgentHarnessResources {
+	getResources(): AgentHarnessResources<TSkill, TPromptTemplate> {
 		return {
 			skills: this.resources.skills?.slice(),
 			promptTemplates: this.resources.promptTemplates?.slice(),
 		};
 	}
 
-	async setResources(resources: AgentHarnessResources): Promise<void> {
+	async setResources(resources: AgentHarnessResources<TSkill, TPromptTemplate>): Promise<void> {
+		const previousResources = this.getResources();
 		this.resources = {
 			skills: resources.skills?.slice(),
 			promptTemplates: resources.promptTemplates?.slice(),
 		};
-		await this.emitOwn({ type: "resources_update", resources: this.getResources() });
+		await this.emitOwn({ type: "resources_update", resources: this.getResources(), previousResources });
 	}
 
-	async setTools(tools: AgentTool[], activeToolNames?: string[]): Promise<void> {
+	async setTools(tools: TTool[], activeToolNames?: string[]): Promise<void> {
 		this.tools = new Map(tools.map((tool) => [tool.name, tool]));
 		if (activeToolNames) {
 			this.validateToolNames(activeToolNames);
@@ -623,7 +632,9 @@ export class AgentHarness {
 		await this.agent.waitForIdle();
 	}
 
-	subscribe(listener: (event: AgentHarnessEvent, signal?: AbortSignal) => Promise<void> | void): () => void {
+	subscribe(
+		listener: (event: AgentHarnessEvent<TSkill, TPromptTemplate>, signal?: AbortSignal) => Promise<void> | void,
+	): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);
 	}

@@ -4,6 +4,20 @@
 
 This document describes the current direction and implemented behavior. Some extension/session-facade details are planned and called out explicitly.
 
+## Ultimate lifecycle goal
+
+Harness listeners and hooks should be able to close over the `AgentHarness` instance and call public harness APIs from any event where those APIs are documented as allowed. Those calls must not corrupt in-flight turn snapshots, reorder persisted transcript entries, lose pending writes, deadlock settlement, or leave the harness in the wrong phase.
+
+The intended rule is:
+
+- structural operations remain rejected while busy
+- queue operations are accepted at documented turn-safe points
+- runtime config setters update future snapshots without mutating the current provider request
+- session writes made while busy are durably queued and flushed in deterministic order
+- getters return latest harness config, not in-flight snapshots
+
+A final lifecycle hardening pass should prove these guarantees with a broad listener/hook reentrancy test suite.
+
 ## State model
 
 The harness separates state into four categories.
@@ -23,7 +37,7 @@ Getters return harness config. They do not return the snapshot used by an in-fli
 
 Setters update harness config immediately, including while a turn is in flight. Changes affect the next turn snapshot, not the currently running provider request.
 
-`setResources()` accepts concrete resources and emits `resources_update` with shallow-copied resources. Applications own loading/reloading resources from disk or other sources and should call `setResources()` with new values.
+`setResources()` accepts concrete resources and emits `resources_update` on every call with shallow-copied current and previous resources. Applications own loading/reloading resources from disk or other sources and should call `setResources()` with new values.
 
 `getResources()` returns shallow-copied current resources. It is a live config read, not the last turn snapshot.
 
@@ -173,3 +187,18 @@ They are allowed only while idle and are not queued. They operate on persisted s
 Branch summary generation is part of the tree navigation operation.
 
 Auto-compaction and retry decision points are not implemented in `AgentHarness` yet.
+
+## Final lifecycle hardening todo
+
+Before treating `AgentHarness` as migration-ready, add a broad test suite that exercises listeners and hooks closing over the harness and calling public APIs during every relevant event:
+
+- runtime config setters from low-level lifecycle events and harness events
+- resource/tool/model/thinking updates during active turns and save points
+- session writes from listeners and hooks, including writes from `settled`
+- queue operations from turn events, tool events, and provider hooks
+- rejected structural operations while busy
+- abort from listeners/hooks
+- getter behavior during active operations
+- deterministic ordering of agent-emitted messages and pending listener writes
+- no deadlocks when async listeners call harness APIs and await them
+- phase cleanup through success, provider error, hook error, abort, compaction, and tree navigation

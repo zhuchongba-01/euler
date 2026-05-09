@@ -33,11 +33,14 @@ export interface PromptTemplate {
 }
 
 /** Resources made available to explicit invocation methods and system-prompt callbacks. */
-export interface AgentHarnessResources {
+export interface AgentHarnessResources<
+	TSkill extends Skill = Skill,
+	TPromptTemplate extends PromptTemplate = PromptTemplate,
+> {
 	/** Prompt templates available for explicit invocation. */
-	promptTemplates?: PromptTemplate[];
+	promptTemplates?: TPromptTemplate[];
 	/** Skills available to the model and explicit skill invocation. */
-	skills?: Skill[];
+	skills?: TSkill[];
 }
 
 /** Kind of filesystem object as addressed by an {@link ExecutionEnv}. Symlinks are not followed automatically. */
@@ -295,14 +298,18 @@ export type PendingSessionWrite = SessionTreeEntry extends infer TEntry
 		: never
 	: never;
 
-export interface AgentHarnessTurnState {
+export interface AgentHarnessTurnState<
+	TSkill extends Skill = Skill,
+	TPromptTemplate extends PromptTemplate = PromptTemplate,
+	TTool extends AgentTool = AgentTool,
+> {
 	messages: AgentMessage[];
-	resources: AgentHarnessResources;
+	resources: AgentHarnessResources<TSkill, TPromptTemplate>;
 	systemPrompt: string;
 	model: Model<any>;
 	thinkingLevel: ThinkingLevel;
-	tools: AgentTool[];
-	activeTools: AgentTool[];
+	tools: TTool[];
+	activeTools: TTool[];
 }
 
 export interface QueueUpdateEvent {
@@ -328,12 +335,15 @@ export interface SettledEvent {
 	nextTurnCount: number;
 }
 
-export interface BeforeAgentStartEvent {
+export interface BeforeAgentStartEvent<
+	TSkill extends Skill = Skill,
+	TPromptTemplate extends PromptTemplate = PromptTemplate,
+> {
 	type: "before_agent_start";
 	prompt: string;
 	images?: ImageContent[];
 	systemPrompt: string;
-	resources: AgentHarnessResources;
+	resources: AgentHarnessResources<TSkill, TPromptTemplate>;
 }
 
 export interface ContextEvent {
@@ -410,17 +420,24 @@ export interface ThinkingLevelSelectEvent {
 	previousLevel: ThinkingLevel;
 }
 
-export interface ResourcesUpdateEvent {
+export interface ResourcesUpdateEvent<
+	TSkill extends Skill = Skill,
+	TPromptTemplate extends PromptTemplate = PromptTemplate,
+> {
 	type: "resources_update";
-	resources: AgentHarnessResources;
+	resources: AgentHarnessResources<TSkill, TPromptTemplate>;
+	previousResources: AgentHarnessResources<TSkill, TPromptTemplate>;
 }
 
-export type AgentHarnessOwnEvent =
+export type AgentHarnessOwnEvent<
+	TSkill extends Skill = Skill,
+	TPromptTemplate extends PromptTemplate = PromptTemplate,
+> =
 	| QueueUpdateEvent
 	| SavePointEvent
 	| AbortEvent
 	| SettledEvent
-	| BeforeAgentStartEvent
+	| BeforeAgentStartEvent<TSkill, TPromptTemplate>
 	| ContextEvent
 	| BeforeProviderRequestEvent
 	| AfterProviderResponseEvent
@@ -432,9 +449,11 @@ export type AgentHarnessOwnEvent =
 	| SessionTreeEvent
 	| ModelSelectEvent
 	| ThinkingLevelSelectEvent
-	| ResourcesUpdateEvent;
+	| ResourcesUpdateEvent<TSkill, TPromptTemplate>;
 
-export type AgentHarnessEvent = AgentEvent | AgentHarnessOwnEvent;
+export type AgentHarnessEvent<TSkill extends Skill = Skill, TPromptTemplate extends PromptTemplate = PromptTemplate> =
+	| AgentEvent
+	| AgentHarnessOwnEvent<TSkill, TPromptTemplate>;
 
 export interface BeforeAgentStartResult {
 	messages?: AgentMessage[];
@@ -568,15 +587,19 @@ export interface BranchSummaryResult {
 	error?: string;
 }
 
-export interface AgentHarnessOptions {
+export interface AgentHarnessOptions<
+	TSkill extends Skill = Skill,
+	TPromptTemplate extends PromptTemplate = PromptTemplate,
+	TTool extends AgentTool = AgentTool,
+> {
 	env: ExecutionEnv;
 	session: Session;
-	tools?: AgentTool[];
+	tools?: TTool[];
 	/**
 	 * Concrete resources available to explicit invocation methods and system-prompt callbacks.
 	 * Applications own loading/reloading resources and should call `setResources()` with new values.
 	 */
-	resources?: AgentHarnessResources;
+	resources?: AgentHarnessResources<TSkill, TPromptTemplate>;
 	systemPrompt?:
 		| string
 		| ((context: {
@@ -584,8 +607,8 @@ export interface AgentHarnessOptions {
 				session: Session;
 				model: Model<any>;
 				thinkingLevel: ThinkingLevel;
-				activeTools: AgentTool[];
-				resources: AgentHarnessResources;
+				activeTools: TTool[];
+				resources: AgentHarnessResources<TSkill, TPromptTemplate>;
 		  }) => string | Promise<string>);
 	getApiKeyAndHeaders?: (
 		model: Model<any>,
