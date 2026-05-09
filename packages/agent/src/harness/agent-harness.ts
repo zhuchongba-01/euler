@@ -38,7 +38,7 @@ export class AgentHarness {
 	private steerQueue: UserMessage[] = [];
 	private followUpQueue: UserMessage[] = [];
 	private pendingSessionWrites: PendingSessionWrite[] = [];
-	private resources?: AgentHarnessOptions["resources"];
+	private resources: AgentHarnessResources;
 	private systemPrompt: AgentHarnessOptions["systemPrompt"];
 	private getApiKeyAndHeaders?: AgentHarnessOptions["getApiKeyAndHeaders"];
 	private tools = new Map<string, AgentTool>();
@@ -57,7 +57,7 @@ export class AgentHarness {
 		});
 		this.env = options.env;
 		this.session = options.session;
-		this.resources = options.resources;
+		this.resources = options.resources ?? {};
 		this.systemPrompt = options.systemPrompt;
 		this.getApiKeyAndHeaders = options.getApiKeyAndHeaders;
 		for (const tool of this.agent.state.tools) {
@@ -165,7 +165,7 @@ export class AgentHarness {
 
 	private async createTurnState(): Promise<AgentHarnessTurnState> {
 		const context = await this.session.buildContext();
-		const resources = typeof this.resources === "function" ? await this.resources() : (this.resources ?? {});
+		const resources = this.getResources();
 		const tools = [...this.tools.values()];
 		const activeTools = this.activeToolNames
 			.map((name) => this.tools.get(name))
@@ -578,8 +578,19 @@ export class AgentHarness {
 		this.agent.followUpMode = mode;
 	}
 
+	getResources(): AgentHarnessResources {
+		return {
+			skills: this.resources.skills?.slice(),
+			promptTemplates: this.resources.promptTemplates?.slice(),
+		};
+	}
+
 	async setResources(resources: AgentHarnessResources): Promise<void> {
-		this.resources = resources;
+		this.resources = {
+			skills: resources.skills?.slice(),
+			promptTemplates: resources.promptTemplates?.slice(),
+		};
+		await this.emitOwn({ type: "resources_update", resources: this.getResources() });
 	}
 
 	async setTools(tools: AgentTool[], activeToolNames?: string[]): Promise<void> {

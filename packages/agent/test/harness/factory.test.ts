@@ -35,4 +35,30 @@ describe("harness factories", () => {
 		expect(harness.agent.steeringMode).toBe("one-at-a-time");
 		expect(harness.agent.followUpMode).toBe("one-at-a-time");
 	});
+
+	it("updates and reads concrete resources", async () => {
+		const session = createSession(new InMemorySessionStorage());
+		const env = new NodeExecutionEnv({ cwd: process.cwd() });
+		const model = getModel("anthropic", "claude-sonnet-4-5");
+		const harness = createAgentHarness({ env, session, model });
+		const skill = {
+			name: "inspect",
+			description: "Inspect things",
+			content: "Use inspection tools.",
+			filePath: "/skills/inspect/SKILL.md",
+		};
+		const resources = { skills: [skill], promptTemplates: [{ name: "review", content: "Review $1" }] };
+		const updates: unknown[] = [];
+		harness.subscribe((event) => {
+			if (event.type === "resources_update") updates.push(event.resources);
+		});
+
+		await harness.setResources(resources);
+		const resolved = harness.getResources();
+
+		expect(updates).toEqual([resources]);
+		expect(resolved).toEqual(resources);
+		expect(resolved.skills).not.toBe(resources.skills);
+		expect(resolved.promptTemplates).not.toBe(resources.promptTemplates);
+	});
 });

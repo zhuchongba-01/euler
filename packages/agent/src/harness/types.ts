@@ -410,6 +410,11 @@ export interface ThinkingLevelSelectEvent {
 	previousLevel: ThinkingLevel;
 }
 
+export interface ResourcesUpdateEvent {
+	type: "resources_update";
+	resources: AgentHarnessResources;
+}
+
 export type AgentHarnessOwnEvent =
 	| QueueUpdateEvent
 	| SavePointEvent
@@ -426,7 +431,8 @@ export type AgentHarnessOwnEvent =
 	| SessionBeforeTreeEvent
 	| SessionTreeEvent
 	| ModelSelectEvent
-	| ThinkingLevelSelectEvent;
+	| ThinkingLevelSelectEvent
+	| ResourcesUpdateEvent;
 
 export type AgentHarnessEvent = AgentEvent | AgentHarnessOwnEvent;
 
@@ -481,6 +487,7 @@ export type AgentHarnessEventResultMap = {
 	session_tree: undefined;
 	model_select: undefined;
 	thinking_level_select: undefined;
+	resources_update: undefined;
 	queue_update: undefined;
 	save_point: undefined;
 	abort: undefined;
@@ -565,7 +572,11 @@ export interface AgentHarnessOptions {
 	env: ExecutionEnv;
 	session: Session;
 	tools?: AgentTool[];
-	resources?: AgentHarnessResources | (() => AgentHarnessResources | Promise<AgentHarnessResources>);
+	/**
+	 * Concrete resources available to explicit invocation methods and system-prompt callbacks.
+	 * Applications own loading/reloading resources and should call `setResources()` with new values.
+	 */
+	resources?: AgentHarnessResources;
 	systemPrompt?:
 		| string
 		| ((context: {

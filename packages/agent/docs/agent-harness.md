@@ -16,12 +16,16 @@ Harness config is the latest runtime configuration set by the application or ext
 - thinking level
 - tools
 - active tool names
-- resources or resource provider
+- resources
 - system prompt or system prompt provider
 
 Getters return harness config. They do not return the snapshot used by an in-flight provider request.
 
 Setters update harness config immediately, including while a turn is in flight. Changes affect the next turn snapshot, not the currently running provider request.
+
+`setResources()` accepts concrete resources and emits `resources_update` with shallow-copied resources. Applications own loading/reloading resources from disk or other sources and should call `setResources()` with new values.
+
+`getResources()` returns shallow-copied current resources. It is a live config read, not the last turn snapshot.
 
 ### Turn snapshot
 
@@ -35,7 +39,9 @@ A turn snapshot is the concrete state used for one LLM turn. It is created by `c
 - all tools
 - active tools
 
-Static option values are used directly. Provider callbacks are invoked once per `createTurnState()` call. All logic for that turn uses the same snapshot.
+Static option values are used directly. System-prompt provider callbacks are invoked once per `createTurnState()` call. All logic for that turn uses the same snapshot.
+
+Resource arrays are shallow-copied when a snapshot is created. Individual skill and prompt-template objects are not deep-copied.
 
 ### Session
 
@@ -115,6 +121,8 @@ The low-level loop converts harness `ThinkingLevel` to provider `reasoning` at t
 - all other thinking levels pass through
 
 No state refresh is needed on `agent_end` except flushing leftover pending session writes and clearing the operation phase. The exact `settled` event timing is still under review.
+
+If the system-prompt callback throws while starting `prompt`, `skill`, or `promptFromTemplate`, the operation throws and the harness returns to idle. If it throws from the save-point snapshot created by `prepareNextTurn`, the low-level agent run records an assistant error message.
 
 ## Hooks and events
 
