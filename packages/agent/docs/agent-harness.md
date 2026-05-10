@@ -193,11 +193,46 @@ Branch summary generation is part of the tree navigation operation.
 
 Auto-compaction and retry decision points are not implemented in `AgentHarness` yet.
 
+## Test organization
+
+Harness tests should stay focused by area instead of growing one large catch-all file.
+
+Current structure:
+
+- `packages/agent/test/harness/agent-harness.test.ts`: basic construction/API smoke tests.
+- `packages/agent/test/harness/agent-harness-stream.test.ts`: stream options and provider hook semantics.
+
+Preferred future structure:
+
+- `agent-harness-resources.test.ts`: resource snapshot/loading semantics.
+- `agent-harness-tools.test.ts`: tool registry getters, active-tool semantics, and update events.
+- `agent-harness-lifecycle.test.ts`: phase/save-point/settled/reentrancy behavior.
+
+Use the `pi-ai` faux provider (`registerFauxProvider`, `fauxAssistantMessage`) for deterministic harness/provider tests. Faux response factories can inspect `StreamOptions`, invoke `options.onPayload`, and return scripted assistant messages without real provider APIs or network access.
+
 ## Implementation todo
 
 This list tracks the remaining work before treating `AgentHarness` as migration-ready.
 
-### 1. Finish curated provider/stream configuration
+### 1. Remove `Agent` dependency from `AgentHarness`
+
+New top priority.
+
+`AgentHarness` should likely call `agentLoop` / `agentLoopContinue` directly instead of owning an internal `Agent` instance. The harness already owns session persistence, runtime config snapshots, queues, provider stream configuration, hooks/events, phase semantics, and abort semantics. Keeping `Agent` in the middle creates duplicated state and adapter seams.
+
+Still needed:
+
+- Replace internal `new Agent(...)` with direct low-level loop calls.
+- Move active run/abort-controller lifecycle into `AgentHarness`.
+- Move queue draining into `AgentHarness` only, removing duplicated low-level `Agent` queues.
+- Reduce low-level `AgentEvent` state directly in the harness where needed.
+- Preserve current public behavior for `prompt`, `skill`, `promptFromTemplate`, `steer`, `followUp`, `nextTurn`, `abort`, and `waitForIdle`.
+- Preserve provider hook behavior implemented by the harness stream wrapper.
+- Preserve save-point snapshot refresh semantics without side-effecting through `Agent.prepareNextTurn`.
+- Decide whether `AgentHarness.agent` remains temporarily for compatibility or is removed before migration.
+- Add tests covering parity with the current harness behavior before and after the refactor.
+
+### 2. Finish curated provider/stream configuration
 
 Implemented so far:
 
@@ -226,12 +261,12 @@ Implemented provider hook behavior:
   3. `before_provider_request` patches, in hook registration order
 - `before_provider_request` does not patch `reasoning`; add that only if a concrete use case appears.
 
-Still needed:
+Implemented validation:
 
-- Add tests proving stream options are snapshotted per turn and changes while busy affect only future provider requests/save-point snapshots.
-- Add tests proving provider hook patch/deletion/chaining semantics.
+- `packages/agent/test/harness/agent-harness-stream.test.ts` uses the `pi-ai` faux provider.
+- Tests cover stream option forwarding, auth header merge, request hook patching, request hook deletion semantics, request hook chaining, payload hook chaining, and busy/save-point snapshot behavior.
 
-### 2. Design per-`AgentHarness` model registry
+### 3. Design per-`AgentHarness` model registry
 
 Not started.
 
@@ -243,7 +278,7 @@ Still needed:
 - Define model change semantics during active turns and save points.
 - Preserve current `setModel()` behavior until the registry model is designed.
 
-### 3. Design generic hook/event extension mechanism
+### 4. Design generic hook/event extension mechanism
 
 Current cleanup already done:
 
@@ -266,7 +301,7 @@ Still needed:
   - possibly `tool_result`: each hook receives the result fields produced by previous hooks.
 - Do not chain hooks where semantics are policy-based or ambiguous until explicitly designed, such as `tool_call`, `session_before_compact`, `session_before_tree`, and `before_agent_start`.
 
-### 4. Add explicit tool registry read/update semantics
+### 5. Add explicit tool registry read/update semantics
 
 Implemented so far:
 
@@ -286,7 +321,7 @@ Still needed:
 - Decide and implement tool update observability events.
 - Include active-tool-only updates in the uniform runtime config observability plan.
 
-### 5. Full `AgentHarness` lifecycle/state pass
+### 6. Full `AgentHarness` lifecycle/state pass
 
 Implemented so far:
 
@@ -320,7 +355,7 @@ Still needed:
 - Document or change timing for model/thinking/stream-option events that may fire before queued session entries persist while busy.
 - Audit `abort()` barrier semantics.
 
-### 6. Later coding-agent migration plan
+### 7. Later coding-agent migration plan
 
 Not started.
 
@@ -332,7 +367,7 @@ Still needed:
 - Preserve UI/session behavior outside core.
 - Move coding-agent stream/auth/retry/header behavior onto the harness stream configuration and provider hooks.
 
-### 7. Final lifecycle hardening suite
+### 8. Final lifecycle hardening suite
 
 Before treating `AgentHarness` as migration-ready, add a broad test suite that exercises listeners and hooks closing over the harness and calling public APIs during every relevant event.
 
