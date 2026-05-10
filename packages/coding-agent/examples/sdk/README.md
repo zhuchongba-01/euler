@@ -40,9 +40,6 @@ import {
   ModelRegistry,
   SessionManager,
   SettingsManager,
-  codingTools,
-  readOnlyTools,
-  readTool, bashTool, editTool, writeTool,
 } from "@earendil-works/pi-coding-agent";
 
 // Auth and models setup
@@ -64,7 +61,7 @@ await loader.reload();
 const { session } = await createAgentSession({ resourceLoader: loader, authStorage, modelRegistry });
 
 // Read-only
-const { session } = await createAgentSession({ tools: readOnlyTools, authStorage, modelRegistry });
+const { session } = await createAgentSession({ tools: ["read", "grep", "find", "ls"], authStorage, modelRegistry });
 
 // In-memory
 const { session } = await createAgentSession({
@@ -92,8 +89,8 @@ const { session } = await createAgentSession({
   authStorage: customAuth,
   modelRegistry: customRegistry,
   resourceLoader,
-  tools: [readTool, bashTool],
-  customTools: [{ tool: myTool }],
+  tools: ["read", "bash", "my_tool"],
+  customTools: [myTool],
   sessionManager: SessionManager.inMemory(),
   settingsManager: SettingsManager.inMemory(),
 });
@@ -117,7 +114,7 @@ await session.prompt("Hello");
 | `agentDir` | `~/.pi/agent` | Config directory |
 | `model` | From settings/first available | Model to use |
 | `thinkingLevel` | From settings/"off" | off, low, medium, high |
-| `tools` | `codingTools` | Built-in tools |
+| `tools` | `["read", "grep", "find", "ls", "bash", "edit", "write"]` | Built-in tools |
 | `customTools` | `[]` | Additional tool definitions |
 | `resourceLoader` | DefaultResourceLoader | Resource loader for extensions, skills, prompts, themes |
 | `sessionManager` | `SessionManager.create(cwd)` | Persistence |
