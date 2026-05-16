@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- Fixed Node 26 OpenAI-compatible streams timing out after five idle minutes by routing global fetch through pi's undici dispatcher ([#4519](https://github.com/earendil-works/pi/issues/4519)).
 - Fixed macOS clipboard access errors under sandboxed pasteboard denial so they do not abort the process ([#4492](https://github.com/earendil-works/pi/issues/4492)).
 - Fixed the scoped model startup hint to show the configured model-cycle keybinding ([#4508](https://github.com/earendil-works/pi/issues/4508)).
 - Fixed `fd` auto-download on macOS x86_64 by pinning the last release that ships an Intel macOS binary ([#4559](https://github.com/earendil-works/pi/issues/4559)).
