@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Bun-compiled release binaries failing to start when Bun's built-in undici shim lacks npm undici's `install` export ([#4657](https://github.com/earendil-works/pi/issues/4657)).
+
 ## [0.75.1] - 2026-05-18
 
 ### Fixed
