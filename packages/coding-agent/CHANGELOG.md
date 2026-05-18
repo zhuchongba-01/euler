@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fixed Windows npm self-updates to move loaded native dependency packages out of the active install before reinstalling pi ([#4157](https://github.com/earendil-works/pi/issues/4157)).
+- Fixed `pi update --self` detection for pnpm v11 global installs whose package path resolves through the pnpm store ([#4647](https://github.com/earendil-works/pi/issues/4647)).
 
 ## [0.75.1] - 2026-05-18
 
