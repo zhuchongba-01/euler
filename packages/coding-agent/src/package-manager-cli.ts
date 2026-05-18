@@ -506,8 +506,10 @@ export async function handlePackageCommand(args: string[]): Promise<boolean> {
 						return true;
 					}
 					const installMethod = detectInstallMethod();
-					if (process.platform === "win32" && installMethod !== "npm") {
-						console.error(chalk.red(`${APP_NAME} self-update on Windows is only supported for npm installs.`));
+					if (process.platform === "win32" && installMethod !== "npm" && installMethod !== "pnpm") {
+						console.error(
+							chalk.red(`${APP_NAME} self-update on Windows is only supported for npm and pnpm installs.`),
+						);
 						console.error(chalk.dim(`Detected install method: ${installMethod}. Update ${APP_NAME} manually.`));
 						process.exitCode = 1;
 						return true;
@@ -523,7 +525,9 @@ export async function handlePackageCommand(args: string[]): Promise<boolean> {
 						return true;
 					}
 					try {
-						prepareWindowsNpmSelfUpdate();
+						if (installMethod === "npm") {
+							prepareWindowsNpmSelfUpdate();
+						}
 						await runSelfUpdate(selfUpdateCommand);
 					} catch (error: unknown) {
 						const message = error instanceof Error ? error.message : "Unknown package command error";
