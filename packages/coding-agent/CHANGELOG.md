@@ -6,6 +6,7 @@
 
 - Changed source syntax to avoid TypeScript constructs that require JavaScript emit, keeping core sources compatible with Node.js strip-only TypeScript checks.
 - Removed web UI workspace references from the CLI package and dropped the package-level development watch script.
+- Published npm installs now include an `npm-shrinkwrap.json` to lock transitive dependencies for the CLI package.
 
 ### Fixed
 
