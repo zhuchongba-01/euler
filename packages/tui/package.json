@@ -12,6 +12,7 @@
 	},
 	"files": [
 		"dist/**/*",
+		"native/win32/prebuilds/**/*.node",
 		"README.md"
 	],
 	"keywords": [
@@ -37,9 +38,6 @@
 	"dependencies": {
 		"get-east-asian-width": "1.6.0",
 		"marked": "15.0.12"
-	},
-	"optionalDependencies": {
-		"koffi": "2.16.2"
 	},
 	"devDependencies": {
 		"@xterm/headless": "5.5.0",
