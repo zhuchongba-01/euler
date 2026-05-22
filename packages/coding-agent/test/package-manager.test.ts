@@ -25,6 +25,16 @@ class MockSpawnedProcess extends EventEmitter {
 	}
 }
 
+interface PackageManagerInternals {
+	runCommand(command: string, args: string[], options?: { cwd?: string }): Promise<void>;
+	runCommandCapture(
+		command: string,
+		args: string[],
+		options?: { cwd?: string; timeoutMs?: number; env?: Record<string, string> },
+	): Promise<string>;
+	getLocalGitUpdateTarget(installedPath: string): Promise<{ ref: string; head: string; fetchArgs: string[] }>;
+}
+
 // Helper to check if a resource is enabled
 const isEnabled = (r: ResolvedResource, pathMatch: string, matchFn: "endsWith" | "includes" = "endsWith") => {
 	const normalizedPath = normalizeForMatch(r.path);
@@ -693,6 +703,62 @@ Content`,
 			expect(runCommandSpy).toHaveBeenCalledWith("npm", ["install", "--omit=dev"], { cwd: targetDir });
 		});
 
+		it("should reconcile an existing git checkout to a pinned ref during install", async () => {
+			const source = "git:github.com/user/repo@v2";
+			const targetDir = join(agentDir, "git", "github.com", "user", "repo");
+			mkdirSync(targetDir, { recursive: true });
+			writeFileSync(join(targetDir, "package.json"), JSON.stringify({ name: "repo", version: "1.0.0" }));
+
+			const managerWithInternals = packageManager as unknown as PackageManagerInternals;
+			vi.spyOn(managerWithInternals, "runCommandCapture").mockImplementation(async (_command, args) => {
+				if (args[0] === "rev-parse" && args[1] === "HEAD") {
+					return "old-head";
+				}
+				if (args[0] === "rev-parse" && args[1] === "FETCH_HEAD") {
+					return "new-head";
+				}
+				throw new Error(`Unexpected runCommandCapture args: ${args.join(" ")}`);
+			});
+			const runCommandSpy = vi.spyOn(managerWithInternals, "runCommand").mockResolvedValue(undefined);
+
+			await packageManager.install(source);
+
+			expect(runCommandSpy).toHaveBeenCalledWith("git", ["fetch", "origin", "v2"], { cwd: targetDir });
+			expect(runCommandSpy).toHaveBeenCalledWith("git", ["reset", "--hard", "FETCH_HEAD"], { cwd: targetDir });
+			expect(runCommandSpy).toHaveBeenCalledWith("git", ["clean", "-fdx"], { cwd: targetDir });
+			expect(runCommandSpy).toHaveBeenCalledWith("npm", ["install", "--omit=dev"], { cwd: targetDir });
+		});
+
+		it("should reconcile an existing git checkout to its update target when installing without a ref", async () => {
+			const source = "git:github.com/user/repo";
+			const targetDir = join(agentDir, "git", "github.com", "user", "repo");
+			const fetchArgs = ["fetch", "--prune", "--no-tags", "origin", "+refs/heads/main:refs/remotes/origin/main"];
+			mkdirSync(targetDir, { recursive: true });
+
+			const managerWithInternals = packageManager as unknown as PackageManagerInternals;
+			vi.spyOn(managerWithInternals, "getLocalGitUpdateTarget").mockResolvedValue({
+				ref: "origin/HEAD",
+				head: "new-head",
+				fetchArgs,
+			});
+			vi.spyOn(managerWithInternals, "runCommandCapture").mockImplementation(async (_command, args) => {
+				if (args[0] === "rev-parse" && args[1] === "HEAD") {
+					return "old-head";
+				}
+				if (args[0] === "rev-parse" && args[1] === "origin/HEAD") {
+					return "new-head";
+				}
+				throw new Error(`Unexpected runCommandCapture args: ${args.join(" ")}`);
+			});
+			const runCommandSpy = vi.spyOn(managerWithInternals, "runCommand").mockResolvedValue(undefined);
+
+			await packageManager.install(source);
+
+			expect(runCommandSpy).toHaveBeenCalledWith("git", fetchArgs, { cwd: targetDir });
+			expect(runCommandSpy).toHaveBeenCalledWith("git", ["reset", "--hard", "origin/HEAD"], { cwd: targetDir });
+			expect(runCommandSpy).toHaveBeenCalledWith("git", ["clean", "-fdx"], { cwd: targetDir });
+		});
+
 		it("should use plain install for git package dependencies when npmCommand is configured", async () => {
 			settingsManager = SettingsManager.inMemory({
 				npmCommand: ["pnpm"],
@@ -1060,6 +1126,47 @@ Content`,
 			const removed = packageManager.removeSourceFromSettings(`${pkgDir}/`);
 			expect(removed).toBe(true);
 			expect(settingsManager.getGlobalSettings().packages ?? []).toHaveLength(0);
+		});
+
+		it("should return false when adding the same git source with the same ref", () => {
+			const first = packageManager.addSourceToSettings("git:github.com/user/repo@v1");
+			expect(first).toBe(true);
+
+			const second = packageManager.addSourceToSettings("git:github.com/user/repo@v1");
+			expect(second).toBe(false);
+			expect(settingsManager.getGlobalSettings().packages).toEqual(["git:github.com/user/repo@v1"]);
+		});
+
+		it("should update the ref when adding the same git source with a different ref", () => {
+			packageManager.addSourceToSettings("git:github.com/user/repo@v1");
+
+			const updated = packageManager.addSourceToSettings("git:github.com/user/repo@v2");
+			expect(updated).toBe(true);
+			expect(settingsManager.getGlobalSettings().packages).toEqual(["git:github.com/user/repo@v2"]);
+		});
+
+		it("should preserve package filters when replacing a package source ref", () => {
+			settingsManager.setPackages([
+				{
+					source: "git:github.com/user/repo@v1",
+					extensions: ["extensions/main.ts"],
+					skills: [],
+					prompts: ["prompts/review.md"],
+					themes: ["themes/dark.json"],
+				},
+			]);
+
+			const updated = packageManager.addSourceToSettings("git:github.com/user/repo@v2");
+			expect(updated).toBe(true);
+			expect(settingsManager.getGlobalSettings().packages).toEqual([
+				{
+					source: "git:github.com/user/repo@v2",
+					extensions: ["extensions/main.ts"],
+					skills: [],
+					prompts: ["prompts/review.md"],
+					themes: ["themes/dark.json"],
+				},
+			]);
 		});
 	});
 

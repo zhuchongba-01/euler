@@ -85,9 +85,9 @@ ssh://git@github.com/user/repo@v1
 - HTTPS and SSH URLs are both supported.
 - SSH URLs use your configured SSH keys automatically (respects `~/.ssh/config`).
 - For non-interactive runs (for example CI), you can set `GIT_TERMINAL_PROMPT=0` to disable credential prompts and set `GIT_SSH_COMMAND` (for example `ssh -o BatchMode=yes -o ConnectTimeout=5`) to fail fast.
-- Refs pin the package and skip package updates (`pi update`, `pi update --extensions`).
+- Refs are pinned tags or commits and skip package updates (`pi update`, `pi update --extensions`). Use `pi install git:host/user/repo@new-ref` to move an existing package to a new pinned ref.
 - Cloned to `~/.pi/agent/git/<host>/<path>` (global) or `.pi/git/<host>/<path>` (project).
-- Runs `npm install` after clone or pull if `package.json` exists.
+- Runs `npm install` after clone, pull, or pinned ref change if `package.json` exists.
 
 **SSH examples:**
 ```bash
