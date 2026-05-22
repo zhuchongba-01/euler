@@ -50,6 +50,15 @@ async function login(providerId: OAuthProviderId): Promise<void> {
 			onPrompt: async (p) => {
 				return await promptFn(`${p.message}${p.placeholder ? ` (${p.placeholder})` : ""}:`);
 			},
+			onSelect: async (p) => {
+				console.log(`\n${p.message}`);
+				for (let i = 0; i < p.options.length; i++) {
+					console.log(`  ${i + 1}. ${p.options[i].label}`);
+				}
+				const choice = await promptFn(`Enter number (1-${p.options.length}):`);
+				const index = parseInt(choice, 10) - 1;
+				return p.options[index]?.id;
+			},
 			onProgress: (msg) => console.log(msg),
 		});
 

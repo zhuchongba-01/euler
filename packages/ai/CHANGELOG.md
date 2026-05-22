@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Changed `OAuthLoginCallbacks` to require `onDeviceCode` and `onSelect`, so OAuth providers can rely on pi supplying device-code and selection UI callbacks.
+
 ### Fixed
 
+- Fixed GitHub Copilot OAuth login to rely on the required device-code callback without a runtime callback availability guard.
 - Fixed Amazon Bedrock Claude requests to send the model output token cap by default, matching Anthropic requests and avoiding Bedrock's 4096-token default truncation ([#4848](https://github.com/earendil-works/pi/issues/4848)).
 
 ## [0.75.4] - 2026-05-20

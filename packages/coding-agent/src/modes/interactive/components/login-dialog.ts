@@ -122,13 +122,17 @@ export class LoginDialogComponent extends Container implements Focusable {
 		this.contentContainer.addChild(new Spacer(1));
 		this.contentContainer.addChild(new Text(theme.fg("warning", `Enter code: ${info.userCode}`), 1, 0));
 
-		// Do not open device-code URLs automatically. These flows need to work in headless environments.
+		this.openUrl(info.verificationUri);
 		this.tui.requestRender();
 	}
 
 	private openUrl(url: string): void {
 		const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-		exec(`${openCmd} "${url}"`);
+		try {
+			exec(`${openCmd} "${url}"`, () => {});
+		} catch {
+			// Ignore browser launch failures. The URL remains visible for manual opening/copying.
+		}
 	}
 
 	/**

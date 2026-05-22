@@ -263,17 +263,28 @@ pi.registerProvider("corporate-ai", {
     name: "Corporate AI (SSO)",
 
     async login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials> {
-      // Option 1: Browser-based OAuth
-      callbacks.onAuth({ url: "https://sso.corp.com/authorize?..." });
-
-      // Option 2: Device code flow
-      callbacks.onDeviceCode({
-        userCode: "ABCD-1234",
-        verificationUri: "https://sso.corp.com/device"
+      const method = await callbacks.onSelect({
+        message: "Select login method:",
+        options: [
+          { id: "browser", label: "Browser OAuth" },
+          { id: "device", label: "Device code" }
+        ]
       });
+      if (!method) throw new Error("Login cancelled");
 
-      // Option 3: Prompt for token/code
-      const code = await callbacks.onPrompt({ message: "Enter SSO code:" });
+      let code: string;
+      if (method === "device") {
+        callbacks.onDeviceCode({
+          userCode: "ABCD-1234",
+          verificationUri: "https://sso.corp.com/device",
+          intervalSeconds: 5,
+          expiresInSeconds: 900
+        });
+        code = await pollDeviceCodeUntilComplete();
+      } else {
+        callbacks.onAuth({ url: "https://sso.corp.com/authorize?..." });
+        code = await callbacks.onPrompt({ message: "Enter SSO code:" });
+      }
 
       // Exchange for tokens (your implementation)
       const tokens = await exchangeCodeForTokens(code);
@@ -322,10 +333,21 @@ interface OAuthLoginCallbacks {
   onAuth(params: { url: string }): void;
 
   // Show device code (for device authorization flow)
-  onDeviceCode(params: { userCode: string; verificationUri: string }): void;
+  onDeviceCode(params: {
+    userCode: string;
+    verificationUri: string;
+    intervalSeconds?: number;
+    expiresInSeconds?: number;
+  }): void;
 
   // Prompt user for input (for manual token entry)
   onPrompt(params: { message: string }): Promise<string>;
+
+  // Show an interactive selector, e.g. to choose browser OAuth vs device code
+  onSelect(params: {
+    message: string;
+    options: { id: string; label: string }[];
+  }): Promise<string | undefined>;
 }
 ```
 

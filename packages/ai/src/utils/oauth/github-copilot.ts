@@ -319,10 +319,6 @@ export const githubCopilotOAuthProvider: OAuthProviderInterface = {
 	name: "GitHub Copilot",
 
 	async login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials> {
-		if (!callbacks.onDeviceCode) {
-			throw new Error("GitHub Copilot OAuth requires a device code callback");
-		}
-
 		return loginGitHubCopilot({
 			onDeviceCode: callbacks.onDeviceCode,
 			onPrompt: callbacks.onPrompt,
