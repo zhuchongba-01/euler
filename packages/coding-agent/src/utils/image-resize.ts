@@ -1,5 +1,5 @@
 import { Worker } from "node:worker_threads";
-import type { ImageResizeOptions, ResizedImage } from "./image-resize-core.ts";
+import { type ImageResizeOptions, type ResizedImage, resizeImageInProcess } from "./image-resize-core.ts";
 
 export type { ImageResizeOptions, ResizedImage } from "./image-resize-core.ts";
 
@@ -18,21 +18,17 @@ function isResizeImageWorkerResponse(value: unknown): value is ResizeImageWorker
 	return value !== null && typeof value === "object";
 }
 
-function createResizeWorker(): Worker {
-	const isTypeScriptRuntime = import.meta.url.endsWith(".ts");
-	const workerUrl = new URL(
-		isTypeScriptRuntime ? "./image-resize-worker.ts" : "./image-resize-worker.js",
-		import.meta.url,
-	);
-	return new Worker(workerUrl);
+function createResizeWorker(workerSpecifier: string | URL): Worker {
+	return new Worker(workerSpecifier);
 }
 
 async function resizeImageInWorker(
+	workerSpecifier: string | URL,
 	inputBytes: Uint8Array,
 	mimeType: string,
 	options?: ImageResizeOptions,
 ): Promise<ResizedImage | null> {
-	const worker = createResizeWorker();
+	const worker = createResizeWorker(workerSpecifier);
 	try {
 		const inputBytesForWorker = toTransferableBytes(inputBytes);
 		return await new Promise<ResizedImage | null>((resolve, reject) => {
@@ -82,15 +78,35 @@ async function resizeImageInWorker(
 /**
  * Resize an image to fit within the specified max dimensions and encoded file size.
  * Runs Photon in a worker thread so WASM decoding, resizing, and encoding do not
- * block the TUI event loop. Worker failures are propagated instead of retried on
- * the main thread.
+ * block the TUI event loop. If the worker cannot be loaded (for example in some
+ * Bun compiled executable layouts), fall back to in-process resizing so image
+ * reads still work.
  */
 export async function resizeImage(
 	inputBytes: Uint8Array,
 	mimeType: string,
 	options?: ImageResizeOptions,
 ): Promise<ResizedImage | null> {
-	return resizeImageInWorker(inputBytes, mimeType, options);
+	const isTypeScriptRuntime = import.meta.url.endsWith(".ts");
+	const workerUrl = new URL(
+		isTypeScriptRuntime ? "./image-resize-worker.ts" : "./image-resize-worker.js",
+		import.meta.url,
+	);
+
+	// Bun compiled executables resolve worker entrypoints by string path, not via
+	// new URL(..., import.meta.url). Try the string path first under Bun so the
+	// release binary uses the embedded worker instead of falling back in-process.
+	if (typeof process.versions.bun === "string") {
+		try {
+			return await resizeImageInWorker("./src/utils/image-resize-worker.ts", inputBytes, mimeType, options);
+		} catch {}
+	}
+
+	try {
+		return await resizeImageInWorker(workerUrl, inputBytes, mimeType, options);
+	} catch {
+		return resizeImageInProcess(inputBytes, mimeType, options);
+	}
 }
 
 /**

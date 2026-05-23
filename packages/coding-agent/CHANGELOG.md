@@ -24,6 +24,7 @@
 - Fixed bash tool truncation line counts to ignore the trailing newline as an extra output line ([#4818](https://github.com/earendil-works/pi/issues/4818)).
 - Fixed footer home-directory abbreviation to avoid shortening sibling paths that only share the same prefix ([#4878](https://github.com/earendil-works/pi/issues/4878)).
 - Fixed macOS Bun release binaries to resolve the native clipboard sidecar so Ctrl+V image paste can load `@mariozechner/clipboard` ([#4307](https://github.com/earendil-works/pi/issues/4307)).
+- Fixed coding-agent tools to avoid synchronous filesystem operations during streaming and moved image resizing off the main TUI thread ([#4756](https://github.com/earendil-works/pi-mono/pull/4756) by [@mitsuhiko](https://github.com/mitsuhiko)).
 
 ## [0.75.4] - 2026-05-20
 

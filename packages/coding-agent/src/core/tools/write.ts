@@ -201,34 +201,27 @@ export function createWriteToolDefinition(
 			const absolutePath = resolveToCwd(path, cwd);
 			const dir = dirname(absolutePath);
 			return withFileMutationQueue(absolutePath, async () => {
-				let aborted = signal?.aborted ?? false;
-				const onAbort = () => {
-					aborted = true;
-				};
+				// Do not reject from an abort event listener here: that would release the
+				// mutation queue while an in-flight filesystem operation may still finish.
+				// Checking signal.aborted after each await observes the same aborts while
+				// keeping the queue locked until the current operation has settled.
 				const throwIfAborted = (): void => {
-					if (aborted || signal?.aborted) {
-						throw new Error("Operation aborted");
-					}
+					if (signal?.aborted) throw new Error("Operation aborted");
 				};
 
-				signal?.addEventListener("abort", onAbort, { once: true });
-				try {
-					throwIfAborted();
-					// Create parent directories if needed.
-					await ops.mkdir(dir);
-					throwIfAborted();
+				throwIfAborted();
+				// Create parent directories if needed.
+				await ops.mkdir(dir);
+				throwIfAborted();
 
-					// Write the file contents.
-					await ops.writeFile(absolutePath, content);
-					throwIfAborted();
+				// Write the file contents.
+				await ops.writeFile(absolutePath, content);
+				throwIfAborted();
 
-					return {
-						content: [{ type: "text", text: `Successfully wrote ${content.length} bytes to ${path}` }],
-						details: undefined,
-					};
-				} finally {
-					signal?.removeEventListener("abort", onAbort);
-				}
+				return {
+					content: [{ type: "text", text: `Successfully wrote ${content.length} bytes to ${path}` }],
+					details: undefined,
+				};
 			});
 		},
 		renderCall(args, theme, context) {
