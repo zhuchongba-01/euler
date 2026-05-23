@@ -170,10 +170,10 @@ function formatReadResult(
 	options: ToolRenderResultOptions,
 	theme: Theme,
 	showImages: boolean,
-	cwd: string,
+	_cwd: string,
 	isError: boolean,
 ): string {
-	if (!options.expanded && !isError && getCompactReadClassification(args, cwd)) {
+	if (!options.expanded && !isError) {
 		return "";
 	}
 

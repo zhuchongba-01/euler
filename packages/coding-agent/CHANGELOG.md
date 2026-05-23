@@ -9,6 +9,7 @@
 
 ### Changed
 
+- Changed collapsed read tool cards to show only the read line until expanded ([#4916](https://github.com/earendil-works/pi/issues/4916)).
 - Changed the root development install documentation to use `npm install --ignore-scripts` ([#4868](https://github.com/earendil-works/pi/issues/4868)).
 
 ### Fixed
