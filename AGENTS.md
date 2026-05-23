@@ -120,13 +120,22 @@ Attribution:
    ```bash
    npm run release:local -- --out /tmp/pi-local-release --force
    cd /tmp
+
+   # Node package install smoke tests
    /tmp/pi-local-release/node/pi --help
    /tmp/pi-local-release/node/pi --version
+   /tmp/pi-local-release/node/pi --list-models
+   /tmp/pi-local-release/node/pi -p "Say exactly: ok"
    /tmp/pi-local-release/node/pi
+
+   # Bun binary smoke tests
    /tmp/pi-local-release/bun/pi --help
    /tmp/pi-local-release/bun/pi --version
+   /tmp/pi-local-release/bun/pi --list-models
+   /tmp/pi-local-release/bun/pi -p "Say exactly: ok"
+   /tmp/pi-local-release/bun/pi
    ```
-   Verify startup, model/account listing, and at least one real prompt with the intended default provider. Failures are release blockers unless the user explicitly accepts the risk.
+   Verify both Node and Bun startup, model/account listing, interactive startup, and at least one real prompt with the intended default provider. The bare commands `/tmp/pi-local-release/node/pi` and `/tmp/pi-local-release/bun/pi` start interactive mode; run each in tmux, submit a prompt, and wait for the model reply before considering the interactive smoke test passed. Failures are release blockers unless the user explicitly accepts the risk.
 
 3. **Brief the user on the WebAuthn flow before running anything**. Print exactly the following message and then stop and wait for the user to confirm in their next message:
 
