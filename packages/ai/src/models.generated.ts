@@ -7968,7 +7968,9 @@ export const MODELS = {
 			api: "openai-completions",
 			provider: "opencode-go",
 			baseUrl: "https://opencode.ai/zen/go/v1",
+			compat: {"thinkingFormat":"string-thinking"},
 			reasoning: true,
+			thinkingLevelMap: {"off":"none"},
 			input: ["text", "image"],
 			cost: {
 				input: 0.95,
@@ -15929,24 +15931,6 @@ export const MODELS = {
 		} satisfies Model<"openai-completions">,
 	},
 	"xiaomi-token-plan-ams": {
-		"mimo-v2-flash": {
-			id: "mimo-v2-flash",
-			name: "MiMo-V2-Flash",
-			api: "openai-completions",
-			provider: "xiaomi-token-plan-ams",
-			baseUrl: "https://token-plan-ams.xiaomimimo.com/v1",
-			compat: {"requiresReasoningContentOnAssistantMessages":true,"thinkingFormat":"deepseek"},
-			reasoning: true,
-			input: ["text"],
-			cost: {
-				input: 0.1,
-				output: 0.3,
-				cacheRead: 0.01,
-				cacheWrite: 0,
-			},
-			contextWindow: 262144,
-			maxTokens: 65536,
-		} satisfies Model<"openai-completions">,
 		"mimo-v2-omni": {
 			id: "mimo-v2-omni",
 			name: "MiMo-V2-Omni",
@@ -16021,24 +16005,6 @@ export const MODELS = {
 		} satisfies Model<"openai-completions">,
 	},
 	"xiaomi-token-plan-cn": {
-		"mimo-v2-flash": {
-			id: "mimo-v2-flash",
-			name: "MiMo-V2-Flash",
-			api: "openai-completions",
-			provider: "xiaomi-token-plan-cn",
-			baseUrl: "https://token-plan-cn.xiaomimimo.com/v1",
-			compat: {"requiresReasoningContentOnAssistantMessages":true,"thinkingFormat":"deepseek"},
-			reasoning: true,
-			input: ["text"],
-			cost: {
-				input: 0.1,
-				output: 0.3,
-				cacheRead: 0.01,
-				cacheWrite: 0,
-			},
-			contextWindow: 262144,
-			maxTokens: 65536,
-		} satisfies Model<"openai-completions">,
 		"mimo-v2-omni": {
 			id: "mimo-v2-omni",
 			name: "MiMo-V2-Omni",
@@ -16113,24 +16079,6 @@ export const MODELS = {
 		} satisfies Model<"openai-completions">,
 	},
 	"xiaomi-token-plan-sgp": {
-		"mimo-v2-flash": {
-			id: "mimo-v2-flash",
-			name: "MiMo-V2-Flash",
-			api: "openai-completions",
-			provider: "xiaomi-token-plan-sgp",
-			baseUrl: "https://token-plan-sgp.xiaomimimo.com/v1",
-			compat: {"requiresReasoningContentOnAssistantMessages":true,"thinkingFormat":"deepseek"},
-			reasoning: true,
-			input: ["text"],
-			cost: {
-				input: 0.1,
-				output: 0.3,
-				cacheRead: 0.01,
-				cacheWrite: 0,
-			},
-			contextWindow: 262144,
-			maxTokens: 65536,
-		} satisfies Model<"openai-completions">,
 		"mimo-v2-omni": {
 			id: "mimo-v2-omni",
 			name: "MiMo-V2-Omni",

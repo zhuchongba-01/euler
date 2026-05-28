@@ -269,6 +269,9 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 		// Pi's low/medium/high pass through verbatim; OpenRouter normalizes to Mercury's vocabulary.
 		mergeThinkingLevelMap(model, { off: null });
 	}
+	if (model.provider === "opencode-go" && model.id === "kimi-k2.6") {
+		mergeThinkingLevelMap(model, { off: "none" });
+	}
 }
 
 function getAnthropicMessagesCompat(provider: string, modelId: string): AnthropicMessagesCompat | undefined {
@@ -900,6 +903,9 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 						api = "openai-completions";
 						baseUrl = `${variant.basePath}/v1`;
 					}
+					if (modelId === "kimi-k2.6") {
+						compat = { ...(compat ?? {}), thinkingFormat: "string-thinking" };
+					}
 					if (modelId === "qwen3.5-plus" || modelId === "qwen3.6-plus") {
 						api = "openai-completions";
 						baseUrl = `${variant.basePath}/v1`;
@@ -1116,6 +1122,7 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 				for (const [modelId, model] of Object.entries(data.xiaomi.models)) {
 					const m = model as ModelsDevModel;
 					if (m.tool_call !== true) continue;
+					if (provider.startsWith("xiaomi-token-plan-") && modelId === "mimo-v2-flash") continue;
 
 					models.push({
 						id: modelId,
