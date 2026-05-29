@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Exported `convertToPng` for extension authors.
+
 ## [0.77.0] - 2026-05-28
 
 ### New Features
