@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Changed direct provider stream functions to require explicit `options.apiKey`; top-level `stream*`/`complete*` helpers still resolve built-in environment auth.
+
 ### Fixed
 
 - Fixed OpenCode Go Kimi K2.6 thinking requests to send `thinking` objects instead of invalid string values, and fixed OpenCode Zen Grok Build thinking requests to omit unsupported `reasoning_effort` ([#5169](https://github.com/earendil-works/pi/issues/5169)).
