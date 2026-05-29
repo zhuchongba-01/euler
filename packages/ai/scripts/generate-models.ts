@@ -905,6 +905,12 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					compat = { ...(compat ?? {}), supportsReasoningEffort: false };
 				}
 
+				if ((variant.provider === "opencode" || variant.provider === "opencode-go") && modelId === "kimi-k2.6") {
+					// OpenCode Kimi K2.6 accepts Anthropic-style thinking objects
+					// and rejects string thinking values or combined reasoning_effort.
+					compat = { ...(compat ?? {}), thinkingFormat: "deepseek", supportsReasoningEffort: false };
+				}
+
 				// Fix known mismatches between models.dev npm data and actual
 				// OpenCode Go endpoint behaviour. models.dev reports these models
 				// as @ai-sdk/anthropic, but the OpenCode Go endpoints either don't
@@ -916,11 +922,6 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					if (modelId === "minimax-m2.7") {
 						api = "openai-completions";
 						baseUrl = `${variant.basePath}/v1`;
-					}
-					if (modelId === "kimi-k2.6") {
-						// OpenCode Go Kimi K2.6 accepts Anthropic-style thinking objects
-						// and rejects string thinking values or combined reasoning_effort.
-						compat = { ...(compat ?? {}), thinkingFormat: "deepseek", supportsReasoningEffort: false };
 					}
 					if (modelId === "qwen3.5-plus" || modelId === "qwen3.6-plus") {
 						api = "openai-completions";
