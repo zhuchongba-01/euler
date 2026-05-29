@@ -5,9 +5,16 @@
 ### Breaking Changes
 
 - Changed direct provider stream functions to require explicit `options.apiKey`; top-level `stream*`/`complete*` helpers still resolve built-in environment auth.
+- Changed top-level stream helpers to delegate to `defaultModels()`, so setup failures are reported through stream error results consistently.
+- Moved the built-in API provider registration helpers from the `providers/register-builtins` subpath to `api-registry`/the root export.
+
+### Added
+
+- Added `Models`/`MutableModels`, `builtinModels()`, and `defaultModels()` for isolated or process-default model metadata, stream, and auth resolution.
 
 ### Fixed
 
+- Fixed OpenRouter Moonshot Kimi K2.6 requests to use `system` instead of unsupported `developer` messages ([#5159](https://github.com/earendil-works/pi/issues/5159)).
 - Fixed OpenCode Go Kimi K2.6 thinking requests to send `thinking` objects instead of invalid string values, and fixed OpenCode Zen Grok Build thinking requests to omit unsupported `reasoning_effort` ([#5169](https://github.com/earendil-works/pi/issues/5169)).
 
 ## [0.77.0] - 2026-05-28
