@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `OverlayHandle.unfocus({ target })` for explicitly releasing overlay focus to a chosen component while overlays remain visible.
+
 ### Fixed
 
 - Fixed focused visible overlays losing input to base components after focus restoration behind the overlay ([#5129](https://github.com/earendil-works/pi/issues/5129)).

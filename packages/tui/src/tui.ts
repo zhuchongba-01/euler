@@ -176,6 +176,12 @@ export interface OverlayOptions {
 	nonCapturing?: boolean;
 }
 
+/** Options for {@link OverlayHandle.unfocus}. */
+export interface OverlayUnfocusOptions {
+	/** Explicit target to focus after releasing this overlay. */
+	target: Component | null;
+}
+
 /**
  * Handle returned by showOverlay for controlling the overlay
  */
@@ -188,8 +194,8 @@ export interface OverlayHandle {
 	isHidden(): boolean;
 	/** Focus this overlay and bring it to the visual front */
 	focus(): void;
-	/** Release focus to the previous target */
-	unfocus(): void;
+	/** Release focus to the next visible overlay or the previous target, or to an explicit target when provided */
+	unfocus(options?: OverlayUnfocusOptions): void;
 	/** Check if this overlay currently has focus */
 	isFocused(): boolean;
 }
@@ -328,7 +334,6 @@ export class TUI extends Container {
 				restoreOverlay?.restoreFocus.status === "blocked" &&
 				restoreOverlay.restoreFocus.blockedBy === previousFocus
 			) {
-				restoreOverlay.restoreFocus = { status: "eligible" };
 				nextFocus = restoreOverlay.component;
 			} else if (
 				previousFocusedOverlay &&
@@ -452,11 +457,23 @@ export class TUI extends Container {
 				this.setFocus(component);
 				this.requestRender();
 			},
-			unfocus: () => {
-				if (this.focusedComponent !== component) return;
+			unfocus: (unfocusOptions) => {
+				const isFocused = this.focusedComponent === component;
+				const hasPendingRestore = entry.restoreFocus.status !== "inactive";
+				// Nothing to release: we neither hold focus nor have a pending reclaim.
+				if (!isFocused && !hasPendingRestore) return;
+				// True when this overlay is waiting to reclaim focus from the component that
+				// currently holds it; computed before clearing the (about-to-be-reset) state.
+				const blockedByFocused =
+					entry.restoreFocus.status === "blocked" && this.focusedComponent === entry.restoreFocus.blockedBy;
 				this.clearOverlayRestoreFocus(entry);
-				const topVisible = this.getTopmostVisibleOverlay();
-				this.setFocus(topVisible && topVisible !== entry ? topVisible.component : entry.preFocus);
+				// Move focus only if we currently hold it, or the caller named an explicit
+				// target and we're not mid-reclaim from the focused component.
+				if (isFocused || (unfocusOptions && !blockedByFocused)) {
+					const topVisible = this.getTopmostVisibleOverlay();
+					const fallbackTarget = topVisible && topVisible !== entry ? topVisible.component : entry.preFocus;
+					this.setFocus(unfocusOptions ? unfocusOptions.target : fallbackTarget);
+				}
 				this.requestRender();
 			},
 			isFocused: () => this.focusedComponent === component,
@@ -491,15 +508,16 @@ export class TUI extends Container {
 		return true;
 	}
 
-	/** Find the topmost visible capturing overlay, if any */
+	/** Find the visual-frontmost visible capturing overlay, if any */
 	private getTopmostVisibleOverlay(): OverlayStackEntry | undefined {
-		for (let i = this.overlayStack.length - 1; i >= 0; i--) {
-			if (this.overlayStack[i].options?.nonCapturing) continue;
-			if (this.isOverlayVisible(this.overlayStack[i])) {
-				return this.overlayStack[i];
+		let topmost: OverlayStackEntry | undefined;
+		for (const overlay of this.overlayStack) {
+			if (overlay.options?.nonCapturing || !this.isOverlayVisible(overlay)) continue;
+			if (!topmost || overlay.focusOrder > topmost.focusOrder) {
+				topmost = overlay;
 			}
 		}
-		return undefined;
+		return topmost;
 	}
 
 	override invalidate(): void {
