@@ -15,13 +15,13 @@
  *   /overlay-sidepanel  - Responsive sidepanel (hides when terminal < 100 cols)
  *   /overlay-toggle     - Toggle visibility demo (demonstrates OverlayHandle.setHidden)
  *   /overlay-passive    - Non-capturing overlay demo (passive info panel alongside active overlay)
- *   /overlay-focus      - Focus cycling and rendering order with non-capturing overlays
+ *   /overlay-focus      - Focus cycling, input routing, dismissal, and rendering order with overlays
  *   /overlay-streaming  - Multiple input panels with simulated streaming (Tab to cycle focus)
  */
 
 import type { ExtensionAPI, ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, OverlayAnchor, OverlayHandle, OverlayOptions, TUI } from "@earendil-works/pi-tui";
-import { matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { CURSOR_MARKER, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { spawn } from "child_process";
 
 // Global handle for toggle demo (in real code, use a more elegant pattern)
@@ -272,9 +272,9 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	// Focus cycling demo - demonstrates focus(), unfocus(), isFocused() and rendering order
+	// Focus cycling demo - demonstrates focus(), input routing, per-panel dismissal, and rendering order
 	pi.registerCommand("overlay-focus", {
-		description: "Test focus cycling and rendering order with non-capturing overlays",
+		description: "Test focus cycling, input routing, dismissal, and rendering order with overlays",
 		handler: async (_args: string, ctx: ExtensionCommandContext) => {
 			ctx.ui.setEditorText("");
 			await ctx.ui.custom<void>((tui, theme, _kb, done) => new FocusDemoController(tui, theme, done), {
@@ -1035,7 +1035,6 @@ class FocusDemoController extends BaseOverlay {
 	private tui: TUI;
 	private panels: FocusPanel[] = [];
 	private handles: OverlayHandle[] = [];
-	private focusIndex = -1;
 	private done: () => void;
 
 	constructor(tui: TUI, theme: Theme, done: () => void) {
@@ -1044,42 +1043,63 @@ class FocusDemoController extends BaseOverlay {
 		this.done = done;
 		const colors = ["error", "success", "accent"] as const;
 		const labels = ["Alpha", "Beta", "Gamma"];
+		const positions = [
+			{ row: 2, col: 4 },
+			{ row: 5, col: 28 },
+			{ row: 8, col: 52 },
+		];
 
 		for (let i = 0; i < 3; i++) {
-			const panel = new FocusPanel(
-				theme,
-				labels[i]!,
-				colors[i]!,
-				() => this.cycleFocus(),
-				() => this.close(),
-			);
+			const panel = new FocusPanel(theme, labels[i]!, colors[i]!, this);
 			const handle = this.tui.showOverlay(panel, {
 				nonCapturing: true,
-				row: 2,
-				col: 5 + i * 6,
-				width: 28,
+				...positions[i]!,
+				width: 34,
 			});
 			panel.handle = handle;
 			this.panels.push(panel);
 			this.handles.push(handle);
 		}
+
+		this.focusFirstOpenPanel();
 	}
 
-	private cycleFocus(): void {
-		if (this.focusIndex >= 0 && this.focusIndex < this.handles.length) {
-			this.handles[this.focusIndex]!.unfocus();
+	focusNext(current: FocusPanel, direction: 1 | -1 = 1): void {
+		const open = this.openPanelIndexes();
+		if (open.length === 0) {
+			this.close();
+			return;
 		}
-		this.focusIndex++;
-		if (this.focusIndex >= this.handles.length) {
-			this.focusIndex = -1;
-		} else {
-			this.handles[this.focusIndex]!.focus();
-		}
+
+		const currentIndex = this.panels.indexOf(current);
+		const currentOpenPosition = open.indexOf(currentIndex);
+		const nextOpenPosition =
+			currentOpenPosition === -1 ? 0 : (currentOpenPosition + direction + open.length) % open.length;
+		this.handles[open[nextOpenPosition]!]!.focus();
 		this.tui.requestRender();
 	}
 
-	private close(): void {
-		for (const handle of this.handles) handle.hide();
+	dismiss(panel: FocusPanel): void {
+		const index = this.panels.indexOf(panel);
+		if (index === -1 || panel.closed) return;
+
+		panel.closed = true;
+		this.handles[index]?.hide();
+		if (this.openPanelIndexes().length === 0) {
+			this.close();
+			return;
+		}
+
+		this.focusNext(panel);
+	}
+
+	close(): void {
+		for (let i = 0; i < this.handles.length; i++) {
+			if (!this.panels[i]?.closed) {
+				this.panels[i]!.closed = true;
+				this.handles[i]!.hide();
+			}
+		}
 		this.handles = [];
 		this.panels = [];
 		this.done();
@@ -1089,64 +1109,102 @@ class FocusDemoController extends BaseOverlay {
 		if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) {
 			this.close();
 		} else if (matchesKey(data, "tab")) {
-			this.cycleFocus();
+			this.focusFirstOpenPanel();
 		}
 	}
 
 	render(width: number): string[] {
 		const th = this.theme;
-		const focused = this.focusIndex === -1 ? "Controller" : (this.panels[this.focusIndex]?.label ?? "?");
+		const focused = this.panels.find((panel) => panel.handle?.isFocused())?.label ?? "Controller";
 		return this.box(
 			[
 				"",
 				` Current focus: ${th.fg("accent", focused)}`,
 				"",
 				" Three overlapping panels above are",
-				` all ${th.fg("accent", "nonCapturing")}. Press Tab to`,
-				" cycle focus() between them.",
+				` ${th.fg("accent", "nonCapturing")} overlays controlled with`,
+				" raw OverlayHandle.focus()/hide().",
 				"",
-				" Focused panel renders on top",
-				" (focus-based rendering order).",
+				" Type in the focused panel's input.",
+				" Focused panel renders on top.",
 				"",
-				th.fg("dim", " Tab = cycle focus | Esc = close"),
+				th.fg("dim", " Tab/Shift+Tab = cycle panels"),
+				th.fg("dim", " Esc/Ctrl+D = dismiss panel"),
+				th.fg("dim", " Ctrl+C = close all"),
 				"",
 			],
 			width,
-			"Focus Demo",
+			"Focus + Input Demo",
 		);
 	}
 
 	override dispose(): void {
 		for (const handle of this.handles) handle.hide();
 	}
+
+	private focusFirstOpenPanel(): void {
+		const firstOpen = this.openPanelIndexes()[0];
+		if (firstOpen !== undefined) {
+			this.handles[firstOpen]!.focus();
+			this.tui.requestRender();
+		}
+	}
+
+	private openPanelIndexes(): number[] {
+		return this.panels.flatMap((panel, index) => (panel.closed ? [] : [index]));
+	}
 }
 
 class FocusPanel extends BaseOverlay {
 	handle: OverlayHandle | null = null;
+	closed = false;
 	readonly label: string;
 	private color: "error" | "success" | "accent";
-	private onTab: () => void;
-	private onClose: () => void;
+	private controller: FocusDemoController;
+	private text = "";
+	private cursor = 0;
+	private inputs: string[] = [];
 
-	constructor(
-		theme: Theme,
-		label: string,
-		color: "error" | "success" | "accent",
-		onTab: () => void,
-		onClose: () => void,
-	) {
+	constructor(theme: Theme, label: string, color: "error" | "success" | "accent", controller: FocusDemoController) {
 		super(theme);
 		this.label = label;
 		this.color = color;
-		this.onTab = onTab;
-		this.onClose = onClose;
+		this.controller = controller;
 	}
 
 	handleInput(data: string): void {
 		if (matchesKey(data, "tab")) {
-			this.onTab();
-		} else if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) {
-			this.onClose();
+			this.controller.focusNext(this);
+		} else if (matchesKey(data, "shift+tab")) {
+			this.controller.focusNext(this, -1);
+		} else if (matchesKey(data, "escape") || matchesKey(data, "ctrl+d")) {
+			this.controller.dismiss(this);
+		} else if (matchesKey(data, "ctrl+c")) {
+			this.controller.close();
+		} else if (matchesKey(data, "backspace")) {
+			if (this.cursor > 0) {
+				this.text = this.text.slice(0, this.cursor - 1) + this.text.slice(this.cursor);
+				this.cursor--;
+			}
+			this.inputs.push("Backspace");
+		} else if (matchesKey(data, "left")) {
+			this.cursor = Math.max(0, this.cursor - 1);
+			this.inputs.push("←");
+		} else if (matchesKey(data, "right")) {
+			this.cursor = Math.min(this.text.length, this.cursor + 1);
+			this.inputs.push("→");
+		} else if (matchesKey(data, "return")) {
+			this.inputs.push("Enter");
+		} else if (matchesKey(data, "up")) {
+			this.inputs.push("↑");
+		} else if (matchesKey(data, "down")) {
+			this.inputs.push("↓");
+		} else if (data.length === 1 && data.charCodeAt(0) >= 32) {
+			this.text = this.text.slice(0, this.cursor) + data + this.text.slice(this.cursor);
+			this.cursor++;
+			this.inputs.push(JSON.stringify(data));
+		} else {
+			this.inputs.push(JSON.stringify(data));
 		}
 	}
 
@@ -1154,24 +1212,36 @@ class FocusPanel extends BaseOverlay {
 		const th = this.theme;
 		const focused = this.handle?.isFocused() ?? false;
 		const innerW = Math.max(1, width - 2);
-		const border = (c: string) => th.fg(this.color, c);
+		const border = (c: string) => th.fg(focused ? this.color : "dim", c);
 		const padLine = (s: string) => truncateToWidth(s, innerW, "...", true);
+		const recent = this.inputs.length === 0 ? "(none)" : this.inputs.slice(-6).join(" ");
 		const lines: string[] = [];
 
 		lines.push(border(`╭${"─".repeat(innerW)}╮`));
-		lines.push(border("│") + padLine(` ${th.fg("accent", this.label)}`) + border("│"));
+		lines.push(
+			border("│") +
+				padLine(
+					` ${th.fg(this.color, this.label)} ${focused ? th.fg("success", "FOCUSED") : th.fg("dim", "visible")}`,
+				) +
+				border("│"),
+		);
 		lines.push(border("│") + padLine("") + border("│"));
-		if (focused) {
-			lines.push(border("│") + padLine(th.fg("success", " ● FOCUSED")) + border("│"));
-			lines.push(border("│") + padLine(th.fg("dim", " (receiving input)")) + border("│"));
-		} else {
-			lines.push(border("│") + padLine(th.fg("dim", " ○ unfocused")) + border("│"));
-			lines.push(border("│") + padLine(th.fg("dim", " (passive)")) + border("│"));
-		}
-		lines.push(border("│") + padLine("") + border("│"));
+		lines.push(border("│") + padLine(` Input: ${this.renderInput(focused)}`) + border("│"));
+		lines.push(border("│") + padLine(` Keys: ${recent}`) + border("│"));
+		lines.push(border("│") + padLine(th.fg("dim", " Tab/Shift+Tab focus")) + border("│"));
+		lines.push(border("│") + padLine(th.fg("dim", " Esc/Ctrl+D dismiss")) + border("│"));
 		lines.push(border(`╰${"─".repeat(innerW)}╯`));
 
 		return lines;
+	}
+
+	private renderInput(focused: boolean): string {
+		if (!focused) return this.text || this.theme.fg("dim", "(empty)");
+
+		const before = this.text.slice(0, this.cursor);
+		const cursorChar = this.cursor < this.text.length ? this.text[this.cursor] : " ";
+		const after = this.text.slice(this.cursor + 1);
+		return `${before}${CURSOR_MARKER}\x1b[7m${cursorChar}\x1b[27m${after}`;
 	}
 }
 
