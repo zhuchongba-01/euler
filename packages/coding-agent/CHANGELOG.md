@@ -5,6 +5,7 @@
 ### Added
 
 - Added `ctx.mode` to extension contexts so extensions can distinguish TUI, RPC, JSON, and print mode.
+- Added `ctx.getSystemPromptOptions()` for extension commands to inspect the current base system prompt inputs.
 
 ### Fixed
 
