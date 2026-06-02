@@ -335,6 +335,9 @@ export interface ExtensionContext {
  * Includes session control methods only safe in user-initiated commands.
  */
 export interface ExtensionCommandContext extends ExtensionContext {
+	/** Get the current base system-prompt construction options. */
+	getSystemPromptOptions(): BuildSystemPromptOptions;
+
 	/** Wait for the agent to finish streaming */
 	waitForIdle(): Promise<void>;
 
@@ -1506,6 +1509,7 @@ export interface ExtensionContextActions {
 	getContextUsage: () => ContextUsage | undefined;
 	compact: (options?: CompactOptions) => void;
 	getSystemPrompt: () => string;
+	getSystemPromptOptions?: () => BuildSystemPromptOptions;
 }
 
 /**
