@@ -150,7 +150,6 @@ const NVIDIA_NIM_UNSUPPORTED_MODELS = new Set([
 	"mistralai/mistral-nemotron",
 	"nvidia/nemotron-mini-4b-instruct",
 	"qwen/qwen3-next-80b-a3b-instruct",
-	"qwen/qwen3.5-122b-a10b",
 	"qwen/qwen3.5-397b-a17b",
 	"sarvamai/sarvam-m",
 	"upstage/solar-10.7b-instruct",
