@@ -110,6 +110,7 @@ For each built-in provider, pi maintains a list of tool-capable models, updated 
 
 **API keys:**
 - Anthropic
+- Ant Ling
 - OpenAI
 - Azure OpenAI
 - DeepSeek

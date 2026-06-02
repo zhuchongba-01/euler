@@ -578,6 +578,11 @@ function buildParams(
 		} else if (model.thinkingLevelMap?.off !== null) {
 			openRouterParams.reasoning = { effort: model.thinkingLevelMap?.off ?? "none" };
 		}
+	} else if (compat.thinkingFormat === "ant-ling" && model.reasoning && options?.reasoningEffort) {
+		const effort = model.thinkingLevelMap?.[options.reasoningEffort];
+		if (typeof effort === "string") {
+			(params as typeof params & { reasoning?: { effort: string } }).reasoning = { effort };
+		}
 	} else if (compat.thinkingFormat === "together" && model.reasoning) {
 		const togetherParams = params as Omit<typeof params, "reasoning_effort"> & {
 			reasoning?: { enabled: boolean };
@@ -1079,6 +1084,7 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 	const isCloudflareWorkersAI = provider === "cloudflare-workers-ai" || baseUrl.includes("api.cloudflare.com");
 	const isCloudflareAiGateway = provider === "cloudflare-ai-gateway" || baseUrl.includes("gateway.ai.cloudflare.com");
 	const isNvidia = provider === "nvidia" || baseUrl.includes("integrate.api.nvidia.com");
+	const isAntLing = provider === "ant-ling" || baseUrl.includes("api.ant-ling.com");
 
 	const isNonStandard =
 		isNvidia ||
@@ -1094,9 +1100,11 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 		provider === "opencode" ||
 		baseUrl.includes("opencode.ai") ||
 		isCloudflareWorkersAI ||
-		isCloudflareAiGateway;
+		isCloudflareAiGateway ||
+		isAntLing;
 
-	const useMaxTokens = baseUrl.includes("chutes.ai") || isMoonshot || isCloudflareAiGateway || isTogether || isNvidia;
+	const useMaxTokens =
+		baseUrl.includes("chutes.ai") || isMoonshot || isCloudflareAiGateway || isTogether || isNvidia || isAntLing;
 
 	const isGrok = provider === "xai" || baseUrl.includes("api.x.ai");
 	const isDeepSeek = provider === "deepseek" || baseUrl.includes("deepseek.com");
@@ -1107,7 +1115,8 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 	return {
 		supportsStore: !isNonStandard,
 		supportsDeveloperRole: isOpenRouterDeveloperRoleModel || (!isNonStandard && !isOpenRouter),
-		supportsReasoningEffort: !isGrok && !isZai && !isMoonshot && !isTogether && !isCloudflareAiGateway && !isNvidia,
+		supportsReasoningEffort:
+			!isGrok && !isZai && !isMoonshot && !isTogether && !isCloudflareAiGateway && !isNvidia && !isAntLing,
 		supportsUsageInStreaming: true,
 		maxTokensField: useMaxTokens ? "max_tokens" : "max_completion_tokens",
 		requiresToolResultName: false,
@@ -1120,16 +1129,24 @@ function detectCompat(model: Model<"openai-completions">): ResolvedOpenAIComplet
 				? "zai"
 				: isTogether
 					? "together"
-					: isOpenRouter
-						? "openrouter"
-						: "openai",
+					: isAntLing
+						? "ant-ling"
+						: isOpenRouter
+							? "openrouter"
+							: "openai",
 		openRouterRouting: {},
 		vercelGatewayRouting: {},
 		zaiToolStream: false,
 		supportsStrictMode: !isMoonshot && !isTogether && !isCloudflareAiGateway && !isNvidia,
 		cacheControlFormat,
 		sendSessionAffinityHeaders: false,
-		supportsLongCacheRetention: !(isTogether || isCloudflareWorkersAI || isCloudflareAiGateway || isNvidia),
+		supportsLongCacheRetention: !(
+			isTogether ||
+			isCloudflareWorkersAI ||
+			isCloudflareAiGateway ||
+			isNvidia ||
+			isAntLing
+		),
 	};
 }
 

@@ -49,6 +49,7 @@ pi
 | Provider | Environment Variable | `auth.json` key |
 |----------|----------------------|------------------|
 | Anthropic | `ANTHROPIC_API_KEY` | `anthropic` |
+| Ant Ling | `ANT_LING_API_KEY` | `ant-ling` |
 | Azure OpenAI Responses | `AZURE_OPENAI_API_KEY` | `azure-openai-responses` |
 | OpenAI | `OPENAI_API_KEY` | `openai` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek` |
@@ -85,6 +86,7 @@ Store credentials in `~/.pi/agent/auth.json`:
 ```json
 {
   "anthropic": { "type": "api_key", "key": "sk-ant-..." },
+  "ant-ling": { "type": "api_key", "key": "..." },
   "openai": { "type": "api_key", "key": "sk-..." },
   "deepseek": { "type": "api_key", "key": "sk-..." },
   "nvidia": { "type": "api_key", "key": "nvapi-..." },

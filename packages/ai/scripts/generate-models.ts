@@ -169,6 +169,15 @@ const DEEPSEEK_V4_THINKING_LEVEL_MAP = {
 	xhigh: "max",
 } as const;
 
+const ANT_LING_RING_THINKING_LEVEL_MAP = {
+	off: null,
+	minimal: null,
+	low: null,
+	medium: null,
+	high: "high",
+	xhigh: "xhigh",
+} as const;
+
 const OPENAI_RESPONSES_NONE_REASONING_MODELS = new Set([
 	"gpt-5.1",
 	"gpt-5.2",
@@ -329,6 +338,10 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 	if (model.provider === "opencode" && model.id === "grok-build-0.1") {
 		// OpenCode Zen Grok Build reasons by default but rejects explicit reasoningEffort.
 		mergeThinkingLevelMap(model, { off: null, minimal: null, low: null, medium: null });
+	}
+	if (model.provider === "ant-ling" && model.reasoning) {
+		// Ring reasons by default. Only high/xhigh have documented explicit effort controls.
+		mergeThinkingLevelMap(model, ANT_LING_RING_THINKING_LEVEL_MAP);
 	}
 }
 
@@ -1642,6 +1655,56 @@ async function generateModels() {
 		},
 	];
 	allModels.push(...deepseekV4Models);
+
+	const antLingCompat: OpenAICompletionsCompat = {
+		supportsStore: false,
+		supportsDeveloperRole: false,
+		supportsReasoningEffort: false,
+		maxTokensField: "max_tokens",
+		supportsLongCacheRetention: false,
+	};
+	const antLingModels: Model<"openai-completions">[] = [
+		{
+			id: "Ling-2.6-flash",
+			name: "Ling 2.6 Flash",
+			api: "openai-completions",
+			baseUrl: "https://api.ant-ling.com/v1",
+			provider: "ant-ling",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0.01, output: 0.02, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 262144,
+			maxTokens: 65536,
+			compat: antLingCompat,
+		},
+		{
+			id: "Ling-2.6-1T",
+			name: "Ling 2.6 1T",
+			api: "openai-completions",
+			baseUrl: "https://api.ant-ling.com/v1",
+			provider: "ant-ling",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0.06, output: 0.25, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 262144,
+			maxTokens: 65536,
+			compat: antLingCompat,
+		},
+		{
+			id: "Ring-2.6-1T",
+			name: "Ring 2.6 1T",
+			api: "openai-completions",
+			baseUrl: "https://api.ant-ling.com/v1",
+			provider: "ant-ling",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0.06, output: 0.25, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 262144,
+			maxTokens: 65536,
+			compat: { ...antLingCompat, thinkingFormat: "ant-ling" },
+		},
+	];
+	allModels.push(...antLingModels);
 
 	for (const candidate of allModels) {
 		if (candidate.api === "openai-completions" && candidate.id.includes("deepseek-v4")) {

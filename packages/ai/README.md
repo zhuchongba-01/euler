@@ -51,6 +51,7 @@ Unified LLM API with automatic model discovery, provider configuration, token an
 ## Supported Providers
 
 - **OpenAI**
+- **Ant Ling**
 - **Azure OpenAI (Responses)**
 - **OpenAI Codex** (ChatGPT Plus/Pro subscription, requires OAuth, see below)
 - **DeepSeek**
@@ -939,7 +940,7 @@ interface OpenAICompletionsCompat {
   requiresAssistantAfterToolResult?: boolean; // Whether tool results must be followed by an assistant message (default: false)
   requiresThinkingAsText?: boolean;  // Whether thinking blocks must be converted to text (default: false)
   requiresReasoningContentOnAssistantMessages?: boolean; // Whether all replayed assistant messages must include empty reasoning_content when reasoning is enabled (default: auto-detected for DeepSeek)
-  thinkingFormat?: 'openai' | 'openrouter' | 'deepseek' | 'together' | 'zai' | 'qwen' | 'qwen-chat-template'; // Format for reasoning param: 'openai' uses reasoning_effort, 'openrouter' uses reasoning: { effort }, 'deepseek' uses thinking: { type } plus reasoning_effort when supported, 'together' uses reasoning: { enabled } plus reasoning_effort when supported, 'zai' uses enable_thinking, 'qwen' uses enable_thinking, 'qwen-chat-template' uses chat_template_kwargs.enable_thinking (default: openai)
+  thinkingFormat?: 'openai' | 'openrouter' | 'deepseek' | 'together' | 'zai' | 'qwen' | 'qwen-chat-template' | 'string-thinking' | 'ant-ling'; // Format for reasoning param: 'openai' uses reasoning_effort, 'openrouter' uses reasoning: { effort }, 'deepseek' uses thinking: { type } plus reasoning_effort when supported, 'together' uses reasoning: { enabled } plus reasoning_effort when supported, 'zai' uses enable_thinking, 'qwen' uses enable_thinking, 'qwen-chat-template' uses chat_template_kwargs.enable_thinking, 'string-thinking' uses top-level thinking, 'ant-ling' uses reasoning: { effort } only for mapped efforts (default: openai)
   cacheControlFormat?: 'anthropic';  // Anthropic-style cache_control on system prompt, last tool, and last user/assistant text content
   openRouterRouting?: OpenRouterRouting; // OpenRouter routing preferences (default: {})
   vercelGatewayRouting?: VercelGatewayRouting; // Vercel AI Gateway routing preferences (default: {})
@@ -1100,6 +1101,7 @@ In Node.js environments, you can set environment variables to avoid passing API 
 | Provider | Environment Variable(s) |
 |----------|------------------------|
 | OpenAI | `OPENAI_API_KEY` |
+| Ant Ling | `ANT_LING_API_KEY` |
 | Azure OpenAI | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_BASE_URL` (e.g. `https://{resource}.openai.azure.com`) or `AZURE_OPENAI_RESOURCE_NAME`. Supports `*.openai.azure.com` and `*.cognitiveservices.azure.com`; root endpoints auto-normalize to `/openai/v1`. Optional: `AZURE_OPENAI_API_VERSION` (default `v1`), `AZURE_OPENAI_DEPLOYMENT_NAME_MAP`. |
 | Anthropic | `ANTHROPIC_API_KEY` or `ANTHROPIC_OAUTH_TOKEN` |
 | DeepSeek | `DEEPSEEK_API_KEY` |
