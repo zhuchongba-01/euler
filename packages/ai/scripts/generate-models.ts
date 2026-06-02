@@ -1343,7 +1343,11 @@ async function generateModels() {
 			candidate.maxTokens = 4096;
 		}
 		if (candidate.provider === "openrouter" && candidate.id.startsWith("moonshotai/kimi-k2.6")) {
-			candidate.compat = { ...candidate.compat, supportsDeveloperRole: false };
+			candidate.compat = {
+				...candidate.compat,
+				supportsDeveloperRole: false,
+				requiresReasoningContentOnAssistantMessages: true,
+			};
 		}
 		if (candidate.provider === "openrouter" && candidate.id === "z-ai/glm-5") {
 			candidate.cost.input = 0.6;
