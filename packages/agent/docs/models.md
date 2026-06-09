@@ -1,23 +1,25 @@
 # Models architecture
 
-This document describes the target design for the next `pi-ai` model/provider refactor. It intentionally describes the desired shape, not the current implementation.
+This document describes the target design for the next `pi-ai` model/provider refactor. It describes the desired shape, not the current implementation. It is intended to be complete enough to start implementing from a fresh session.
 
 Goals:
 
 - `Models` is a dumb runtime collection of providers.
 - Concrete providers own metadata, auth, model listing, and stream behavior.
-- API implementations live under `src/ai/` and are reusable/lazy.
+- API implementations live under `src/api/` and are reusable/lazy.
 - Concrete provider factories live under `src/providers/`.
 - Users can import only the providers they need.
-- Importing a provider should not eagerly import heavy SDKs.
+- Importing a provider must not eagerly import heavy SDKs.
 - Dynamic model lists are first-class and side-effect-free.
 - `models.json` and extensions layer by wrapping providers, not by mutating provider internals ad hoc.
+- Old global APIs survive only in an explicit, temporary `/compat` entrypoint.
 
 Non-goals for the immediate `pi-ai` pass:
 
 - Do not migrate coding-agent `ModelRegistry` yet.
-- Do not preserve old process-global APIs unless as explicit temporary compatibility shims.
 - Do not keep the stream/API registry inside `Models`.
+- Do not implement web OAuth flows yet (the factory option is reserved).
+- Images (`images.ts`, `images-api-registry.ts`) are out of scope; leave untouched.
 
 ## Package layout
 
@@ -26,43 +28,55 @@ Target source layout:
 ```txt
 packages/ai/src/
   index.ts                    # core exports only; no built-in provider imports
-  models.ts                   # Models, Provider, auth, runtime types
-  auth/                       # shared auth helpers, local/OAuth wrappers
-  ai/                         # API implementations and lazy API wrappers
-    openai-compatible.ts      # real implementation, imports SDKs
-    openai-compatible-lazy.ts # lightweight lazy wrapper
-    anthropic.ts
-    anthropic-lazy.ts
-    bedrock.ts
-    bedrock-lazy.ts
-    ...
+  models.ts                   # Models runtime, Provider, auth types
+  compat.ts                   # temporary old-API compatibility entrypoint
+  auth/                       # auth method types, helpers, login callbacks
+  api/                        # API implementations and lazy wrappers
+    openai-completions.ts     # real implementation, imports SDKs, exports stream/streamSimple
+    openai-completions-lazy.ts
+    openai-responses.ts
+    openai-responses-lazy.ts
+    openai-codex-responses.ts
+    openai-codex-responses-lazy.ts
+    azure-openai-responses.ts
+    azure-openai-responses-lazy.ts
+    anthropic-messages.ts
+    anthropic-messages-lazy.ts
+    google-generative-ai.ts
+    google-generative-ai-lazy.ts
+    google-vertex.ts
+    google-vertex-lazy.ts
+    mistral-conversations.ts
+    mistral-conversations-lazy.ts
+    bedrock-converse-stream.ts
+    bedrock-converse-stream-lazy.ts
+    lazy.ts                   # lazyStream()/lazyApi() helpers
+    (shared helpers: openai-responses-shared, google-shared, transform-messages, ...)
   providers/                  # concrete provider factories and per-provider catalogs
     openai.ts
-    openai.models.ts          # OpenAI provider catalog
+    openai.models.ts          # generated OpenAI catalog
     openai-codex.ts
-    openai-codex.models.ts    # OpenAI Codex provider catalog
-    openrouter.ts
-    openrouter.models.ts
+    openai-codex.models.ts
     anthropic.ts
     anthropic.models.ts
-    google-vertex.ts
-    google-vertex.models.ts
-    bedrock.ts
-    bedrock.models.ts
-    cloudflare-ai-gateway.ts
-    cloudflare-ai-gateway.models.ts
-    all.ts                    # explicit aggregate for pi CLI/coding-agent
+    google.ts
+    google.models.ts
+    ...one pair per built-in provider...
+    faux.ts                   # test provider factory
+    all.ts                    # explicit aggregate: builtinModels(), getBuiltin*()
+  utils/oauth/                # OAuth flow implementations (node), lazy-loaded
 ```
 
 `src/index.ts` must stay core-only. It must not import:
 
-- all generated model metadata
+- generated model catalogs
 - built-in provider factories
 - provider SDK implementations
 - Node-only OAuth modules
 - `providers/all`
+- `compat`
 
-Provider and API entrypoints are explicit subpath exports.
+Provider, API, and compat entrypoints are explicit subpath exports.
 
 ## Public usage
 
@@ -84,10 +98,6 @@ const response = await models.complete(model, context);
 Multiple providers:
 
 ```ts
-import { createModels } from "@earendil-works/pi-ai";
-import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
-import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
-
 const models = createModels();
 models.setProvider(openaiProvider());
 models.setProvider(openrouterProvider());
@@ -98,16 +108,18 @@ All built-ins, explicitly heavy metadata entrypoint:
 ```ts
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
-const models = builtinModels();
+const models = builtinModels({ oauth: "node" });
 ```
 
-`providers/all` may import all provider metadata/catalogs. It still must not eagerly import heavy SDK implementations; provider streams use lazy wrappers.
+`providers/all` may import all provider metadata/catalogs. It still must not eagerly import SDK implementations; provider streams use lazy wrappers.
 
 ## Core runtime: Models
 
-`Models` is a provider collection plus auth application and stream convenience. It does not contain a stream registry.
+`Models` is a provider collection plus auth application and stream convenience. No stream registry, no auth resolver strategy object.
 
 ```ts
+export function createModels(options?: { credentials?: CredentialStore }): MutableModels;
+
 export interface Models {
   getProviders(): readonly Provider[];
   getProvider(id: string): Provider | undefined;
@@ -115,7 +127,8 @@ export interface Models {
   getModels(provider?: string, options?: { forceRefresh?: boolean }): Promise<readonly Model<Api>[]>;
   getModel(provider: string, id: string, options?: { forceRefresh?: boolean }): Promise<Model<Api> | undefined>;
 
-  getAuth(model: Model<Api>): Promise<ModelAuth | undefined>;
+  /** Resolve request auth for a model. Includes source label for status UI. */
+  getAuth(model: Model<Api>): Promise<AuthResolution | undefined>;
 
   stream<TApi extends Api>(
     model: Model<TApi>,
@@ -129,17 +142,8 @@ export interface Models {
     options?: ApiStreamOptions<TApi>,
   ): Promise<AssistantMessage>;
 
-  streamSimple<TApi extends Api>(
-    model: Model<TApi>,
-    context: Context,
-    options?: SimpleStreamOptions,
-  ): AssistantMessageEventStream;
-
-  completeSimple<TApi extends Api>(
-    model: Model<TApi>,
-    context: Context,
-    options?: SimpleStreamOptions,
-  ): Promise<AssistantMessage>;
+  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
+  completeSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): Promise<AssistantMessage>;
 }
 
 export interface MutableModels extends Models {
@@ -147,55 +151,34 @@ export interface MutableModels extends Models {
   setProvider(provider: Provider): void;
   deleteProvider(id: string): void;
   clearProviders(): void;
-
-  getAuthResolver(): ModelAuthResolver;
-  setAuthResolver(resolver: ModelAuthResolver): void;
 }
 ```
 
-No stream registry:
+Removed concepts:
 
 ```txt
-remove Models.setStreamFunctions()
-remove Models.getStreamFunctions()
-remove api-registry as real API
+no Models.setStreamFunctions() / getStreamFunctions()
+no api-registry as a real dispatch mechanism
+no Models.provider(id) builder, no setModel/upsertModel/patchModel lifecycle
+no ModelAuthResolver / setAuthResolver — resolution policy is fixed, store is injected
 ```
 
-No provider builder mutation API as public API:
-
-```txt
-remove/avoid Models.provider(id)
-remove setModel/upsertModel/patchModel public lifecycle
-```
-
-A `MutableModels` implementation may still use internal maps, but the public object is provider-oriented.
+If an app needs different auth policy, it wraps providers (wrap auth methods or `getModels`) or passes explicit request auth in stream options.
 
 ## Provider
 
-A provider is the concrete runtime unit. It owns:
-
-- id/name/base metadata
-- auth behavior
-- model listing
-- stream behavior
-
-Full stream options are API-specific. The generic `Model<TApi>` only pays off if the stream option type is derived from `TApi`.
+A provider is the concrete runtime unit. It owns id/name/base metadata, auth methods, model listing, and stream behavior.
 
 ```ts
-export type ApiStreamOptions<TApi extends Api> = StreamOptionsForApi<TApi>;
-
 export interface Provider {
   readonly id: string;
   readonly name: string;
 
-  /** Default model API metadata/diagnostics, not Models dispatch. */
-  readonly api?: Api;
-
   readonly baseUrl?: string;
   readonly headers?: Record<string, string>;
 
-  /** Required. Use {} for no-auth providers. */
-  readonly auth: ProviderAuth;
+  /** Required. Empty array for no-auth providers. */
+  readonly auth: readonly AuthMethod[];
 
   getModels(options?: { forceRefresh?: boolean }): Promise<readonly Model<Api>[]>;
 
@@ -205,157 +188,146 @@ export interface Provider {
     options?: ApiStreamOptions<TApi>,
   ): AssistantMessageEventStream;
 
-  streamSimple<TApi extends Api>(
-    model: Model<TApi>,
-    context: Context,
-    options?: SimpleStreamOptions,
-  ): AssistantMessageEventStream;
+  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
 }
 ```
 
-`Model.api` should remain for now because:
+There is no `Provider.api` field. `model.api` carries API identity; the provider dispatches internally (see `createProvider()`).
 
-- existing metadata and tests use it
-- it is useful for diagnostics
-- custom provider helpers may use it for API implementation selection
+`Model.api` remains: existing metadata and tests use it, it is useful for diagnostics, and provider construction uses it for API implementation selection. But `Models` never dispatches on it; the provider does.
 
-But `Models` no longer dispatches through `model.api`. The provider does.
+### Typed stream options
 
-## Provider model sources
-
-Provider model listing is async.
+Full stream options are API-specific. `Model<TApi>` pays off by deriving the option type from the API:
 
 ```ts
-export type ProviderModelSource =
-  | readonly Model<Api>[]
-  | ((options?: { forceRefresh?: boolean }) => Promise<readonly Model<Api>[]>);
+// types.ts — type-only imports from API impl modules are erased, so this is tree-shake safe
+export interface ApiOptionsMap {
+  "anthropic-messages": AnthropicOptions;
+  "openai-completions": OpenAICompletionsOptions;
+  "openai-responses": OpenAIResponsesOptions;
+  "openai-codex-responses": OpenAICodexResponsesOptions;
+  "azure-openai-responses": AzureOpenAIResponsesOptions;
+  "google-generative-ai": GoogleOptions;
+  "google-vertex": GoogleVertexOptions;
+  "mistral-conversations": MistralOptions;
+  "bedrock-converse-stream": BedrockOptions;
+}
+
+export type ApiStreamOptions<TApi extends Api> = TApi extends keyof ApiOptionsMap
+  ? ApiOptionsMap[TApi]
+  : StreamOptions & Record<string, unknown>;
 ```
 
-Provider helpers can accept `ProviderModel[]` and resolve provider defaults, but public `Provider.getModels()` returns full `Model<Api>` objects.
+Custom api strings fall back to the generic shape.
 
-Dynamic model sources must be side-effect-free discovery:
+### Name collision
+
+`types.ts` currently exports `type Provider = KnownProvider | string` (a provider id). Rename that alias to `ProviderId` and fix call sites. The `Provider` interface above takes the name.
+
+## Provider model listing
+
+`Provider.getModels()` is async and returns full `Model<Api>` objects. Static providers wrap their catalog; dynamic providers (llama.cpp, OpenRouter live listing) fetch and cache, honoring `forceRefresh`.
+
+Dynamic model listing must be side-effect-free discovery:
 
 ```txt
 OK: fetch /v1/models, enumerate local catalog, refresh cached remote model list
 Not OK: load model, download model, mutate server state, run request probe
 ```
 
-Provider-specific model lifecycle belongs in app/provider-management commands, not in `getModels()`.
+Provider-specific model lifecycle (load/unload) belongs in app/provider-management commands, not in `getModels()`.
 
 ## Streaming path
 
-`Models.stream()` finds the provider by `model.provider`, resolves request auth, applies request-scoped auth, and delegates to the provider.
+`Models.stream()` finds the provider by `model.provider`, resolves auth, merges it into request options, and delegates:
 
 ```ts
-async function stream(model, context, options) {
-  const provider = getProvider(model.provider);
-  if (!provider) throw new ModelsError(...);
+function stream(model, context, options) {
+  const provider = this.getProvider(model.provider);
+  if (!provider) {
+    // produce an error stream, not a throw — see Error behavior
+  }
 
-  const auth = await getAuth(model);
-  const requestModel = auth?.baseUrl ? { ...model, baseUrl: auth.baseUrl } : model;
-  const requestOptions = mergeAuthIntoOptions(options, auth);
+  // async setup happens inside the returned stream (lazyStream pattern)
+  const resolution = await this.getAuth(model);
+  const requestModel = resolution?.auth.baseUrl ? { ...model, baseUrl: resolution.auth.baseUrl } : model;
+  const requestOptions = mergeAuth(options, resolution?.auth); // explicit options win per-field
 
   return provider.stream(requestModel, context, requestOptions);
 }
 ```
 
-`stream()` still returns `AssistantMessageEventStream` synchronously. Async setup happens inside the returned stream, as today.
+`stream()` returns `AssistantMessageEventStream` synchronously; async setup (auth resolution, lazy module load) happens inside the returned stream. The forwarding pattern already exists in today's `register-builtins.ts` (`createLazyStream`); extract it as `lazyStream()` in `src/api/lazy.ts`.
 
-No request hot-path model canonicalization. If an app wants fresh model metadata after refresh, it must call:
+No request hot-path model canonicalization: `stream()` uses the supplied model object as-is. If an app wants fresh model metadata, it calls `models.getModel(provider, id, { forceRefresh: true })` before starting the turn.
 
-```ts
-const model = await models.getModel(provider, id, { forceRefresh: true });
-```
-
-before starting the turn.
-
-## API implementations under `src/ai`
+## API implementations under `src/api`
 
 An API implementation is reusable stream behavior. It is not a provider.
 
-Example real implementation:
+Uniform export contract — every real implementation module exports exactly:
 
 ```ts
-// src/ai/openai-compatible.ts
-import OpenAI from "openai";
-
-export function streamOpenAICompatible(...) { ... }
-export function streamSimpleOpenAICompatible(...) { ... }
+// src/api/anthropic-messages.ts — imports SDKs
+export function stream(model, context, options) { ... }
+export function streamSimple(model, context, options) { ... }
 ```
 
-Example lazy wrapper:
+This makes the module itself satisfy `ProviderStreams`, so the lazy wrapper is one generic helper instead of bespoke per-API plumbing:
 
 ```ts
-// src/ai/openai-compatible-lazy.ts
-export function openAICompatibleApi(): ProviderStreams {
-  return {
-    stream(model, context, options) {
-      return lazyStream(() =>
-        import("./openai-compatible.ts").then((m) =>
-          m.streamOpenAICompatible(model, context, options),
-        ),
-      );
-    },
-
-    streamSimple(model, context, options) {
-      return lazyStream(() =>
-        import("./openai-compatible.ts").then((m) =>
-          m.streamSimpleOpenAICompatible(model, context, options),
-        ),
-      );
-    },
-  };
+export interface ProviderStreams {
+  stream<TApi extends Api>(
+    model: Model<TApi>,
+    context: Context,
+    options?: ApiStreamOptions<TApi>,
+  ): AssistantMessageEventStream;
+  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
 }
+
+// src/api/lazy.ts
+export function lazyApi(load: () => Promise<ProviderStreams>): ProviderStreams;
+
+// src/api/anthropic-messages-lazy.ts
+export const anthropicMessagesApi = (): ProviderStreams => lazyApi(() => import("./anthropic-messages.ts"));
 ```
 
-Provider modules import lazy API wrappers, never real SDK-heavy implementation modules.
+Import chain:
 
 ```txt
 provider module -> lazy API wrapper -> dynamic import(real API impl) -> SDK deps
 ```
 
-This preserves both:
+Notes:
 
-- provider-owned stream behavior
-- lazy SDK loading
+- Bedrock keeps the node-only dynamic import trick (`importNodeOnlyProvider`, `.ts`/`.js` specifier rewrite) inside its lazy wrapper. `setBedrockProviderModule()` (used by the Bun build) moves into the bedrock lazy wrapper module.
+- Shared helper modules (`openai-responses-shared.ts`, `google-shared.ts`, `transform-messages.ts`, prompt-cache, copilot headers) move to `src/api/` alongside the implementations.
 
 ## Shared API implementations across concrete providers
 
-Many concrete providers share an API implementation. Example:
-
-- OpenAI
-- OpenRouter
-- Groq
-- Together
-- DeepSeek
-- Cloudflare AI Gateway OpenAI-compatible models
-
-They should share lazy API objects by reference, not through `Models` stream registry.
+Many concrete providers share an API implementation (OpenAI-completions: OpenRouter, Groq, Cerebras, xAI, ZAI, ...). They share lazy API objects by reference:
 
 ```ts
-import { openAICompatibleApi } from "../ai/openai-compatible-lazy.ts";
-
-const api = openAICompatibleApi();
+import { openAICompletionsApi } from "../api/openai-completions-lazy.ts";
 
 export function openrouterProvider(): Provider {
-  return {
+  return createProvider({
     id: "openrouter",
     name: "OpenRouter",
-    api: "openai-completions",
     baseUrl: "https://openrouter.ai/api/v1",
-    auth: { local: envLocalAuth(["OPENROUTER_API_KEY"]) },
-    getModels: staticModels(OPENROUTER_MODELS),
-    stream: api.stream,
-    streamSimple: api.streamSimple,
-  };
+    auth: [envApiKeyMethod({ id: "api-key", name: "OpenRouter API key", env: ["OPENROUTER_API_KEY"] })],
+    models: OPENROUTER_MODELS,
+    api: openAICompletionsApi(),
+  });
 }
 ```
 
-This copies Vercel AI SDK’s useful property: users import concrete providers, while shared protocol implementation is internal.
+This copies Vercel AI SDK's useful property: users import concrete providers; shared protocol implementation is internal.
 
 ## Auth
 
-Request auth output stays small.
+Request auth output stays small:
 
 ```ts
 export interface ModelAuth {
@@ -365,52 +337,19 @@ export interface ModelAuth {
 }
 ```
 
-No `streamOptions` in auth. If a value cannot be expressed as `apiKey`, `headers`, or `baseUrl`, it is provider config, not auth.
+If a value cannot be expressed as `apiKey`, `headers`, or `baseUrl`, it is provider config, not auth (Vertex project/location, Bedrock region/profile, Azure apiVersion are provider factory options).
 
-Provider auth:
+### Auth methods
 
-```ts
-export interface ProviderAuth {
-  local?: LocalAuthProvider;
-  oauth?: OAuthProvider;
-}
-```
-
-`auth` is required on `Provider`; no-auth providers use `{}`.
-
-### Local auth
-
-Local auth covers non-OAuth credentials:
-
-- env API keys
-- files on disk
-- ambient SDK credentials
-- AuthStorage local credentials
-- models.json local credentials
-- provider-specific credential metadata
+`Provider.auth` is a list of uniform auth methods. The `kind` discriminant keeps the UI's oauth-vs-api-key split and types the credential:
 
 ```ts
-export interface ProviderAuthContext {
-  env(name: string): Promise<string | undefined>;
-  fileExists(path: string): Promise<boolean>; // supports leading ~
-}
+export interface ApiKeyAuthMethod {
+  kind: "api-key";
+  id: string;   // unique within provider, e.g. "api-key"
+  name: string; // "Anthropic API key"
 
-export interface LocalCredential {
-  type: "local";
-  key?: string;
-  metadata?: Record<string, string>;
-}
-
-export interface OAuthCredential extends OAuthCredentials {
-  type: "oauth";
-}
-
-export type Credential = LocalCredential | OAuthCredential;
-
-export interface LocalAuthProvider {
-  id: string;
-  name: string;
-
+  /** Interactive setup (prompt for key/metadata). Absent = ambient-only (env, ADC, IAM). */
   login?(callbacks: AuthLoginCallbacks): Promise<LocalCredential>;
 
   resolve(input: {
@@ -420,218 +359,166 @@ export interface LocalAuthProvider {
   }): Promise<AuthResolution | undefined>;
 }
 
-export interface AuthResolution {
-  auth: ModelAuth;
-  sources: readonly ProviderAuthSource[];
-}
-
-export type ProviderAuthSource =
-  | { type: "env"; name: string }
-  | { type: "file"; path: string; label?: string }
-  | { type: "ambient"; label: string };
-```
-
-Local auth receives an optional credential from the app. It does not read AuthStorage itself.
-
-Examples:
-
-- OpenAI: `credential.key ?? env("OPENAI_API_KEY")` -> `{ apiKey }`
-- Bedrock: bearer token -> `{ apiKey }`; AWS profile/IAM/ECS/IRSA -> `{}`
-- Vertex: API key -> `{ apiKey }`; ADC files -> `{}`
-- Cloudflare: key + account/gateway metadata/env -> `{ apiKey, baseUrl }`
-
-### OAuth
-
-```ts
-export interface OAuthProvider {
-  id: string;
-  name: string;
-  usesCallbackServer?: boolean;
+export interface OAuthAuthMethod {
+  kind: "oauth";
+  id: string;   // e.g. "oauth"
+  name: string; // "Anthropic (Claude Pro/Max)"
 
   login(callbacks: AuthLoginCallbacks): Promise<OAuthCredential>;
 
-  resolve(credentials: OAuthCredential): Promise<{
-    credentials: OAuthCredential;
-    auth: ModelAuth;
-  }>;
+  resolve(input: {
+    model: Model<Api>;
+    ctx: ProviderAuthContext;
+    credential?: OAuthCredential;
+  }): Promise<AuthResolution | undefined>;
+}
+
+export type AuthMethod = ApiKeyAuthMethod | OAuthAuthMethod;
+
+export interface AuthResolution {
+  auth: ModelAuth;
+  /** Human-readable label for status UI: "ANTHROPIC_API_KEY", "OAuth", "~/.aws/credentials". */
+  source?: string;
+  /** Present when the method refreshed/updated the credential; Models persists it via the store. */
+  credential?: Credential;
+}
+
+export interface ProviderAuthContext {
+  env(name: string): Promise<string | undefined>;
+  fileExists(path: string): Promise<boolean>; // supports leading ~
 }
 ```
 
-OAuth receives stored OAuth credentials, may refresh them, and returns updated credentials for the app to persist.
+There is no `usesCallbackServer` flag. With `prompt()/notify()` callbacks the flow self-describes at runtime: a flow that runs a callback server issues a `manual_code` prompt racing the server and aborts the prompt when the callback wins. The UI needs no static foreknowledge.
+
+### Credentials
+
+```ts
+export interface LocalCredential {
+  type: "local";
+  key?: string;
+  metadata?: Record<string, string>; // e.g. Cloudflare accountId/gatewayId
+}
+
+export interface OAuthCredential extends OAuthCredentials {
+  type: "oauth";
+}
+
+export type Credential = LocalCredential | OAuthCredential;
+```
+
+`LocalCredential.metadata` exists for providers like Cloudflare that store non-key values (account id, gateway id) alongside or instead of a key. The method's `resolve()` merges per field: `credential.key ?? env("CLOUDFLARE_API_TOKEN")`, `credential.metadata?.accountId ?? env("CLOUDFLARE_ACCOUNT_ID")`, etc.
+
+### Credential store
+
+The app injects storage; `pi-ai` ships an in-memory default.
+
+```ts
+export interface CredentialStore {
+  get(providerId: string, methodId: string): Promise<Credential | undefined>;
+  set(providerId: string, methodId: string, credential: Credential): Promise<void>;
+  delete(providerId: string, methodId: string): Promise<void>;
+}
+```
+
+coding-agent later implements this over AuthStorage. Login/logout orchestration is app-owned: the app calls `method.login(callbacks)` and persists the returned credential itself. `Models` only *reads* the store during resolution, and *writes* refreshed credentials when `resolve()` returns an updated one (OAuth token refresh).
+
+### Resolution policy (fixed)
+
+`Models.getAuth(model)` resolves with a fixed policy. Precedence, highest first:
+
+```txt
+1. explicit request auth (stream options apiKey/headers) — merged per-field on top, in stream()
+2. methods with a stored credential, in provider auth list order
+3. methods resolving without a credential (ambient/env), in provider auth list order
+```
+
+Two-pass over `provider.auth`:
+
+- Pass 1: for each method with a credential in the store, call `resolve({ model, ctx, credential })`; first non-undefined resolution wins.
+- Pass 2: for each method, call `resolve({ model, ctx })`; first non-undefined resolution wins.
+
+So an explicit login (stored credential) beats ambient env vars regardless of list order; list order breaks ties. Per-field merging *within* one method (stored key + env account id) happens inside that method's `resolve()`.
+
+If a resolution carries an updated `credential`, `Models` persists it via the store before returning.
 
 ### Login callbacks
 
-One callback interface serves local and OAuth login. Use the nicer `prompt()` / `notify()` shape now instead of carrying forward the ad hoc OAuth callback bag.
+One interface serves api-key and OAuth login:
 
 ```ts
 export interface AuthLoginCallbacks {
   signal?: AbortSignal;
 
-  prompt<TPrompt extends AuthPrompt>(
-    prompt: TPrompt,
-    options?: { signal?: AbortSignal },
-  ): Promise<AuthPromptResult<TPrompt>>;
-
+  prompt(prompt: AuthPrompt, options?: { signal?: AbortSignal }): Promise<string>;
   notify(event: AuthEvent): void;
 }
 
 export type AuthPrompt =
-  | {
-      type: "text";
-      id: string;
-      message: string;
-      placeholder?: string;
-      allowEmpty?: boolean;
-      required?: boolean;
-    }
-  | {
-      type: "secret";
-      id: string;
-      message: string;
-      placeholder?: string;
-      required?: boolean;
-    }
-  | {
-      type: "select";
-      id: string;
-      message: string;
-      options: readonly { id: string; label: string; description?: string }[];
-    }
-  | {
-      type: "manual_code";
-      id: string;
-      message: string;
-      placeholder?: string;
-    };
-
-export type AuthPromptResult<TPrompt extends AuthPrompt> = string;
+  | { type: "text"; message: string; placeholder?: string }
+  | { type: "secret"; message: string; placeholder?: string }
+  | { type: "select"; message: string; options: readonly { id: string; label: string; description?: string }[] }
+  | { type: "manual_code"; message: string; placeholder?: string };
 
 export type AuthEvent =
   | { type: "auth_url"; url: string; instructions?: string }
-  | {
-      type: "device_code";
-      userCode: string;
-      verificationUri: string;
-      intervalSeconds?: number;
-      expiresInSeconds?: number;
-    }
+  | { type: "device_code"; userCode: string; verificationUri: string; intervalSeconds?: number; expiresInSeconds?: number }
   | { type: "progress"; message: string };
 ```
 
-Codex browser login can race a `manual_code` prompt against a callback server by passing an abort signal to `prompt(..., { signal })` and aborting the prompt when the callback wins.
+`prompt()` returns the entered/selected string (`select` returns the option id). Flows race a `manual_code` prompt against a callback server by passing a per-prompt abort signal and aborting when the callback wins.
 
 ### OAuth implementation target
 
-OAuth providers must not force Node-only code into browser bundles. Keep OAuth lazy, and let each concrete provider factory decide whether to attach a Node OAuth implementation, a web OAuth implementation, or no OAuth implementation.
-
-Do not build a universal OAuth runtime abstraction in this refactor. The provider factory option is enough:
+OAuth must not force Node-only code (`node:http`, `node:crypto`) into browser bundles. Keep OAuth lazy; the provider factory decides which implementation to attach:
 
 ```ts
 export type OAuthTarget = "node" | "web" | false;
 
 export interface AnthropicProviderOptions {
-  oauth?: OAuthTarget;
+  oauth?: OAuthTarget; // default false
 }
 
 export function anthropicProvider(options: AnthropicProviderOptions = {}): Provider {
-  return {
+  return createProvider({
     id: "anthropic",
     name: "Anthropic",
-    api: "anthropic",
     baseUrl: "https://api.anthropic.com/v1",
-    auth: {
-      local: envLocalAuth("anthropic-api-key", "Anthropic API key", ["ANTHROPIC_API_KEY"]),
-      oauth:
-        options.oauth === "node"
-          ? lazyOAuthProvider({
-              id: "anthropic",
-              name: "Anthropic (Claude Pro/Max)",
-              usesCallbackServer: true,
-              load: () => import("../oauth/anthropic-node.ts").then((m) => m.anthropicOAuthProvider),
-            })
-          : options.oauth === "web"
-            ? lazyOAuthProvider({
-                id: "anthropic",
-                name: "Anthropic (Claude Pro/Max)",
-                load: () => import("../oauth/anthropic-web.ts").then((m) => m.anthropicOAuthProvider),
-              })
-            : undefined,
-    },
-    getModels: staticModels(ANTHROPIC_MODELS),
-    stream: anthropicApi().stream,
-    streamSimple: anthropicApi().streamSimple,
-  };
+    auth: [
+      ...(options.oauth === "node"
+        ? [lazyOAuthMethod({
+            id: "oauth",
+            name: "Anthropic (Claude Pro/Max)",
+            load: () => import("../utils/oauth/anthropic.ts").then((m) => m.anthropicOAuthMethod),
+          })]
+        : []),
+      envApiKeyMethod({ id: "api-key", name: "Anthropic API key", env: ["ANTHROPIC_API_KEY"] }),
+    ],
+    models: ANTHROPIC_MODELS,
+    api: anthropicMessagesApi(),
+  });
 }
 ```
 
-Recommended defaults:
+- Individual factories default to `oauth: false`.
+- `builtinModels({ oauth: "node" })` for pi CLI/coding-agent.
+- `"web"` is reserved; web flows (sitegeist-style: Web Crypto PKCE, auth tab, extension tab APIs watching the localhost redirect, fetch token exchange, device-code polling for Copilot) are a follow-up. Until implemented, passing `"web"` throws at login time with a clear message.
 
-- individual provider factories default to `oauth: false` unless we intentionally want Node defaults
-- `providers/all` for pi CLI/coding-agent calls providers with `oauth: "node"`
-- browser users call providers with `oauth: "web"`
-- users that only want API-key/env auth leave OAuth disabled
-
-Sitegeist demonstrates that browser-compatible OAuth is practical for Anthropic, OpenAI Codex, GitHub Copilot, and Gemini CLI. The browser implementations use Web Crypto, auth tabs, localhost redirect URL watching through extension tab APIs, `fetch` for token exchange, CORS permissions/proxies where needed, and device-code polling for Copilot.
-
-So the target is not “OAuth is Node-only”. The target is: provider factories attach the right lazy OAuth module for the runtime the caller asked for.
-
-Use a lazy wrapper so provider definitions can advertise OAuth without importing the actual implementation:
+`lazyOAuthMethod()` wraps a dynamically imported `OAuthAuthMethod` so provider definitions can advertise OAuth without importing the implementation:
 
 ```ts
-export function lazyOAuthProvider(input: {
+export function lazyOAuthMethod(input: {
   id: string;
   name: string;
-  usesCallbackServer?: boolean;
-  load: () => Promise<OAuthProvider>;
-}): OAuthProvider {
-  return {
-    id: input.id,
-    name: input.name,
-    usesCallbackServer: input.usesCallbackServer,
-    async login(callbacks) {
-      return (await input.load()).login(callbacks);
-    },
-    async resolve(credentials) {
-      return (await input.load()).resolve(credentials);
-    },
-  };
-}
+  load: () => Promise<OAuthAuthMethod>;
+}): OAuthAuthMethod;
 ```
 
-## Auth resolution policy
-
-`pi-ai` can ship a default resolver using injected context/store. Applications can replace it.
-
-Recommended default order, low to high precedence:
-
-```txt
-provider local auth defaults
--> CredentialStore local/OAuth credential
--> explicit request auth
-```
-
-coding-agent later adds models.json and CLI policy:
-
-```txt
-provider local auth defaults
--> AuthStorage credential
--> models.json auth sidecar
--> CLI/runtime explicit request auth
-```
-
-Auth values merge:
-
-- later `apiKey` wins
-- later `baseUrl` wins
-- headers shallow-merge; later wins per header
-
-Cloudflare requires merge, not early return. It may need env account/gateway + stored key, or stored metadata + env token.
+The existing flows in `src/utils/oauth/` (anthropic, openai-codex, github-copilot) are adapted to `OAuthAuthMethod` with the new callbacks, staying Node-targeted and lazy-loaded.
 
 ## Provider wrappers and models.json
 
-`models.json` is naturally a provider wrapper layer.
-
-It should not mutate a provider in place. It should wrap:
+`models.json` is a provider wrapper layer. It does not mutate providers in place:
 
 ```ts
 function withProviderOverrides(base: Provider, overrides: ProviderOverrides): Provider {
@@ -652,17 +539,35 @@ function withProviderOverrides(base: Provider, overrides: ProviderOverrides): Pr
 }
 ```
 
-This composes with dynamic providers because `getModels()` delegates to the base provider source.
+This composes with dynamic providers because `getModels()` delegates to the base source.
 
-Request-auth config from models.json remains app-owned sidecar state. It is not stored in `Provider` unless it is true provider metadata such as base URL or headers.
+Request-auth config from models.json (`$ENV`, `!command`, inline keys) remains app-owned sidecar state, surfaced either as explicit request auth or as a custom `ApiKeyAuthMethod` the app prepends to the wrapped provider's auth list.
 
-## Custom providers from models.json
+## Custom providers: createProvider()
 
-A models.json custom provider must become a concrete `Provider` object.
+One helper builds providers from parts; it handles both single-API and mixed-API providers:
 
-### Single API custom provider
+```ts
+export function createProvider(input: {
+  id: string;
+  name?: string;                 // default: id
+  baseUrl?: string;
+  headers?: Record<string, string>;
+  auth?: readonly AuthMethod[];  // default: []
+  models:
+    | readonly Model<Api>[]
+    | ((options?: { forceRefresh?: boolean }) => Promise<readonly Model<Api>[]>);
+  /** Single implementation, or map keyed by model.api for mixed-API providers. */
+  api: ProviderStreams | Record<string, ProviderStreams>;
+}): Provider;
+```
 
-If all models use one known API:
+- Single `api`: all models stream through it.
+- Map `api`: `stream()`/`streamSimple()` dispatch on `model.api`; unknown api produces a stream error.
+
+Mixed-API custom providers must be supported (opencode Go/Zen-style providers expose models backed by different APIs under one provider id).
+
+Built-in provider factories use `createProvider()` internally. models.json custom providers map onto it directly:
 
 ```json
 {
@@ -676,185 +581,181 @@ If all models use one known API:
 }
 ```
 
-coding-agent/pi-ai helper can build:
+## Compat entrypoint
+
+`@earendil-works/pi-ai/compat` preserves the old global API surface until the coding-agent migration deletes it. New code never imports it.
+
+Old semantics being preserved: global `stream()` dispatched purely on `model.api` via the api-registry, with env API key injection. The compat module reproduces this:
+
+- Lazily creates a default `Models` singleton from `builtinModels({ oauth: "node" })` on first use.
+- `stream/complete/streamSimple/completeSimple(model, ctx, opts)`: look up `getProvider(model.provider)`; if found, route through the singleton (auth resolution included). If not found (custom models.json/extension models), fall back to api-dispatch through a hidden `createProvider()` map containing all builtin API implementations plus anything registered via compat `registerApiProvider()`.
+- `registerApiProvider()/unregisterApiProviders()` feed that fallback dispatch map. `api-registry.ts` dies as a real mechanism.
+- Sync `getModel/getModels/getProviders` become deprecated aliases of `getBuiltinModel/getBuiltinModels/getBuiltinProviders` (they were always pure generated-catalog reads — verified: nothing ever mutated the old `modelRegistry`).
+- Re-exports `setBedrockProviderModule` from the bedrock lazy wrapper.
+- `getEnvApiKey`/`env-api-keys.ts` stays available from compat only; provider auth methods own env lookup in the new design.
+
+coding-agent switches imports of these symbols from `@earendil-works/pi-ai` to `@earendil-works/pi-ai/compat` (import-path-only change) and is otherwise untouched until the ModelManager migration.
+
+## Builtin static helpers
+
+Typed, sync, generated-catalog-only helpers live with the catalogs (exported from `providers/all`):
 
 ```ts
-createApiBackedProvider({
-  id: "my-openai-proxy",
-  name: "my-openai-proxy",
-  api: "openai-completions",
-  baseUrl: "https://proxy.example/v1",
-  auth: {},
-  models,
-  apiImplementation: openAICompatibleApi(),
-});
+getBuiltinModel(provider, id)   // sync, typed overloads from generated catalog
+getBuiltinModels(provider)      // sync
+getBuiltinProviders()           // sync
 ```
 
-This helper lives outside `Models`; it is provider construction sugar.
+Runtime lookup is always the async instance API: `await models.getModel(...)`.
 
-### Mixed API custom provider
-
-Custom providers with mixed APIs must be supported. Existing providers such as opencode-go/zen can expose models backed by different APIs under one provider id. In this design that means the provider dispatches internally.
-
-```ts
-createDispatchProvider({
-  id,
-  models,
-  apis: {
-    "openai-completions": openAICompatibleApi(),
-    "anthropic": anthropicApi(),
-  },
-});
-```
-
-The returned provider still exposes only:
-
-```ts
-stream(model, context, options)
-streamSimple(model, context, options)
-```
-
-Internally it switches on `model.api` and calls the right lazy API implementation.
-
-This preserves the rule that `Models` has no stream registry while supporting required mixed-API providers.
+Generated catalogs are split per provider (`providers/<id>.models.ts`) by updating `packages/ai/scripts/generate-models.ts`. If the generator change turns out too large for this pass, splitting may be deferred; `providers/all` and provider factories may temporarily import the monolithic `models.generated.ts`, relying on `sideEffects: false` for pruning.
 
 ## Tree-shaking and lazy imports
 
 Rules:
 
 1. Main `@earendil-works/pi-ai` import is core-only.
-2. Provider modules import metadata, model catalog, auth helpers, and lazy API wrappers only.
+2. Provider modules import their catalog, auth helpers, and lazy API wrappers only.
 3. Lazy API wrappers dynamically import real API implementations.
 4. Real API implementations import SDK dependencies.
-5. OAuth providers are selected by provider factory option (`oauth: "node" | "web" | false`) and lazy-loaded; provider metadata must not eagerly import Node-only OAuth code.
-6. `providers/all` is explicit and allowed to import all provider metadata, but still no eager SDK imports.
-7. Provider modules are side-effect-free; importing a provider does not register it globally.
-8. `package.json` should set `sideEffects: false` if all entrypoints are side-effect-free.
+5. OAuth implementations are selected by factory option (`oauth: "node" | "web" | false`) and lazy-loaded; provider metadata never eagerly imports Node-only OAuth code.
+6. `providers/all` may import all provider metadata, but no eager SDK imports.
+7. Provider modules are side-effect-free; importing a provider does not register anything globally.
+8. `package.json` sets `sideEffects: false`.
 
-Example exports:
+Exports map sketch:
 
 ```json
 {
   "exports": {
     ".": "./dist/index.js",
+    "./compat": "./dist/compat.js",
+    "./providers/all": "./dist/providers/all.js",
     "./providers/openai": "./dist/providers/openai.js",
     "./providers/anthropic": "./dist/providers/anthropic.js",
-    "./providers/openrouter": "./dist/providers/openrouter.js",
-    "./providers/all": "./dist/providers/all.js",
-    "./ai/openai-compatible": "./dist/ai/openai-compatible-lazy.js"
+    "./providers/*": "./dist/providers/*.js",
+    "./api/*": "./dist/api/*.js"
   }
 }
 ```
 
-To avoid metadata bloat for minimal users, generated model catalogs should be split per provider. Until then, any provider module importing the monolithic generated catalog can pull more metadata than necessary.
-
-## Static typed helpers
-
-The old global sync helpers are incompatible with dynamic providers:
-
-```ts
-getModel(...)
-getModels(...)
-getProviders(...)
-```
-
-If they mean runtime lookup, they must be async. If they remain sync and read only built-ins, they are misleading.
-
-Target:
-
-- remove old global runtime helpers, or make them async and default-instance backed only in a compatibility entrypoint
-- add explicit static catalog helpers if type-safe built-in lookup is still desired
-
-```ts
-getBuiltinModel(provider, id)      // sync, generated catalog only
-getBuiltinModels(provider)        // sync, generated catalog only
-getBuiltinProviders()             // sync, generated catalog only
-```
-
-Runtime lookup is always:
-
-```ts
-await models.getModel(provider, id)
-await models.getModels(provider)
-```
+Browser smoke check (`scripts/check-browser-smoke.mjs`) must keep passing: bundling the core entrypoint (and any non-node provider entrypoint) must not pull `node:http`/`node:crypto`.
 
 ## AgentHarness integration
 
 `AgentHarness` receives a `Models` instance.
 
-Rules:
+- `AgentHarnessOptions.models` is required.
+- The harness does not snapshot `Models` into turn state.
+- Request path calls `this.models.streamSimple(model, context, options)`; same for compaction/branch-summarization paths.
+- Request path never calls async `models.getModel()` to canonicalize; if model metadata needs refresh, the app updates the selected model before starting a turn.
+- Harness tests build `createModels()` and install the faux provider (`fauxProvider()` factory from `providers/faux`).
 
-- `AgentHarnessOptions.models` is required
-- harness does not snapshot `Models` into turn state
-- request path calls `models.streamSimple(model, context, options)` or equivalent
-- request path does not call async `models.getModel()` to canonicalize
-- if model metadata needs refresh, app updates the selected model before starting a turn
+## coding-agent next phase (not this pass)
 
-## coding-agent next phase
-
-coding-agent should build providers in layers:
+coding-agent builds providers in layers and binds them per session:
 
 ```txt
-built-in providers
--> models.json provider wrappers
+built-in providers (builtinModels)
+-> models.json provider wrappers / custom providers (createProvider)
 -> extension provider wrappers/additions
 ```
-
-Then:
 
 ```ts
 sessionModels.clearProviders();
 for (const provider of layeredProviders) sessionModels.setProvider(provider);
-sessionModels.setAuthResolver(codingAgentResolver);
 ```
 
-coding-agent owns:
+coding-agent owns: AuthStorage-backed `CredentialStore`, models.json auth sidecar (`$ENV`, `!command`), command execution policy, provider status labels (from `AuthResolution.source`), login/logout UI (driving `method.login()` with `prompt()/notify()`), extension lifecycle, provider-management slash commands.
 
-- AuthStorage local/OAuth files
-- models.json auth sidecar
-- `$ENV` and `!command`
-- command execution policy
-- provider status labels
-- login/logout UI
-- extension lifecycle
-- provider-management slash commands
+Until then, the only coding-agent changes in this pass are:
 
-## Migration TODOs
+- construct a `Models` instance for `AgentHarness` (builtins + legacy api-dispatch fallback bridging `ModelRegistry` custom providers)
+- switch old-global imports to `@earendil-works/pi-ai/compat`
+- adapt the login dialog to `prompt()/notify()` callbacks (thin UI adapter; replaces the `usesCallbackServer` special-casing)
 
-1. Restore/remove half-implemented old auth/stream-registry changes before starting this design.
-2. Redesign `packages/ai/src/models.ts` around provider-owned streams.
-3. Remove `StreamFunctions` registry from `Models` public API.
-4. Introduce `Provider` with required `auth`, async `getModels()`, `stream()`, and `streamSimple()`.
-5. Add lazy API wrappers under `packages/ai/src/ai/`.
-6. Move real API implementations under `packages/ai/src/ai/` or adapt existing stream files into that layout.
-7. Add concrete provider factories under `packages/ai/src/providers/`.
-8. Add `providers/all` explicit aggregate.
-9. Add `lazyOAuthProvider()`, `OAuthTarget`, and provider factory options such as `anthropicProvider({ oauth: "node" | "web" | false })`.
-10. Convert built-in OAuth attachment to lazy target-specific wrappers.
-11. Split generated model catalogs per provider, or mark as follow-up if too large.
-12. Replace old global `defaultModels()`/global helpers with explicit instance usage or compatibility entrypoint.
-13. Add custom provider helpers:
-    - `createApiBackedProvider()`
-    - `createDispatchProvider()` for required mixed-API providers
-14. Update `AgentHarness` to use provider-owned `models.streamSimple()` without stream registry lookups.
-15. Keep coding-agent compatibility only as needed until the coding-agent `ModelManager` migration.
-16. Update tests to construct explicit `Models` instances and install only needed providers/faux providers.
+## Implementation TODOs
+
+Check items off as they land. Keep this list current; it is the working state for resumed sessions.
+
+### Phase 1 — core types/runtime
+
+- [ ] Rename `types.ts` `Provider` alias to `ProviderId`; fix call sites.
+- [ ] Add `ApiOptionsMap` and `ApiStreamOptions<TApi>` to `types.ts` (type-only imports).
+- [ ] New `models.ts`: `Provider` interface, `AuthMethod` union (`ApiKeyAuthMethod`/`OAuthAuthMethod`), `LocalCredential`/`OAuthCredential`/`Credential`, `CredentialStore` (+ in-memory default), `AuthResolution`, `ProviderAuthContext`, `ModelAuth`, `ModelsError` + codes.
+- [ ] `Models`/`MutableModels`/`createModels({ credentials? })` with provider map, async `getModel(s)` (per-provider failure isolation), `getAuth` (two-pass fixed policy, persists refreshed credentials), `stream/complete/streamSimple/completeSimple` with per-field auth merge.
+- [ ] Keep metadata helpers: `calculateCost`, `getSupportedThinkingLevels`, `clampThinkingLevel`, `modelsAreEqual`.
+
+### Phase 2 — `src/api/`
+
+- [ ] Move stream implementations from `src/providers/` to `src/api/`, renamed by API id (`anthropic.ts` -> `api/anthropic-messages.ts`, etc.).
+- [ ] Normalize each implementation module to export exactly `stream` and `streamSimple`.
+- [ ] Move shared helpers (`openai-responses-shared`, `google-shared`, `transform-messages`, `openai-prompt-cache`, `github-copilot-headers`) to `src/api/`.
+- [ ] Extract `lazyStream()`/`lazyApi()` into `src/api/lazy.ts`.
+- [ ] Add `*-lazy.ts` wrappers per API; bedrock keeps node-only import trick and `setBedrockProviderModule()`.
+- [ ] Delete `providers/register-builtins.ts`.
+
+### Phase 3 — provider factories + catalogs
+
+- [ ] Auth helpers in `src/auth/`: `envApiKeyMethod()`, `lazyOAuthMethod()`, `OAuthTarget`, `AuthLoginCallbacks`/`AuthPrompt`/`AuthEvent`.
+- [ ] `createProvider()` (single + mixed `api` map, dispatch on `model.api`).
+- [ ] Per-provider factories under `src/providers/` for all built-in catalog providers, `oauth` factory options where applicable.
+- [ ] `providers/all.ts`: `builtinModels({ oauth? })`, `getBuiltinModel/getBuiltinModels/getBuiltinProviders`.
+- [ ] Faux provider factory (`providers/faux.ts`) for tests.
+- [ ] Split generated catalogs per provider via `scripts/generate-models.ts` (`providers/<id>.models.ts`) — or record explicitly that this is deferred.
+
+### Phase 4 — OAuth adaptation
+
+- [ ] Adapt `utils/oauth/anthropic.ts`, `openai-codex.ts`, `github-copilot.ts` to `OAuthAuthMethod` + `prompt()/notify()`.
+- [ ] Remove `usesCallbackServer`; callback-server flows race a `manual_code` prompt instead.
+- [ ] `oauth: "web"` reserved: throws at login with clear message.
+
+### Phase 5 — packaging
+
+- [ ] `index.ts` core-only (no catalogs, no provider factories, no OAuth, no compat).
+- [ ] `compat.ts`: default builtin singleton, `stream/complete/streamSimple/completeSimple` with api-dispatch fallback, `registerApiProvider`/`unregisterApiProviders`, deprecated `getModel/getModels/getProviders` aliases, `setBedrockProviderModule` re-export, `getEnvApiKey`.
+- [ ] Subpath exports map; `sideEffects: false`.
+- [ ] Browser smoke + shrinkwrap checks green.
+
+### Phase 6 — AgentHarness
+
+- [ ] `AgentHarnessOptions.models` required; harness stream path uses `models.streamSimple()`.
+- [ ] Compaction/branch-summarization paths use the harness `Models` instance.
+- [ ] Harness tests use `createModels()` + faux provider.
+
+### Phase 7 — coding-agent bridge (minimal)
+
+- [ ] Construct `Models` for the harness (builtins + legacy api-dispatch fallback for ModelRegistry custom providers).
+- [ ] Switch old-global imports to `@earendil-works/pi-ai/compat`.
+- [ ] Login dialog adapter for `prompt()/notify()` callbacks.
+
+### Phase 8 — wrap-up
+
+- [ ] Update/add tests; run affected suites (`./test.sh` or per-package vitest).
+- [ ] `packages/ai/CHANGELOG.md`: `### Breaking Changes` entry with a migration guide (old global `stream/streamSimple/complete/completeSimple`, `getModel/getModels/getProviders`, `registerApiProvider`, `Provider` -> `ProviderId` rename, OAuth callback changes; old API -> `createModels()`/provider factories or `/compat` as interim).
+- [ ] `packages/coding-agent/CHANGELOG.md`: `### Breaking Changes` entry with a migration guide for extension authors who work directly with pi-ai through coding-agent (e.g. custom providers via `registerApiProvider`, model access, login/auth hooks): what changed, what to import now, compat timeline.
+- [ ] `packages/agent/CHANGELOG.md`: `### Breaking Changes` entry for required `AgentHarnessOptions.models`.
+- [ ] `npm run check` clean.
+
+### Deferred / follow-ups
+
+- [ ] Web OAuth implementations (sitegeist-style) behind `oauth: "web"`.
+- [ ] coding-agent `ModelRegistry` -> session `ModelManager` migration; delete `/compat`.
+- [ ] Images API registry redesign (untouched in this pass).
 
 ## Error behavior
 
-`undefined` means not found or not configured.
-Real failures reject or become stream errors.
-
-Recommended error codes:
+`undefined` means not found or not configured. Real failures reject or become stream errors.
 
 ```ts
 export type ModelsErrorCode =
-  | "model_source"
-  | "model_validation"
-  | "provider"
-  | "stream"
-  | "auth"
-  | "oauth";
+  | "model_source"      // provider getModels() failed
+  | "model_validation"  // model object invalid
+  | "provider"          // unknown provider, dispatch failure
+  | "stream"            // stream setup failure
+  | "auth"              // auth resolution failure
+  | "oauth";            // oauth login/refresh failure
 ```
 
-`Models.stream()` should produce stream errors for async setup failures. `getModels()` should isolate provider source failures when listing all providers if possible, so one dynamic provider failure does not prevent listing other providers.
+- `Models.stream()` produces stream errors (error event + error result) for async setup failures; it does not throw after returning the stream.
+- `Models.getModels()` with no provider filter isolates per-provider source failures so one dynamic provider failure does not prevent listing others.
