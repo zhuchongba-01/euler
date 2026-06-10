@@ -805,7 +805,7 @@ export interface AgentHarnessOptions<
 	/**
 	 * Provider collection used for all model requests (turn streaming,
 	 * compaction, branch summarization). Auth resolves through the providers'
-	 * auth; explicit per-request values (`getApiKeyAndHeaders`) win per field.
+	 * auth.
 	 */
 	models: Models;
 	tools?: TTool[];
@@ -824,9 +824,6 @@ export interface AgentHarnessOptions<
 				activeTools: TTool[];
 				resources: AgentHarnessResources<TSkill, TPromptTemplate>;
 		  }) => string | Promise<string>);
-	getApiKeyAndHeaders?: (
-		model: Model<any>,
-	) => Promise<{ apiKey: string; headers?: Record<string, string> } | undefined>;
 	/** Curated stream/provider request options. Snapshotted at turn start. */
 	streamOptions?: AgentHarnessStreamOptions;
 	model: Model<any>;

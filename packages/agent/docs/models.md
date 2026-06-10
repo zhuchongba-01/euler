@@ -821,7 +821,7 @@ Check items off as they land. Keep this list current; it is the working state fo
 ### Phase 6 — AgentHarness
 
 - [x] `AgentHarnessOptions.models` required (`readonly models` on the harness); the harness stream path uses `models.streamSimple()`. `StreamFn` redefined structurally (no compat type dependency); `Models.streamSimple` satisfies it.
-- [x] Compaction/branch-summarization take the harness `Models` instance; explicit `getApiKeyAndHeaders` auth stays and wins per-field, but is no longer required — requests resolve through provider auth otherwise (the hard "No auth available" throws are gone).
+- [x] Compaction/branch-summarization take the harness `Models` instance. `getApiKeyAndHeaders` is removed entirely — `Models` is the only auth path; per-request key resolution becomes provider auth on the collection. `compact()`/`generateSummary()`/`generateBranchSummary()` lose their explicit `apiKey`/`headers` parameters.
 - [x] Harness tests use `createModels()` + `fauxProvider()` with unique per-fake provider ids; no global api-registry state, no unregister bookkeeping.
 
 ### Phase 7 — coding-agent bridge (minimal)

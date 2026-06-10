@@ -36,7 +36,7 @@ function captureOptions(options: StreamOptions | undefined): StreamOptions {
 }
 
 describe("AgentHarness stream configuration", () => {
-	it("snapshots stream options and merges auth headers before provider request hooks", async () => {
+	it("snapshots stream options before provider request hooks", async () => {
 		let capturedOptions: StreamOptions | undefined;
 		const registration = newFaux();
 		registration.setResponses([
@@ -60,12 +60,11 @@ describe("AgentHarness stream configuration", () => {
 				metadata: { base: true },
 				cacheRetention: "none",
 			},
-			getApiKeyAndHeaders: async () => ({ apiKey: "secret", headers: { "x-auth": "auth" } }),
 		});
 
 		harness.on("before_provider_request", (event) => {
 			expect(event.sessionId).toBe("session-1");
-			expect(event.streamOptions.headers).toEqual({ "x-base": "base", "x-auth": "auth" });
+			expect(event.streamOptions.headers).toEqual({ "x-base": "base" });
 			return {
 				streamOptions: {
 					headers: { "x-hook": "hook" },
@@ -77,14 +76,13 @@ describe("AgentHarness stream configuration", () => {
 		await harness.prompt("hello");
 
 		expect(capturedOptions).toMatchObject({
-			apiKey: "secret",
 			timeoutMs: 1000,
 			maxRetries: 2,
 			maxRetryDelayMs: 3000,
 			sessionId: "session-1",
 			cacheRetention: "none",
 		});
-		expect(capturedOptions?.headers).toEqual({ "x-base": "base", "x-auth": "auth", "x-hook": "hook" });
+		expect(capturedOptions?.headers).toEqual({ "x-base": "base", "x-hook": "hook" });
 		expect(capturedOptions?.metadata).toEqual({ base: true, hook: true });
 	});
 

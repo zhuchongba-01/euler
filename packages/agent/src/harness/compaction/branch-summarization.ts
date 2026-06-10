@@ -49,14 +49,10 @@ export interface CollectEntriesResult {
 
 /** Options for generating a branch summary. */
 export interface GenerateBranchSummaryOptions {
-	/** Provider collection the summarization request goes through. */
+	/** Provider collection the summarization request goes through; owns auth resolution. */
 	models: Models;
 	/** Model used for summarization. */
 	model: Model<any>;
-	/** Explicit API key; wins over provider-resolved auth. */
-	apiKey?: string;
-	/** Optional request headers forwarded to the provider. */
-	headers?: Record<string, string>;
 	/** Abort signal for the summarization request. */
 	signal: AbortSignal;
 	/** Optional instructions appended to or replacing the default prompt. */
@@ -204,16 +200,7 @@ export async function generateBranchSummary(
 	entries: SessionTreeEntry[],
 	options: GenerateBranchSummaryOptions,
 ): Promise<Result<BranchSummaryResult, BranchSummaryError>> {
-	const {
-		models,
-		model,
-		apiKey,
-		headers,
-		signal,
-		customInstructions,
-		replaceInstructions,
-		reserveTokens = 16384,
-	} = options;
+	const { models, model, signal, customInstructions, replaceInstructions, reserveTokens = 16384 } = options;
 	const contextWindow = model.contextWindow || 128000;
 	const tokenBudget = contextWindow - reserveTokens;
 
@@ -244,7 +231,7 @@ export async function generateBranchSummary(
 	const response = await models.completeSimple(
 		model,
 		{ systemPrompt: SUMMARIZATION_SYSTEM_PROMPT, messages: summarizationMessages },
-		{ apiKey, headers, signal, maxTokens: 2048 },
+		{ signal, maxTokens: 2048 },
 	);
 	if (response.stopReason === "aborted") {
 		return err(new BranchSummaryError("aborted", response.errorMessage || "Branch summary aborted"));

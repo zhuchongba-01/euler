@@ -457,8 +457,6 @@ export async function generateSummary(
 	models: Models,
 	model: Model<any>,
 	reserveTokens: number,
-	apiKey?: string,
-	headers?: Record<string, string>,
 	signal?: AbortSignal,
 	customInstructions?: string,
 	previousSummary?: string,
@@ -490,8 +488,8 @@ export async function generateSummary(
 
 	const completionOptions =
 		model.reasoning && thinkingLevel && thinkingLevel !== "off"
-			? { maxTokens, signal, apiKey, headers, reasoning: thinkingLevel }
-			: { maxTokens, signal, apiKey, headers };
+			? { maxTokens, signal, reasoning: thinkingLevel }
+			: { maxTokens, signal };
 
 	const response = await models.completeSimple(
 		model,
@@ -628,8 +626,6 @@ export async function compact(
 	preparation: CompactionPreparation,
 	models: Models,
 	model: Model<any>,
-	apiKey?: string,
-	headers?: Record<string, string>,
 	customInstructions?: string,
 	signal?: AbortSignal,
 	thinkingLevel?: ThinkingLevel,
@@ -659,24 +655,13 @@ export async function compact(
 						models,
 						model,
 						settings.reserveTokens,
-						apiKey,
-						headers,
 						signal,
 						customInstructions,
 						previousSummary,
 						thinkingLevel,
 					)
 				: Promise.resolve(ok<string, CompactionError>("No prior history.")),
-			generateTurnPrefixSummary(
-				turnPrefixMessages,
-				models,
-				model,
-				settings.reserveTokens,
-				apiKey,
-				headers,
-				signal,
-				thinkingLevel,
-			),
+			generateTurnPrefixSummary(turnPrefixMessages, models, model, settings.reserveTokens, signal, thinkingLevel),
 		]);
 		if (!historyResult.ok) return err(historyResult.error);
 		if (!turnPrefixResult.ok) return err(turnPrefixResult.error);
@@ -687,8 +672,6 @@ export async function compact(
 			models,
 			model,
 			settings.reserveTokens,
-			apiKey,
-			headers,
 			signal,
 			customInstructions,
 			previousSummary,
@@ -713,8 +696,6 @@ async function generateTurnPrefixSummary(
 	models: Models,
 	model: Model<any>,
 	reserveTokens: number,
-	apiKey?: string,
-	headers?: Record<string, string>,
 	signal?: AbortSignal,
 	thinkingLevel?: ThinkingLevel,
 ): Promise<Result<string, CompactionError>> {
@@ -737,8 +718,8 @@ async function generateTurnPrefixSummary(
 		model,
 		{ systemPrompt: SUMMARIZATION_SYSTEM_PROMPT, messages: summarizationMessages },
 		model.reasoning && thinkingLevel && thinkingLevel !== "off"
-			? { maxTokens, signal, apiKey, headers, reasoning: thinkingLevel }
-			: { maxTokens, signal, apiKey, headers },
+			? { maxTokens, signal, reasoning: thinkingLevel }
+			: { maxTokens, signal },
 	);
 	if (response.stopReason === "aborted") {
 		return err(new CompactionError("aborted", response.errorMessage || "Turn prefix summarization aborted"));
