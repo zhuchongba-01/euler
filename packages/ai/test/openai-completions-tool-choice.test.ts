@@ -1,7 +1,7 @@
 import { Type } from "typebox";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { convertMessages } from "../src/api/openai-completions.ts";
 import { getModel } from "../src/models.ts";
-import { convertMessages } from "../src/providers/openai-completions.ts";
 import { stream, streamSimple } from "../src/stream.ts";
 import type { AssistantMessage, Model, Tool, ToolResultMessage } from "../src/types.ts";
 
@@ -890,11 +890,11 @@ describe("openai-completions tool_choice", () => {
 	});
 
 	it("stores OpenRouter Kimi K2.6 reasoning replay compat in built-in metadata", () => {
-		for (const modelId of ["moonshotai/kimi-k2.6", "moonshotai/kimi-k2.6:free"] as const) {
-			const model = getModel("openrouter", modelId)!;
-			expect(model.compat?.supportsDeveloperRole).toBe(false);
-			expect(model.compat?.requiresReasoningContentOnAssistantMessages).toBe(true);
-		}
+		// `:free` variant delisted from the OpenRouter API; the generator override
+		// matches any `moonshotai/kimi-k2.6*` variant that is listed.
+		const model = getModel("openrouter", "moonshotai/kimi-k2.6")!;
+		expect(model.compat?.supportsDeveloperRole).toBe(false);
+		expect(model.compat?.requiresReasoningContentOnAssistantMessages).toBe(true);
 	});
 
 	it("stores Xiaomi MiMo reasoning replay compat in built-in metadata", () => {
