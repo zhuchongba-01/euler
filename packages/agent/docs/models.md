@@ -10,7 +10,7 @@ Goals:
 - Concrete provider factories live under `src/providers/`.
 - Users can import only the providers they need.
 - Importing a provider must not eagerly import heavy SDKs.
-- Dynamic model lists are first-class and side-effect-free.
+- Dynamic model lists are first-class: reads are sync (last-known list), fetching happens in an explicit async `refresh`.
 - `models.json` and extensions layer by wrapping providers, not by mutating provider internals ad hoc.
 - Old global APIs survive only in an explicit, temporary `/compat` entrypoint.
 
@@ -129,11 +129,17 @@ export interface Models {
   getProviders(): readonly Provider[];
   getProvider(id: string): Provider | undefined;
 
-  /** Best-effort aggregation: provider source failures yield the models that did list. */
-  getModels(options?: { forceRefresh?: boolean }): Promise<readonly Model<Api>[]>;
-  getModels(provider?: string, options?: { forceRefresh?: boolean }): Promise<readonly Model<Api>[]>;
+  /** Sync read of last-known models. Best-effort: a provider whose getModels() throws yields no models. */
+  getModels(provider?: string): readonly Model<Api>[];
   /** Dynamic lists are honestly Model<Api>; narrow with the hasApi() guard. */
-  getModel(provider: string, id: string, options?: { forceRefresh?: boolean }): Promise<Model<Api> | undefined>;
+  getModel(provider: string, id: string): Model<Api> | undefined;
+
+  /**
+   * Ask dynamic providers to re-fetch their model lists. With a provider id,
+   * rejects on that provider's failure; without, refreshes all concurrently
+   * best-effort. Static providers are no-ops.
+   */
+  refresh(provider?: string): Promise<void>;
 
   /**
    * Resolve request auth for a model. Includes source label for status UI.
@@ -201,8 +207,11 @@ export interface Provider<TApi extends Api = Api> {
    */
   readonly auth: ProviderAuth;
 
-  /** Sync return suits static catalogs; Models always exposes a Promise. */
-  getModels(options?: { forceRefresh?: boolean }): Promise<readonly Model<TApi>[]> | readonly Model<TApi>[];
+  /** Current known models, sync. Static providers: the catalog. Dynamic providers: as of the last refresh (empty before the first). */
+  getModels(): readonly Model<TApi>[];
+
+  /** Dynamic providers only: fetch and update the model list. Concurrent calls share one in-flight fetch. */
+  refreshModels?(): Promise<void>;
 
   stream<T extends TApi>(model: Model<T>, context: Context, options?: ApiStreamOptions<T>): AssistantMessageEventStream;
 
@@ -268,16 +277,20 @@ For comparison: Vercel AI SDK attaches the implementation to the model object, w
 
 ## Provider model listing
 
-`Provider.getModels()` is async and returns full `Model<Api>` objects. Static providers wrap their catalog; dynamic providers (llama.cpp, OpenRouter live listing) fetch and cache, honoring `forceRefresh`.
+Reads are sync; fetching is an explicit async verb. `Provider.getModels()` returns the current known list — the full catalog for static providers, the last-refreshed list for dynamic ones (llama.cpp, OpenRouter live listing). `refreshModels()` is where dynamic providers fetch.
 
-Dynamic model listing must be side-effect-free discovery:
+This split exists because a sync-or-async union (`Promise<T> | T`) invites latent sync assumptions that detonate on the first async provider, while async-only reads force every consumer (UI lists, extension `find`/`getAll` surfaces) through Promises for data that is almost always static. Sync reads + explicit refresh keeps the staleness visible and the contract single: `getModels()` = last known, `refresh()` = make it current. A fetched list is stale the moment it returns anyway; naming the refresh point is honest about it.
+
+Apps own the refresh lifecycle: startup, registry reload, opening a model selector. Freshness-critical lookups are two-step: `await models.refresh("llamacpp"); models.getModel("llamacpp", id)`.
+
+Dynamic refresh must be side-effect-free discovery:
 
 ```txt
 OK: fetch /v1/models, enumerate local catalog, refresh cached remote model list
 Not OK: load model, download model, mutate server state, run request probe
 ```
 
-Provider-specific model lifecycle (load/unload) belongs in app/provider-management commands, not in `getModels()`.
+Provider-specific model lifecycle (load/unload) belongs in app/provider-management commands, not in `refreshModels()`.
 
 ## Streaming path
 
@@ -301,7 +314,7 @@ function stream(model, context, options) {
 
 `stream()` returns `AssistantMessageEventStream` synchronously; async setup (auth resolution, lazy module load) happens inside the returned stream. The forwarding pattern already exists in today's `register-builtins.ts` (`createLazyStream`); extract it as `lazyStream()` in `src/api/lazy.ts`.
 
-No request hot-path model canonicalization: `stream()` uses the supplied model object as-is. If an app wants fresh model metadata, it calls `models.getModel(provider, id, { forceRefresh: true })` before starting the turn.
+No request hot-path model canonicalization: `stream()` uses the supplied model object as-is. If an app wants fresh model metadata, it refreshes the provider and re-reads (`await models.refresh(p); models.getModel(p, id)`) before starting the turn.
 
 ## API implementations under `src/api`
 
@@ -629,10 +642,8 @@ function withProviderOverrides(base: Provider, overrides: ProviderOverrides): Pr
     baseUrl: overrides.baseUrl ?? base.baseUrl,
     headers: mergeHeaders(base.headers, overrides.headers),
 
-    async getModels(options) {
-      const models = await base.getModels(options);
-      return applyModelOverrides(models, overrides.models);
-    },
+    getModels: () => applyModelOverrides(base.getModels(), overrides.models),
+    refreshModels: base.refreshModels?.bind(base),
 
     stream: base.stream,
     streamSimple: base.streamSimple,
@@ -640,7 +651,7 @@ function withProviderOverrides(base: Provider, overrides: ProviderOverrides): Pr
 }
 ```
 
-This composes with dynamic providers because `getModels()` delegates to the base source.
+This composes with dynamic providers because `getModels()` delegates to the base source and `refreshModels()` passes through.
 
 Request-auth config from models.json (`$ENV`, `!command`, inline keys) remains app-owned sidecar state, surfaced either as explicit request auth or as a custom `ApiKeyAuth` the app sets on the wrapped provider's `auth.apiKey`.
 
@@ -655,9 +666,10 @@ export function createProvider(input: {
   baseUrl?: string;
   headers?: Record<string, string>;
   auth: ProviderAuth;            // required, at least one of apiKey/oauth (no "no-auth" providers)
-  models:
-    | readonly Model<Api>[]
-    | ((options?: { forceRefresh?: boolean }) => Promise<readonly Model<Api>[]>);
+  /** Initial model list (empty for purely dynamic providers). */
+  models: readonly Model<Api>[];
+  /** Dynamic providers: fetch the current list; createProvider stores it and dedupes in-flight calls. */
+  refreshModels?: () => Promise<readonly Model<Api>[]>;
   /** Single implementation, or map keyed by model.api for mixed-API providers. */
   api: ProviderStreams | Record<string, ProviderStreams>;
 }): Provider;
@@ -837,17 +849,45 @@ Check items off as they land. Keep this list current; it is the working state fo
 - [x] `packages/agent/CHANGELOG.md`: `### Breaking Changes` for required `AgentHarnessOptions.models`, compaction signature changes, structural `StreamFn`.
 - [x] `npm run check` clean.
 
-### Phase 9 — ModelManager migration (separate pass, not started)
+### Phase 9 — coding-agent on Models + CredentialStore (in scope)
 
-The big one: coding-agent moves off ModelRegistry/AuthStorage onto `Models` + `CredentialStore`, and compat dies. Ordering sketch:
+coding-agent replaces AuthStorage and ModelRegistry's internals with `FileCredentialStore` + a `MutableModels` collection. AgentSession itself stays (AgentHarness adoption is pi 2.0); only its model/auth substrate swaps. Layering is strictly one-directional:
 
-- [ ] coding-agent constructs a `Models` instance per session: builtins (`builtinModels()`), models.json custom providers via `createProvider()` + `withProviderOverrides`, extension custom providers as real providers (legacy `registerApiProvider` extensions bridged by a catch-all api-dispatch provider until extensions migrate).
-- [ ] `AgentSession` streams through that instance (directly or by adopting `AgentHarness`); `agent.streamFn` identity checks and env-key injection die.
-- [ ] AuthStorage replaced per "Replacing AuthStorage": `FileCredentialStore` (ports the lock backend), `withConfigValues` (`$ENV`/`!command`), `withRuntimeOverrides` (`--api-key`); custom providers carry their own `ApiKeyAuth` (kills `fallbackResolver`).
-- [ ] Login/logout/status UIs move to `ProviderAuth` (`OAuthAuth.login` + `prompt()/notify()` adapter in the login dialog); the old `pi-ai/oauth` registry and `OAuthProviderInterface` (incl. `usesCallbackServer`) are deleted.
-- [ ] Cloudflare cleanup (gated on builtin streaming going through `Models.getAuth`): cloudflare factories' `ApiKeyAuth.resolve` reads key + `CLOUDFLARE_ACCOUNT_ID` (+ `CLOUDFLARE_GATEWAY_ID`) from credential metadata/env, substitutes the `{...}` placeholders in `model.baseUrl`, and returns `ModelAuth.baseUrl` (Copilot pattern); unconfigured ids report "not configured". `resolveCloudflareBaseUrl`/`isCloudflareProvider` drop out of `api/anthropic-messages.ts`, `api/openai-completions.ts`, `api/openai-responses.ts`.
+```txt
+FileCredentialStore (auth.json, locked) + --api-key overlay + $ENV/!command resolution
+        ↑
+MutableModels: builtin factories (wrapped per models.json config) + custom providers (models.json ∪ extensions)
+        ↑
+ModelRegistry: async facade — reads delegate to the collection; registerProvider/login/logout/status for extensions + UI
+        ↑
+AgentSession / sdk / interactive-mode (await added; stream via models)
+```
+
+Decisions:
+
+- `AuthStorage` is deleted as a type — it would otherwise depend on provider auth while provider auth depends on its store (circular). Its surface splits: `get`/`set`/`remove` -> `CredentialStore`; `getApiKey` -> `Models.getAuth`; `login`/`logout`/`getAuthStatus` -> ModelRegistry facade methods over `provider.auth.oauth` + the store.
+- Runtime `--api-key` overrides are a store overlay (an override reads as an ephemeral stored api-key credential, masking stored OAuth — matches today's priority). Every registered provider is guaranteed an `apiKey` auth slot so overrides apply to OAuth-only providers too.
+- `ModelRegistry.getAll`/`find`/`getAvailable` become async, delegating to the collection (no materialized snapshot, no sync lies; dynamic providers like llama.cpp work). The extension-facing `modelRegistry` surface changes accordingly (breaking, changelogged); extensions also get the collection itself as the forward API.
+- models.json keeps FULL feature parity, implemented as provider decoration: builtin factories wrapped so `getModels()` applies provider `baseUrl`/`compat` overlays, `modelOverrides`, and custom-model merges (async-safe); provider `apiKey`/`headers`/`authHeader` configs become that provider's `ApiKeyAuth` (config first, factory auth fallback); parse errors keep `getError()` semantics.
+- Extension `ProviderConfig` parity: provider-keyed `streamSimple`, old-style `oauth` adapted to `OAuthAuth` (`modifyModels` -> `getModels` wrap + `toAuth`), full model replacement per provider. The api-registry `registerApiProvider` dual-write stays for compat consumers (extensions calling global `complete()`); it dies with compat.
+- Copilot: stored-credential baseUrl applied in the wrapped `getModels()` (extension-visible models stay correct) plus per-request `toAuth().baseUrl`.
+- Cloudflare: provider-auth substitution (key + `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_GATEWAY_ID` from credential metadata/env -> `ModelAuth.baseUrl`); impl-side `resolveCloudflareBaseUrl` stays until compat dies (it is idempotent on substituted URLs), keeping extension `complete()` calls working.
+
+Ordering:
+
+- [ ] pi-ai rework first: `Provider.getModels()` sync + optional `refreshModels()`; `Models.getModels`/`getModel` sync, `Models.refresh(provider?)` async; `createProvider` takes `models` array + optional `refreshModels` fetcher (in-flight dedupe). Reverses Phase 1's async-listing decision — see "Provider model listing" for rationale (sync-or-async unions breed latent sync assumptions; async-only breaks sync consumer surfaces like extension `find`/`getAll`).
+- [ ] `FileCredentialStore` (ports the auth.json lock backend, reads legacy `type: "api_key"` tags) + `--api-key` overlay + `$ENV`/`!command` resolution; tests.
+- [ ] Cloudflare provider auth in pi-ai factories; copilot `getModels` baseUrl wrap.
+- [ ] Extension-OAuth adapter (old `OAuthProviderInterface` config -> `OAuthAuth`).
+- [ ] ModelRegistry rebuild: owns `MutableModels`, async reads, models.json decoration, provider-keyed extension streams, facade auth ops; AuthStorage deleted.
+- [ ] Consumer rewiring: agent-session, sdk (`credentials?: CredentialStore` option replaces `authStorage`; sdk.md updated), model-resolver, interactive login/status UI on `prompt()/notify()`, cli `--api-key`.
+- [ ] Test migration; tmux validation of login flows against real providers.
+
+### Phase 10 — compat deletion (pi 2.0 era, separate)
+
+- [ ] AgentSession -> AgentHarness; the registry facade dies in favor of harness `Models`.
 - [ ] Move ALL internal `/compat` imports to the new API: every package's src, all tests, and the example extensions (examples then demonstrate the new API). Nothing inside the repo may import `/compat` at that point.
-- [ ] Delete `/compat`, `api-registry.ts`, `env-api-keys.ts`, and the extension-loader root-to-compat alias. This is the extension-author breaking release; changelog carries the migration guide.
+- [ ] Delete `/compat`, `api-registry.ts`, `env-api-keys.ts`, the extension-loader root-to-compat alias, the old `pi-ai/oauth` registry and `OAuthProviderInterface` (incl. `usesCallbackServer`), and the impl-side cloudflare substitution. This is the extension-author breaking release; changelog carries the migration guide.
 
 ### Deferred / follow-ups
 
@@ -860,7 +900,7 @@ The big one: coding-agent moves off ModelRegistry/AuthStorage onto `Models` + `C
 
 ```ts
 export type ModelsErrorCode =
-  | "model_source"      // provider getModels() failed
+  | "model_source"      // provider model refresh failed
   | "model_validation"  // model object invalid
   | "provider"          // unknown provider, dispatch failure
   | "stream"            // stream setup failure
@@ -869,6 +909,6 @@ export type ModelsErrorCode =
 ```
 
 - `Models.stream()` produces stream errors (error event + error result) for async setup failures; it does not throw after returning the stream.
-- `Models.getModels()` is best-effort aggregation in all forms: provider source failures yield the models that did list (empty for a single failing provider). Apps that need the concrete failure call `getProvider(id).getModels()` directly.
+- `Models.getModels()` is a sync best-effort read: a provider whose `getModels()` throws yields no models. `Models.refresh(provider)` rejects on that provider's fetch failure; `Models.refresh()` (all providers) is concurrent best-effort. Apps that need a concrete listing failure refresh the single provider.
 - Auth resolution and credential store failures reject loudly (`ModelsError` codes `auth`/`oauth`); silent fallback to a different auth path after a failure risks billing surprises. A stored credential always blocks ambient/env fallback, including after a failed refresh.
 - Status/availability UIs catch `getAuth` rejections and render "needs re-login"; they do not treat rejection as "unconfigured".

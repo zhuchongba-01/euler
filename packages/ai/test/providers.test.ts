@@ -26,15 +26,15 @@ describe("builtin providers", () => {
 		expect(providers.length).toBe(builtinProviders().length);
 		expect(providers.map((p) => p.id)).toContain("anthropic");
 
-		const anthropic = await models.getModel("anthropic", "claude-haiku-4-5");
+		const anthropic = models.getModel("anthropic", "claude-haiku-4-5");
 		expect(anthropic?.api).toBe("anthropic-messages");
 
-		const all = await models.getModels();
+		const all = models.getModels();
 		expect(all.length).toBeGreaterThan(500);
 
 		// every provider lists at least one model and owns its models
 		for (const provider of providers) {
-			const list = await models.getModels(provider.id);
+			const list = models.getModels(provider.id);
 			expect(list.length).toBeGreaterThan(0);
 			expect(list.every((m) => m.provider === provider.id)).toBe(true);
 		}
@@ -45,7 +45,7 @@ describe("builtin providers", () => {
 			authContext: fakeAuthContext({ ANTHROPIC_API_KEY: "key", ANTHROPIC_OAUTH_TOKEN: "oauth-token" }),
 		});
 		models.setProvider(anthropicProvider());
-		const model = (await models.getModel("anthropic", "claude-haiku-4-5"))!;
+		const model = models.getModel("anthropic", "claude-haiku-4-5")!;
 
 		const result = await models.getAuth(model);
 		expect(result?.auth.apiKey).toBe("oauth-token");
@@ -55,7 +55,7 @@ describe("builtin providers", () => {
 	it("reports bedrock as configured from ambient AWS credentials without an api key", async () => {
 		const models = createModels({ authContext: fakeAuthContext({ AWS_PROFILE: "dev" }) });
 		models.setProvider(amazonBedrockProvider());
-		const model = (await models.getModels("amazon-bedrock"))[0];
+		const model = models.getModels("amazon-bedrock")[0];
 
 		const result = await models.getAuth(model);
 		expect(result?.auth).toEqual({});
@@ -72,7 +72,7 @@ describe("builtin providers", () => {
 			authContext: fakeAuthContext({ GOOGLE_CLOUD_PROJECT: "proj", GOOGLE_CLOUD_LOCATION: "us-central1" }, [adc]),
 		});
 		configured.setProvider(googleVertexProvider());
-		const model = (await configured.getModels("google-vertex"))[0];
+		const model = configured.getModels("google-vertex")[0];
 
 		const result = await configured.getAuth(model);
 		expect(result?.auth).toEqual({});
@@ -180,15 +180,28 @@ describe("createProvider", () => {
 		expect(result.errorMessage).toContain("no API implementation");
 	});
 
-	it("supports async model listers", async () => {
+	it("supports dynamic providers: empty until refreshed, in-flight refreshes deduped", async () => {
+		let fetches = 0;
 		const provider = createProvider({
 			id: "dynamic",
 			auth: { apiKey: { name: "Test", resolve: async () => ({ auth: {} }) } },
-			models: async () => [testModel("api-a", "listed")],
+			models: [],
+			refreshModels: async () => {
+				fetches++;
+				await new Promise((resolve) => setTimeout(resolve, 5));
+				return [testModel("api-a", "listed")];
+			},
 			api: recordingStreams("a", []),
 		});
-		const models = await provider.getModels();
-		expect(models.map((m) => m.id)).toEqual(["listed"]);
+
+		expect(provider.getModels()).toEqual([]);
+		await Promise.all([provider.refreshModels?.(), provider.refreshModels?.()]);
+		expect(fetches).toBe(1);
+		expect(provider.getModels().map((m) => m.id)).toEqual(["listed"]);
+
+		// a later refresh fetches again
+		await provider.refreshModels?.();
+		expect(fetches).toBe(2);
 	});
 });
 
@@ -199,7 +212,7 @@ describe("fauxProvider", () => {
 		models.setProvider(faux.provider);
 		faux.setResponses([fauxAssistantMessage("hello from faux")]);
 
-		const model = (await models.getModels(faux.provider.id))[0];
+		const model = models.getModels(faux.provider.id)[0];
 		const result = await models.completeSimple(model, context);
 		expect(result.stopReason).toBe("stop");
 		expect(result.content).toEqual([{ type: "text", text: "hello from faux" }]);

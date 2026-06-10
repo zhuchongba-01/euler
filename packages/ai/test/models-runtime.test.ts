@@ -55,7 +55,8 @@ function testProvider(input: {
 	id: string;
 	models?: Model<Api>[];
 	auth?: ProviderAuth;
-	getModels?: () => Promise<readonly Model<Api>[]>;
+	getModels?: () => readonly Model<Api>[];
+	refreshModels?: () => Promise<void>;
 	calls?: ProviderCall[];
 }): Provider {
 	const models = input.models ?? [testModel(input.id, "model-a")];
@@ -72,7 +73,8 @@ function testProvider(input: {
 		id: input.id,
 		name: input.id,
 		auth: input.auth ?? { apiKey: ambientAuth },
-		getModels: input.getModels ?? (async () => models),
+		getModels: input.getModels ?? (() => models),
+		refreshModels: input.refreshModels,
 		stream: (model, _context, options) => respond(model, options as StreamOptions | undefined),
 		streamSimple: (model, _context, options) => respond(model, options as SimpleStreamOptions | undefined),
 	};
@@ -127,14 +129,14 @@ describe("Models runtime", () => {
 		models.setProvider(testProvider({ id: "p1", models: [testModel("p1", "m1"), testModel("p1", "m2")] }));
 		models.setProvider(testProvider({ id: "p2", models: [testModel("p2", "m3")] }));
 
-		expect((await models.getModels()).map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
-		expect((await models.getModels("p1")).map((m) => m.id)).toEqual(["m1", "m2"]);
-		expect((await models.getModels("nope")).length).toBe(0);
-		expect((await models.getModel("p2", "m3"))?.id).toBe("m3");
-		expect(await models.getModel("p2", "missing")).toBeUndefined();
+		expect(models.getModels().map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
+		expect(models.getModels("p1").map((m) => m.id)).toEqual(["m1", "m2"]);
+		expect(models.getModels("nope").length).toBe(0);
+		expect(models.getModel("p2", "m3")?.id).toBe("m3");
+		expect(models.getModel("p2", "missing")).toBeUndefined();
 
 		// hasApi() narrows dynamically looked-up models with a runtime check
-		const found = await models.getModel("p2", "m3");
+		const found = models.getModel("p2", "m3");
 		expect(found && hasApi(found, "openai-completions")).toBe(false);
 		expect(found && hasApi(found, "test-api")).toBe(true);
 		if (found && hasApi(found, "test-api")) {
@@ -143,48 +145,63 @@ describe("Models runtime", () => {
 		}
 	});
 
-	it("swallows provider source failures for both all-provider and single-provider listing", async () => {
+	it("swallows provider source failures for both all-provider and single-provider listing", () => {
 		const models = createModels();
 		models.setProvider(
 			testProvider({
 				id: "broken",
-				getModels: async () => {
+				getModels: () => {
 					throw new Error("boom");
 				},
 			}),
 		);
 		models.setProvider(testProvider({ id: "ok", models: [testModel("ok", "m1")] }));
 
-		expect((await models.getModels()).map((m) => m.id)).toEqual(["m1"]);
-		expect(await models.getModels("broken")).toEqual([]);
+		expect(models.getModels().map((m) => m.id)).toEqual(["m1"]);
+		expect(models.getModels("broken")).toEqual([]);
 		// precise failures come from the provider directly
-		await expect(models.getProvider("broken")?.getModels()).rejects.toThrow("boom");
-
-		// even sync-throwing (non-async) provider implementations are isolated
-		models.setProvider({
-			...testProvider({ id: "sync-broken" }),
-			getModels: () => {
-				throw new Error("sync boom");
-			},
-		});
-		expect((await models.getModels()).map((m) => m.id)).toEqual(["m1"]);
+		expect(() => models.getProvider("broken")?.getModels()).toThrow("boom");
 	});
 
-	it("supports getModels(options) without a provider id", async () => {
-		const seen: ({ forceRefresh?: boolean } | undefined)[] = [];
+	it("refresh() updates dynamic providers; single-provider refresh failures reject", async () => {
+		let list = [testModel("dyn", "before")];
+		let refreshes = 0;
 		const models = createModels();
-		models.setProvider(testProvider({ id: "p1", models: [testModel("p1", "m1")] }));
-		models.setProvider({
-			...testProvider({ id: "p2" }),
-			getModels: async (options) => {
-				seen.push(options);
-				return [testModel("p2", "m2")];
-			},
-		});
+		models.setProvider(
+			testProvider({
+				id: "dyn",
+				getModels: () => list,
+				refreshModels: async () => {
+					refreshes++;
+					list = [testModel("dyn", "after")];
+				},
+			}),
+		);
+		models.setProvider(testProvider({ id: "static", models: [testModel("static", "s1")] }));
 
-		const all = await models.getModels({ forceRefresh: true });
-		expect(all.map((m) => m.id)).toEqual(["m1", "m2"]);
-		expect(seen).toEqual([{ forceRefresh: true }]);
+		expect(models.getModel("dyn", "before")).toBeDefined();
+		await models.refresh("dyn");
+		expect(refreshes).toBe(1);
+		expect(models.getModel("dyn", "after")).toBeDefined();
+		expect(models.getModel("dyn", "before")).toBeUndefined();
+
+		// static providers are no-ops; refresh-all is best-effort
+		await models.refresh("static");
+		await models.refresh();
+		expect(refreshes).toBe(2);
+
+		// single-provider refresh failures reject with ModelsError
+		models.setProvider(
+			testProvider({
+				id: "flaky",
+				refreshModels: async () => {
+					throw new Error("fetch failed");
+				},
+			}),
+		);
+		await expect(models.refresh("flaky")).rejects.toMatchObject({ code: "model_source" });
+		// refresh-all swallows the same failure
+		await expect(models.refresh()).resolves.toBeUndefined();
 	});
 
 	it("resolves auth: stored credential owns the provider, ambient only when nothing stored", async () => {

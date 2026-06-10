@@ -198,7 +198,6 @@ export class InMemoryAuthStorageBackend implements AuthStorageBackend {
 export class AuthStorage {
 	private data: AuthStorageData = {};
 	private runtimeOverrides: Map<string, string> = new Map();
-	private fallbackResolver?: (provider: string) => string | undefined;
 	private loadError: Error | null = null;
 	private errors: Error[] = [];
 	private storage: AuthStorageBackend;
@@ -235,14 +234,6 @@ export class AuthStorage {
 	 */
 	removeRuntimeApiKey(provider: string): void {
 		this.runtimeOverrides.delete(provider);
-	}
-
-	/**
-	 * Set a fallback resolver for API keys not found in auth.json or env vars.
-	 * Used for custom provider keys from models.json.
-	 */
-	setFallbackResolver(resolver: (provider: string) => string | undefined): void {
-		this.fallbackResolver = resolver;
 	}
 
 	private recordError(error: unknown): void {
@@ -341,7 +332,6 @@ export class AuthStorage {
 		if (this.runtimeOverrides.has(provider)) return true;
 		if (this.data[provider]) return true;
 		if (getEnvApiKey(provider)) return true;
-		if (this.fallbackResolver?.(provider)) return true;
 		return false;
 	}
 
@@ -360,10 +350,6 @@ export class AuthStorage {
 		const envKeys = findEnvKeys(provider);
 		if (envKeys?.[0]) {
 			return { configured: false, source: "environment", label: envKeys[0] };
-		}
-
-		if (this.fallbackResolver?.(provider)) {
-			return { configured: false, source: "fallback", label: "custom provider config" };
 		}
 
 		return { configured: false };
@@ -459,9 +445,8 @@ export class AuthStorage {
 	 * 2. API key from auth.json
 	 * 3. OAuth token from auth.json (auto-refreshed with locking)
 	 * 4. Environment variable
-	 * 5. Fallback resolver (models.json custom providers)
 	 */
-	async getApiKey(providerId: string, options?: { includeFallback?: boolean }): Promise<string | undefined> {
+	async getApiKey(providerId: string): Promise<string | undefined> {
 		// Runtime override takes highest priority
 		const runtimeKey = this.runtimeOverrides.get(providerId);
 		if (runtimeKey) {
@@ -515,11 +500,6 @@ export class AuthStorage {
 		// Fall back to environment variable
 		const envKey = getEnvApiKey(providerId);
 		if (envKey) return envKey;
-
-		// Fall back to custom resolver (e.g., models.json custom providers)
-		if (options?.includeFallback !== false) {
-			return this.fallbackResolver?.(providerId) ?? undefined;
-		}
 
 		return undefined;
 	}

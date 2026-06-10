@@ -18,7 +18,7 @@ models.setProvider(anthropicProvider());
 // 2. Look up a model and check auth.
 // ---------------------------------------------------------------------------
 
-const model = await models.getModel("anthropic", "claude-haiku-4-5");
+const model = models.getModel("anthropic", "claude-haiku-4-5");
 if (!model) throw new Error("model not found");
 
 const auth = await models.getAuth(model);

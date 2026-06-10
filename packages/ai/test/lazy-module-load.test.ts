@@ -72,7 +72,7 @@ describe("lazy provider module loading", () => {
 		const result = runProbe(`
 			const all = await import(${JSON.stringify(providersAllUrl)});
 			const models = all.builtinModels();
-			await models.getModels();
+			models.getModels();
 		`);
 		expect(result.loadedSpecifiers).toEqual([]);
 	});

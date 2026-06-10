@@ -757,7 +757,7 @@ export class ModelRegistry {
 	async getApiKeyAndHeaders(model: Model<Api>): Promise<ResolvedRequestAuth> {
 		try {
 			const providerConfig = this.providerRequestConfigs.get(model.provider);
-			const apiKeyFromAuthStorage = await this.authStorage.getApiKey(model.provider, { includeFallback: false });
+			const apiKeyFromAuthStorage = await this.authStorage.getApiKey(model.provider);
 			const apiKey =
 				apiKeyFromAuthStorage ??
 				(providerConfig?.apiKey
@@ -844,7 +844,7 @@ export class ModelRegistry {
 	 * Get API key for a provider.
 	 */
 	async getApiKeyForProvider(provider: string): Promise<string | undefined> {
-		const apiKey = await this.authStorage.getApiKey(provider, { includeFallback: false });
+		const apiKey = await this.authStorage.getApiKey(provider);
 		if (apiKey !== undefined) {
 			return apiKey;
 		}

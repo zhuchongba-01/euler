@@ -64,10 +64,21 @@ export interface Provider<TApi extends Api = Api> {
 	readonly auth: ProviderAuth;
 
 	/**
-	 * List models. Async and side-effect-free discovery only; provider-specific
-	 * model lifecycle (load/unload) belongs in app commands.
+	 * Current known models, sync. Static providers return their catalog;
+	 * dynamic providers return the list as of the last `refreshModels()`
+	 * (empty before the first). Must not throw; `Models` treats a throwing
+	 * implementation as having no models.
 	 */
-	getModels(options?: { forceRefresh?: boolean }): Promise<readonly Model<TApi>[]> | readonly Model<TApi>[];
+	getModels(): readonly Model<TApi>[];
+
+	/**
+	 * Dynamic providers only: fetch and update the model list. Side-effect-free
+	 * discovery (no loading/downloading); provider-specific model lifecycle
+	 * belongs in app commands. Concurrent calls share one in-flight fetch.
+	 * May reject (network); on rejection the model list stays at its last-known
+	 * state and a later call retries.
+	 */
+	refreshModels?(): Promise<void>;
 
 	stream<T extends TApi>(
 		model: Model<T>,
@@ -88,19 +99,24 @@ export interface Models {
 	getProvider(id: string): Provider | undefined;
 
 	/**
-	 * List models from one provider or all providers. Best-effort aggregation:
-	 * provider source failures yield the models that did list (empty for a
-	 * single failing provider). Apps that need the failure call
-	 * `getProvider(id).getModels()` directly.
+	 * Sync read of last-known models from one provider or all providers.
+	 * Best-effort: a provider whose `getModels()` throws yields no models.
 	 */
-	getModels(options?: { forceRefresh?: boolean }): Promise<readonly Model<Api>[]>;
-	getModels(provider?: string, options?: { forceRefresh?: boolean }): Promise<readonly Model<Api>[]>;
+	getModels(provider?: string): readonly Model<Api>[];
 
 	/**
-	 * Runtime model lookup. Dynamic model lists are typed as `Model<Api>`;
-	 * narrow with the `hasApi()` type guard.
+	 * Sync runtime model lookup against last-known lists. Dynamic model lists
+	 * are typed as `Model<Api>`; narrow with the `hasApi()` type guard.
 	 */
-	getModel(provider: string, id: string, options?: { forceRefresh?: boolean }): Promise<Model<Api> | undefined>;
+	getModel(provider: string, id: string): Model<Api> | undefined;
+
+	/**
+	 * Ask dynamic providers to re-fetch their model lists. With a provider id,
+	 * rejects with `ModelsError` ("model_source") on that provider's fetch
+	 * failure; without one, refreshes all providers concurrently best-effort.
+	 * Static providers (no `refreshModels`) are no-ops.
+	 */
+	refresh(provider?: string): Promise<void>;
 
 	/**
 	 * Resolve request auth for a model. Includes a source label for status UI.
@@ -171,37 +187,48 @@ class ModelsImpl implements MutableModels {
 		return this.providers.get(id);
 	}
 
-	async getModels(
-		providerOrOptions?: string | { forceRefresh?: boolean },
-		maybeOptions?: { forceRefresh?: boolean },
-	): Promise<readonly Model<Api>[]> {
-		const provider = typeof providerOrOptions === "string" ? providerOrOptions : undefined;
-		const options = typeof providerOrOptions === "string" ? maybeOptions : providerOrOptions;
-
+	getModels(provider?: string): readonly Model<Api>[] {
 		if (provider !== undefined) {
 			const entry = this.providers.get(provider);
 			if (!entry) return [];
 			try {
-				return await entry.getModels(options);
+				return entry.getModels();
 			} catch {
 				return [];
 			}
 		}
 
-		// Async wrapper turns sync throws from ill-behaved providers into rejections.
-		const results = await Promise.allSettled(
-			Array.from(this.providers.values(), async (entry) => entry.getModels(options)),
-		);
 		const models: Model<Api>[] = [];
-		for (const result of results) {
-			if (result.status === "fulfilled") models.push(...result.value);
+		for (const entry of this.providers.values()) {
+			try {
+				models.push(...entry.getModels());
+			} catch {
+				// Best-effort: ill-behaved providers yield no models.
+			}
 		}
 		return models;
 	}
 
-	async getModel(provider: string, id: string, options?: { forceRefresh?: boolean }): Promise<Model<Api> | undefined> {
-		const models = await this.getModels(provider, options);
-		return models.find((model) => model.id === id);
+	getModel(provider: string, id: string): Model<Api> | undefined {
+		return this.getModels(provider).find((model) => model.id === id);
+	}
+
+	async refresh(provider?: string): Promise<void> {
+		if (provider !== undefined) {
+			const entry = this.providers.get(provider);
+			if (!entry?.refreshModels) return;
+			try {
+				await entry.refreshModels();
+			} catch (error) {
+				if (error instanceof ModelsError) throw error;
+				throw new ModelsError("model_source", `Model refresh failed for ${provider}`, { cause: error });
+			}
+			return;
+		}
+
+		// Cannot reject: the async mapper turns even sync throws from ill-behaved
+		// providers into rejections, and allSettled captures all of them.
+		await Promise.allSettled(Array.from(this.providers.values(), async (entry) => entry.refreshModels?.()));
 	}
 
 	async getAuth(model: Model<Api>): Promise<AuthResult | undefined> {
@@ -358,9 +385,16 @@ export interface CreateProviderOptions<TApi extends Api = Api> {
 	headers?: Record<string, string>;
 	/** Required — every provider has auth semantics, even ambient/keyless ones. */
 	auth: ProviderAuth;
-	models:
-		| readonly Model<TApi>[]
-		| ((options?: { forceRefresh?: boolean }) => Promise<readonly Model<TApi>[]> | readonly Model<TApi>[]);
+	/** Initial model list (empty for purely dynamic providers). */
+	models: readonly Model<TApi>[];
+	/**
+	 * Dynamic providers: fetch the current list. Stored on success; concurrent
+	 * calls share one in-flight fetch. May reject: the stored list then stays
+	 * at its last-known state, the rejection propagates to the caller of
+	 * `refreshModels()` (wrapped as ModelsError "model_source" by
+	 * `Models.refresh(provider)`), and a later call retries.
+	 */
+	refreshModels?: () => Promise<readonly Model<TApi>[]>;
 	/** Single implementation, or map keyed by `model.api` for mixed-API providers. */
 	api: ProviderStreams | Partial<Record<TApi, ProviderStreams>>;
 }
@@ -372,7 +406,9 @@ export interface CreateProviderOptions<TApi extends Api = Api> {
  * produces a stream error.
  */
 export function createProvider<TApi extends Api = Api>(input: CreateProviderOptions<TApi>): Provider<TApi> {
-	const { models } = input;
+	let models = input.models;
+	let inflightRefresh: Promise<void> | undefined;
+	const refreshModels = input.refreshModels;
 	const single =
 		typeof (input.api as ProviderStreams).stream === "function" ? (input.api as ProviderStreams) : undefined;
 	const byApi = single ? undefined : (input.api as Partial<Record<string, ProviderStreams>>);
@@ -398,7 +434,19 @@ export function createProvider<TApi extends Api = Api>(input: CreateProviderOpti
 		baseUrl: input.baseUrl,
 		headers: input.headers,
 		auth: input.auth,
-		getModels: typeof models === "function" ? (options) => models(options) : () => models,
+		getModels: () => models,
+		refreshModels: refreshModels
+			? () => {
+					inflightRefresh ??= (async () => {
+						try {
+							models = await refreshModels();
+						} finally {
+							inflightRefresh = undefined;
+						}
+					})();
+					return inflightRefresh;
+				}
+			: undefined,
 		stream: (model, context, options) => dispatch(model, (streams) => streams.stream(model, context, options)),
 		streamSimple: (model, context, options) =>
 			dispatch(model, (streams) => streams.streamSimple(model, context, options)),
@@ -409,7 +457,7 @@ export function createProvider<TApi extends Api = Api>(input: CreateProviderOpti
  * Runtime-checked narrowing for dynamically looked-up models:
  *
  * ```ts
- * const model = await models.getModel("anthropic", "claude-opus-4-7");
+ * const model = models.getModel("anthropic", "claude-opus-4-7");
  * if (model && hasApi(model, "anthropic-messages")) {
  *   // model: Model<"anthropic-messages">, stream options fully typed
  * }

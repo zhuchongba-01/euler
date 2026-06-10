@@ -99,7 +99,7 @@ describe("OAuth through Models.getAuth (lazy load chain)", () => {
 		const models = createModels({ credentials });
 		models.setProvider(anthropicProvider());
 
-		const model = (await models.getModels("anthropic"))[0];
+		const model = models.getModels("anthropic")[0];
 		const result = await models.getAuth(model);
 		expect(result?.auth.apiKey).toBe("oauth-access-token");
 		expect(result?.source).toBe("OAuth");
@@ -117,7 +117,7 @@ describe("OAuth through Models.getAuth (lazy load chain)", () => {
 		const models = createModels({ credentials });
 		models.setProvider(githubCopilotProvider());
 
-		const model = (await models.getModels("github-copilot"))[0];
+		const model = models.getModels("github-copilot")[0];
 		const result = await models.getAuth(model);
 		expect(result?.auth.apiKey).toBe(access);
 		expect(result?.auth.baseUrl).toBe("https://api.business.githubcopilot.com");
