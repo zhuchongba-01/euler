@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- `AgentHarnessOptions.models` is required: the harness streams turns, compaction, and branch summarization through the provided `Models` instance (`models.streamSimple()`/`completeSimple()`) instead of the pi-ai global stream functions. Build one with `createModels()` + provider factories (or `builtinModels()` from `@earendil-works/pi-ai/providers/all`); tests use `fauxProvider()`. `getApiKeyAndHeaders` still wins per field but is no longer required — without it, requests resolve auth through the providers.
+- `compact()`, `generateSummary()`, and `generateBranchSummary()` take a `Models` parameter; the explicit `apiKey` is now optional.
+- `StreamFn` is defined structurally (`(model, context, options?) => AssistantMessageEventStream | Promise<...>`); `Models.streamSimple` satisfies it.
+
 ## [0.79.1] - 2026-06-09
 
 ## [0.79.0] - 2026-06-08

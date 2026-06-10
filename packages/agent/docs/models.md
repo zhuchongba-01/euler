@@ -826,26 +826,32 @@ Check items off as they land. Keep this list current; it is the working state fo
 
 ### Phase 7 — coding-agent bridge (minimal)
 
-- [ ] Construct `Models` for the harness (builtins + legacy api-dispatch fallback for ModelRegistry custom providers).
-- [ ] Switch old-global imports to `@earendil-works/pi-ai/compat`.
-- [ ] Login dialog adapter for `prompt()/notify()` callbacks.
-- [ ] Cloudflare cleanup (only after builtin streaming goes through `Models.getAuth`): the cloudflare provider factories' `ApiKeyAuth.resolve` reads key + `CLOUDFLARE_ACCOUNT_ID` (+ `CLOUDFLARE_GATEWAY_ID`) from credential metadata/env, substitutes the `{...}` placeholders in `model.baseUrl`, and returns it as `ModelAuth.baseUrl` (Copilot pattern); unconfigured ids report "not configured" instead of throwing mid-request. Then `resolveCloudflareBaseUrl`/`isCloudflareProvider` drop out of `api/anthropic-messages.ts`, `api/openai-completions.ts`, and `api/openai-responses.ts`; `api/cloudflare.ts` shrinks to the generator's baseUrl constants.
-
-The full AuthStorage deletion (`FileCredentialStore` + decorators, see "Replacing AuthStorage") happens in the later ModelManager migration, not this pass.
+- [x] Switch old-global imports to `@earendil-works/pi-ai/compat` (landed with Phase 5; compat is a superset so the switch was path-only). Extension loader resolves the pi-ai root to compat as the runtime grace period.
+- [x] Everything else originally sketched here is gated on coding-agent actually streaming through a `Models` instance — coding-agent's `AgentSession` drives the low-level `Agent` via `streamFn`, not the harness — and moved to Phase 9.
 
 ### Phase 8 — wrap-up
 
-- [ ] Update/add tests; run affected suites (`./test.sh` or per-package vitest).
-- [ ] `packages/ai/CHANGELOG.md`: `### Breaking Changes` entry with a migration guide (old global `stream/streamSimple/complete/completeSimple`, `getModel/getModels/getProviders`, `registerApiProvider`, `Provider` -> `ProviderId` rename, OAuth callback changes; old API -> `createModels()`/provider factories or `/compat` as interim).
-- [ ] `packages/coding-agent/CHANGELOG.md`: `### Breaking Changes` entry with a migration guide for extension authors who work directly with pi-ai through coding-agent (e.g. custom providers via `registerApiProvider`, model access, login/auth hooks): what changed, what to import now, compat timeline.
-- [ ] `packages/agent/CHANGELOG.md`: `### Breaking Changes` entry for required `AgentHarnessOptions.models`.
-- [ ] `npm run check` clean.
+- [x] Update/add tests; run affected suites (tests landed with each phase; `./test.sh` green throughout).
+- [x] `packages/ai/CHANGELOG.md`: `### Breaking Changes` with migration guide (compat entrypoint, `Provider` -> `ProviderId`, api module moves) + `### Added` for the new Models/provider/auth API.
+- [x] `packages/coding-agent/CHANGELOG.md`: `### Changed` entry for extension authors — runtime unaffected (loader resolves the pi-ai root to compat), typecheck nudges to `/compat` or the new API; removal happens later with a migration guide.
+- [x] `packages/agent/CHANGELOG.md`: `### Breaking Changes` for required `AgentHarnessOptions.models`, compaction signature changes, structural `StreamFn`.
+- [x] `npm run check` clean.
+
+### Phase 9 — ModelManager migration (separate pass, not started)
+
+The big one: coding-agent moves off ModelRegistry/AuthStorage onto `Models` + `CredentialStore`, and compat dies. Ordering sketch:
+
+- [ ] coding-agent constructs a `Models` instance per session: builtins (`builtinModels()`), models.json custom providers via `createProvider()` + `withProviderOverrides`, extension custom providers as real providers (legacy `registerApiProvider` extensions bridged by a catch-all api-dispatch provider until extensions migrate).
+- [ ] `AgentSession` streams through that instance (directly or by adopting `AgentHarness`); `agent.streamFn` identity checks and env-key injection die.
+- [ ] AuthStorage replaced per "Replacing AuthStorage": `FileCredentialStore` (ports the lock backend), `withConfigValues` (`$ENV`/`!command`), `withRuntimeOverrides` (`--api-key`); custom providers carry their own `ApiKeyAuth` (kills `fallbackResolver`).
+- [ ] Login/logout/status UIs move to `ProviderAuth` (`OAuthAuth.login` + `prompt()/notify()` adapter in the login dialog); the old `pi-ai/oauth` registry and `OAuthProviderInterface` (incl. `usesCallbackServer`) are deleted.
+- [ ] Cloudflare cleanup (gated on builtin streaming going through `Models.getAuth`): cloudflare factories' `ApiKeyAuth.resolve` reads key + `CLOUDFLARE_ACCOUNT_ID` (+ `CLOUDFLARE_GATEWAY_ID`) from credential metadata/env, substitutes the `{...}` placeholders in `model.baseUrl`, and returns `ModelAuth.baseUrl` (Copilot pattern); unconfigured ids report "not configured". `resolveCloudflareBaseUrl`/`isCloudflareProvider` drop out of `api/anthropic-messages.ts`, `api/openai-completions.ts`, `api/openai-responses.ts`.
+- [ ] Move ALL internal `/compat` imports to the new API: every package's src, all tests, and the example extensions (examples then demonstrate the new API). Nothing inside the repo may import `/compat` at that point.
+- [ ] Delete `/compat`, `api-registry.ts`, `env-api-keys.ts`, and the extension-loader root-to-compat alias. This is the extension-author breaking release; changelog carries the migration guide.
 
 ### Deferred / follow-ups
 
 - [ ] Web OAuth implementations (sitegeist-style) as an alternative `OAuthAuth`.
-- [ ] coding-agent `ModelRegistry` -> session `ModelManager` migration; delete `/compat`.
-- [ ] Move ALL internal `/compat` imports to the new API before compat is deleted: every package's src, all tests, and the example extensions (examples then demonstrate the new API; the extension-loader root-to-compat alias dies with compat). Nothing inside the repo may import `/compat` at that point.
 - [ ] Images API registry redesign (untouched in this pass).
 
 ## Error behavior

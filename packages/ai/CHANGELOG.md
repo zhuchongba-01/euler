@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- The root entrypoint (`@earendil-works/pi-ai`) is now core-only and side-effect free. The old global API moved to the temporary `@earendil-works/pi-ai/compat` entrypoint, a strict superset of the root: switching a file's import path is the only migration step. Moved symbols include `stream`/`complete`/`streamSimple`/`completeSimple`, `getModel`/`getModels`/`getProviders` (now deprecated aliases of `getBuiltinModel`/`getBuiltinModels`/`getBuiltinProviders` from `@earendil-works/pi-ai/providers/all`), `registerApiProvider`/`unregisterApiProviders`/`resetApiProviders`/`getApiProvider`, `getEnvApiKey`/`findEnvKeys`, `setBedrockProviderModule`, the per-API lazy stream wrappers (`anthropicMessagesApi`, ...), and the image-generation API. `/compat` will be removed with the coding-agent ModelManager migration; new code uses `createModels()` and the provider factories instead.
+- Renamed the `Provider` type to `ProviderId`. `Provider` now names the runtime provider interface (id, name, auth, model listing, stream behavior).
+- API implementation modules moved from `src/providers/` to `@earendil-works/pi-ai/api/*`, renamed by API id (`anthropic` -> `api/anthropic-messages`, `google` -> `api/google-generative-ai`, `mistral` -> `api/mistral-conversations`, `amazon-bedrock` -> `api/bedrock-converse-stream`), each exporting exactly `stream` and `streamSimple`. The old per-impl export names (`streamAnthropic`, `streamSimpleAnthropic`, ...) are gone; the legacy package subpaths (`./anthropic`, `./google`, ...) keep working and point at the new modules.
+
+### Added
+
+- New `Models` runtime: `createModels()` builds an isolated provider collection with async model listing, auth resolution (`getAuth`), and `stream`/`complete`/`streamSimple`/`completeSimple` that resolve auth through the owning provider. `createProvider()` builds providers from parts (single API implementation or a map dispatched on `model.api`); `hasApi()` narrows dynamically listed models.
+- Provider auth substrate: `ProviderAuth` (`{ apiKey?, oauth? }`), one type-tagged credential per provider, `CredentialStore` (`read`/`modify`/`delete` with serialized writes; in-memory default), `envApiKeyAuth()`, `lazyOAuth()`, and injectable `AuthContext`. OAuth refresh runs under the store lock with double-checked expiry; a stored credential owns its provider (no silent env fallback).
+- One provider factory per built-in provider under `@earendil-works/pi-ai/providers/*` (e.g. `anthropicProvider()`, `openrouterProvider()`), plus `@earendil-works/pi-ai/providers/all` with `builtinProviders()`/`builtinModels()` and typed `getBuiltin*` catalog reads. Generated catalogs are split per provider, so importing one provider pulls one catalog; `sideEffects` metadata makes the package tree-shakeable.
+- OAuth flows (Anthropic, OpenAI Codex, GitHub Copilot) gained `OAuthAuth` adapters (`login`/`refresh`/`toAuth`) on unified `prompt()`/`notify()` login callbacks; Copilot's per-credential base URL is derived in `toAuth()`.
+- `fauxProvider()` returns a faux `Provider` for tests built on explicit `Models` collections.
+
 - When Amazon Bedrock rejects an unsupported data retention mode, the error now links the AWS data retention documentation ([#5561](https://github.com/earendil-works/pi/pull/5561) by [@unexge](https://github.com/unexge)).
 
 ### Fixed
