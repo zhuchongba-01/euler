@@ -15,6 +15,7 @@
 - One provider factory per built-in provider under `@earendil-works/pi-ai/providers/*` (e.g. `anthropicProvider()`, `openrouterProvider()`), plus `@earendil-works/pi-ai/providers/all` with `builtinProviders()`/`builtinModels()` and typed `getBuiltin*` catalog reads. Generated catalogs are split per provider, so importing one provider pulls one catalog; `sideEffects` metadata makes the package tree-shakeable.
 - OAuth flows (Anthropic, OpenAI Codex, GitHub Copilot) gained `OAuthAuth` adapters (`login`/`refresh`/`toAuth`) on unified `prompt()`/`notify()` login callbacks; Copilot's per-credential base URL is derived in `toAuth()`.
 - `fauxProvider()` returns a faux `Provider` for tests built on explicit `Models` collections.
+- Image generation mirrors the chat-side design: `createImagesModels()`/`ImagesProvider`/`createImagesProvider()` with sync model reads, explicit `refresh()`, provider-resolved auth, and never-rejecting `generateImages()`; `openrouterImagesProvider()` factory plus `builtinImagesProviders()`/`builtinImagesModels()` in `providers/all`. The `ImagesProvider` id type alias is renamed to `ImagesProviderId`; the old global image API stays on `/compat`.
 
 - When Amazon Bedrock rejects an unsupported data retention mode, the error now links the AWS data retention documentation ([#5561](https://github.com/earendil-works/pi/pull/5561) by [@unexge](https://github.com/unexge)).
 

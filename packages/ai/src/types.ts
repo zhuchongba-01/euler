@@ -69,7 +69,7 @@ export type ProviderId = KnownProvider | string;
 
 export type KnownImagesProvider = "openrouter";
 
-export type ImagesProvider = KnownImagesProvider | string;
+export type ImagesProviderId = KnownImagesProvider | string;
 
 export type ThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
 export type ModelThinkingLevel = "off" | ThinkingLevel;
@@ -202,6 +202,20 @@ export type ApiStreamOptions<TApi extends Api> = TApi extends keyof ApiOptionsMa
 export interface ProviderStreams {
 	stream(model: Model<Api>, context: Context, options?: StreamOptions): AssistantMessageEventStream;
 	streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
+}
+
+/**
+ * The uniform contract of an image-generation API implementation module:
+ * every image API module under `src/api/` exports exactly `generateImages`,
+ * so the module itself satisfies this interface. Lazy wrappers and image
+ * provider factories pass these around as values.
+ */
+export interface ProviderImages {
+	generateImages(
+		model: ImagesModel<ImagesApi>,
+		context: ImagesContext,
+		options?: ImagesOptions,
+	): Promise<AssistantImages>;
 }
 
 export interface ImagesOptions {
@@ -370,7 +384,7 @@ export type ImagesStopReason = "stop" | "error" | "aborted";
 
 export interface AssistantImages {
 	api: ImagesApi;
-	provider: ImagesProvider;
+	provider: ImagesProviderId;
 	model: string;
 	output: ImagesOutputContent[];
 	responseId?: string;
@@ -647,6 +661,6 @@ export interface Model<TApi extends Api> {
 export interface ImagesModel<TApi extends ImagesApi>
 	extends Omit<Model<Api>, "api" | "provider" | "reasoning" | "contextWindow" | "maxTokens" | "compat"> {
 	api: TApi;
-	provider: ImagesProvider;
+	provider: ImagesProviderId;
 	output: ("text" | "image")[];
 }

@@ -1,17 +1,8 @@
 import { lazyStream } from "./api/lazy.ts";
 import { defaultProviderAuthContext as defaultAuthContext } from "./auth/context.ts";
 import { InMemoryCredentialStore } from "./auth/credential-store.ts";
-import type {
-	ApiKeyAuth,
-	ApiKeyCredential,
-	AuthContext,
-	AuthResult,
-	Credential,
-	CredentialStore,
-	OAuthAuth,
-	OAuthCredential,
-	ProviderAuth,
-} from "./auth/types.ts";
+import { ModelsError, resolveProviderAuth } from "./auth/resolve.ts";
+import type { AuthContext, AuthResult, CredentialStore, ProviderAuth } from "./auth/types.ts";
 import type {
 	Api,
 	ApiStreamOptions,
@@ -26,17 +17,7 @@ import type {
 	Usage,
 } from "./types.ts";
 
-export type ModelsErrorCode = "model_source" | "model_validation" | "provider" | "stream" | "auth" | "oauth";
-
-export class ModelsError extends Error {
-	readonly code: ModelsErrorCode;
-
-	constructor(code: ModelsErrorCode, message: string, options?: { cause?: unknown }) {
-		super(message, options);
-		this.name = "ModelsError";
-		this.code = code;
-	}
-}
+export { type AuthModel, ModelsError, type ModelsErrorCode } from "./auth/resolve.ts";
 
 /**
  * A provider is the concrete runtime unit. It owns id/name/base metadata,
@@ -234,84 +215,7 @@ class ModelsImpl implements MutableModels {
 	async getAuth(model: Model<Api>): Promise<AuthResult | undefined> {
 		const provider = this.providers.get(model.provider);
 		if (!provider) return undefined;
-
-		// A stored credential owns the provider: ambient/env is consulted only
-		// when nothing is stored. No silent env fallback after a failed refresh
-		// or for a credential type without a matching handler.
-		const stored = await this.readCredential(provider.id);
-		if (stored) {
-			if (stored.type === "oauth" && provider.auth.oauth) {
-				return this.resolveOAuth(provider.id, provider.auth.oauth, stored);
-			}
-			if (stored.type === "api-key" && provider.auth.apiKey) {
-				return this.resolveApiKey(provider.auth.apiKey, model, stored);
-			}
-			return undefined;
-		}
-
-		// Ambient (env vars, AWS profiles, ADC files).
-		return provider.auth.apiKey ? this.resolveApiKey(provider.auth.apiKey, model, undefined) : undefined;
-	}
-
-	/**
-	 * OAuth resolution with double-checked locking (same pattern as today's
-	 * AuthStorage): valid tokens cost zero locks; expired tokens lock,
-	 * re-check expiry under the lock, refresh once globally, and persist the
-	 * rotated credential before release.
-	 */
-	private async resolveOAuth(
-		providerId: string,
-		oauth: OAuthAuth,
-		stored: OAuthCredential,
-	): Promise<AuthResult | undefined> {
-		let credential = stored;
-
-		if (Date.now() >= credential.expires) {
-			// Optimistic check said expired; the authoritative check runs under the lock.
-			let post: Credential | undefined;
-			try {
-				post = await this.credentials.modify(providerId, async (current) => {
-					if (current?.type !== "oauth") return undefined; // logged out meanwhile
-					if (Date.now() < current.expires) return undefined; // another process/request refreshed
-					try {
-						return await oauth.refresh(current);
-					} catch (error) {
-						throw new ModelsError("oauth", `OAuth refresh failed for ${providerId}`, { cause: error });
-					}
-				});
-			} catch (error) {
-				if (error instanceof ModelsError) throw error;
-				throw new ModelsError("auth", `Credential store modify failed for ${providerId}`, { cause: error });
-			}
-			if (post?.type !== "oauth") return undefined; // logged out meanwhile
-			credential = post;
-		}
-
-		try {
-			return { auth: await oauth.toAuth(credential), source: "OAuth" };
-		} catch (error) {
-			throw new ModelsError("oauth", `OAuth auth derivation failed for ${providerId}`, { cause: error });
-		}
-	}
-
-	private async resolveApiKey(
-		apiKey: ApiKeyAuth,
-		model: Model<Api>,
-		credential: ApiKeyCredential | undefined,
-	): Promise<AuthResult | undefined> {
-		try {
-			return await apiKey.resolve({ model, ctx: this.authContext, credential });
-		} catch (error) {
-			throw new ModelsError("auth", `API key auth failed for provider ${model.provider}`, { cause: error });
-		}
-	}
-
-	private async readCredential(providerId: string): Promise<Credential | undefined> {
-		try {
-			return await this.credentials.read(providerId);
-		} catch (error) {
-			throw new ModelsError("auth", `Credential store read failed for ${providerId}`, { cause: error });
-		}
+		return resolveProviderAuth(provider, model, this.credentials, this.authContext);
 	}
 
 	private requireProvider(model: Model<Api>): Provider {

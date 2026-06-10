@@ -1,3 +1,4 @@
+import { createImagesModels, type ImagesProvider, type MutableImagesModels } from "../images-models.ts";
 import { MODELS } from "../models.generated.ts";
 import { type CreateModelsOptions, createModels, type MutableModels, type Provider } from "../models.ts";
 import type { Api, KnownProvider, Model } from "../types.ts";
@@ -27,6 +28,7 @@ import { openaiCodexProvider } from "./openai-codex.ts";
 import { opencodeProvider } from "./opencode.ts";
 import { opencodeGoProvider } from "./opencode-go.ts";
 import { openrouterProvider } from "./openrouter.ts";
+import { openrouterImagesProvider } from "./openrouter-images.ts";
 import { togetherProvider } from "./together.ts";
 import { vercelAIGatewayProvider } from "./vercel-ai-gateway.ts";
 import { xaiProvider } from "./xai.ts";
@@ -109,6 +111,20 @@ export function builtinProviders(): Provider[] {
 export function builtinModels(options?: CreateModelsOptions): MutableModels {
 	const models = createModels(options);
 	for (const provider of builtinProviders()) {
+		models.setProvider(provider);
+	}
+	return models;
+}
+
+/** All built-in image-generation providers, freshly constructed. */
+export function builtinImagesProviders(): ImagesProvider[] {
+	return [openrouterImagesProvider()];
+}
+
+/** An `ImagesModels` collection with every built-in image-generation provider registered. */
+export function builtinImagesModels(options?: CreateModelsOptions): MutableImagesModels {
+	const models = createImagesModels(options);
+	for (const provider of builtinImagesProviders()) {
 		models.setProvider(provider);
 	}
 	return models;

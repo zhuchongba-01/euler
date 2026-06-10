@@ -1,4 +1,4 @@
-import type { Api, Model } from "../types.ts";
+import type { Api, ImagesApi, ImagesModel, Model } from "../types.ts";
 import type { OAuthCredentials } from "../utils/oauth/types.ts";
 
 /**
@@ -134,10 +134,11 @@ export interface ApiKeyAuth {
 	/**
 	 * Resolve auth from the stored credential and/or ambient sources, merging
 	 * per field (`credential.key ?? env("...")`, `metadata.accountId ?? env("...")`).
-	 * undefined = not configured.
+	 * undefined = not configured. Receives the chat or image-generation model
+	 * the request is for (both carry `provider` and `baseUrl`).
 	 */
 	resolve(input: {
-		model: Model<Api>;
+		model: Model<Api> | ImagesModel<ImagesApi>;
 		ctx: AuthContext;
 		credential?: ApiKeyCredential;
 	}): Promise<AuthResult | undefined>;

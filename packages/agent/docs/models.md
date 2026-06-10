@@ -18,8 +18,8 @@ Non-goals for the immediate `pi-ai` pass:
 
 - Do not migrate coding-agent `ModelRegistry` yet.
 - Do not keep the stream/API registry inside `Models`.
-- Do not implement web OAuth flows yet (the factory option is reserved).
-- Images (`images.ts`, `images-api-registry.ts`) are out of scope; leave untouched.
+- Do not implement web OAuth flows yet.
+- Image generation mirrors the chat-side design (`ImagesModels`/`ImagesProvider` in `images-models.ts`); the old global image API (`images.ts`, `images-api-registry.ts`) lives on compat.
 
 ## Package layout
 
@@ -28,9 +28,10 @@ Target source layout:
 ```txt
 packages/ai/src/
   index.ts                    # core exports only; no built-in provider imports
-  models.ts                   # Models runtime, Provider, auth types
+  models.ts                   # Models runtime, Provider
+  images-models.ts            # ImagesModels runtime, ImagesProvider (mirrors models.ts)
   compat.ts                   # temporary old-API compatibility entrypoint
-  auth/                       # auth method types, helpers, login callbacks
+  auth/                       # auth method types, helpers, shared resolveProviderAuth(), login callbacks
   api/                        # API implementations and lazy wrappers
     openai-completions.ts     # real implementation, imports SDKs, exports stream/streamSimple
     openai-completions.lazy.ts
@@ -50,6 +51,8 @@ packages/ai/src/
     mistral-conversations.lazy.ts
     bedrock-converse-stream.ts
     bedrock-converse-stream.lazy.ts
+    openrouter-images.ts      # image-generation API implementation
+    openrouter-images.lazy.ts
     lazy.ts                   # lazyStream()/lazyApi() helpers
     (shared helpers: openai-responses-shared, google-shared, transform-messages, ...)
   providers/                  # concrete provider factories and per-provider catalogs
@@ -62,8 +65,9 @@ packages/ai/src/
     google.ts
     google.models.ts
     ...one pair per built-in provider...
+    openrouter-images.ts      # image-generation provider factory
     faux.ts                   # test provider factory
-    all.ts                    # explicit aggregate: builtinModels(), getBuiltin*()
+    all.ts                    # explicit aggregate: builtinModels(), builtinImagesModels(), getBuiltin*()
   utils/oauth/                # OAuth flow implementations (node), lazy-loaded
 ```
 
@@ -892,7 +896,7 @@ Ordering:
 ### Deferred / follow-ups
 
 - [ ] Web OAuth implementations (sitegeist-style) as an alternative `OAuthAuth`.
-- [ ] Images API registry redesign (untouched in this pass).
+- [x] Images API redesign: `ImagesModels`/`ImagesProvider`/`createImagesProvider` mirror the chat-side design (sync reads, explicit refresh, never-reject generation); auth resolution shared with the chat side via the free-standing `resolveProviderAuth()` in `auth/resolve.ts` (which also owns `ModelsError`; both collections pass their store/context as arguments — no resolver object). `openrouterImagesProvider()` factory + `builtinImagesProviders()`/`builtinImagesModels()` in `providers/all`; impl moved to `api/openrouter-images.ts` with a lazy wrapper. The old global image API (registry + `getImageModel*` + `generateImages`) stays on compat; `ImagesProvider` id alias in types.ts renamed to `ImagesProviderId` (mirror of `Provider` -> `ProviderId`).
 
 ## Error behavior
 

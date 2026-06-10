@@ -93,14 +93,14 @@ TypeBox exports are re-exported from `@earendil-works/pi-ai`: `Type`, `Static`, 
 
 ## Quick Start
 
-You build a `Models` collection, register the providers you want, and stream through it. Importing a provider pulls only that provider's catalog; SDKs load lazily on first request.
+You build a `Models` collection of providers and stream through it. The quickest start registers every built-in provider; apps that care about bundle size register individual providers instead (see [Provider Factories](#provider-factories)). Either way, provider SDKs load lazily on first request.
 
 ```typescript
-import { Type, createModels, type Context, type Tool } from '@earendil-works/pi-ai';
-import { openaiProvider } from '@earendil-works/pi-ai/providers/openai';
+import { Type, type Context, type Tool } from '@earendil-works/pi-ai';
+import { builtinModels } from '@earendil-works/pi-ai/providers/all';
 
-const models = createModels();
-models.setProvider(openaiProvider());
+// A Models collection with every built-in provider registered
+const models = builtinModels();
 
 // Sync lookup against the collection
 const model = models.getModel('openai', 'gpt-4o-mini')!;
@@ -130,11 +130,33 @@ for await (const event of s) {
     case 'start':
       console.log(`Starting with ${event.partial.model}`);
       break;
+    case 'text_start':
+      console.log('\n[Text started]');
+      break;
     case 'text_delta':
       process.stdout.write(event.delta);
       break;
+    case 'text_end':
+      console.log('\n[Text ended]');
+      break;
+    case 'thinking_start':
+      console.log('[Model is thinking...]');
+      break;
     case 'thinking_delta':
       process.stdout.write(event.delta);
+      break;
+    case 'thinking_end':
+      console.log('[Thinking complete]');
+      break;
+    case 'toolcall_start':
+      console.log(`\n[Tool call started: index ${event.contentIndex}]`);
+      break;
+    case 'toolcall_delta':
+      // Partial tool arguments are being streamed
+      const partialCall = event.partial.content[event.contentIndex];
+      if (partialCall.type === 'toolCall') {
+        console.log(`[Streaming args for ${partialCall.name}]`);
+      }
       break;
     case 'toolcall_end':
       console.log(`\nTool called: ${event.toolCall.name}`);
@@ -197,7 +219,7 @@ for (const block of response.content) {
 }
 ```
 
-Snippets in the rest of this README assume a `models` collection set up like this (with the relevant provider registered).
+Snippets in the rest of this README assume a `models` collection set up like this (with the relevant providers registered).
 
 ## Providers and Models
 
@@ -207,7 +229,7 @@ Providers internally share **API implementations** (the wire protocols): Anthrop
 
 ### Provider Factories
 
-One factory per built-in provider, each a subpath import that pulls only that provider's catalog:
+For apps that only need specific providers, there is one factory per built-in provider, each a subpath import that pulls only that provider's catalog:
 
 ```typescript
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic';
@@ -225,7 +247,7 @@ Provider SDKs (`@anthropic-ai/sdk`, `openai`, `@google/genai`, AWS) are **not** 
 
 ### All Built-in Providers
 
-For apps that want everything:
+For apps that want everything (as in Quick Start):
 
 ```typescript
 import { builtinModels } from '@earendil-works/pi-ai/providers/all';
@@ -233,7 +255,7 @@ import { builtinModels } from '@earendil-works/pi-ai/providers/all';
 const models = builtinModels(); // a Models collection with every built-in provider registered
 ```
 
-This imports all catalogs (it is the heavy, explicit entrypoint) but still no SDKs.
+This imports all catalogs (it is the heavy, explicit entrypoint) but still no SDKs. `builtinModels()` accepts the same options as `createModels()` (`credentials`, `authContext`); `builtinProviders()` returns the provider array if you want to register them on your own collection.
 
 ### Querying Models
 
@@ -330,6 +352,8 @@ Stored credentials (API keys entered interactively, OAuth tokens) live in a `Cre
 import { createModels, type CredentialStore } from '@earendil-works/pi-ai';
 
 const models = createModels({ credentials: myFileBackedStore });
+// builtinModels() takes the same options:
+// const models = builtinModels({ credentials: myFileBackedStore });
 ```
 
 The contract is small: `read(providerId)`, `modify(providerId, fn)` (the only write path — a serialized read-modify-write), and `delete(providerId)`. OAuth token refresh runs inside `modify`, so concurrent requests and processes cannot double-refresh a rotated token. A stored credential *owns* its provider: environment variables are only consulted when nothing is stored, and a failed refresh never silently falls back to an env key.
@@ -590,17 +614,21 @@ for (const block of response.content) {
 
 ## Image Generation
 
-Image generation uses a separate API surface from text/chat generation and currently lives on the [compat entrypoint](#migrating-from-the-old-global-api). Use `getImageModel()` / `getImageModels()` / `getImageProviders()` to discover image-generation models, and `generateImages()` to get the final result.
+Image generation uses a separate API surface from text/chat generation, mirroring the chat-side design: an `ImagesModels` collection holds `ImagesProvider`s, reads are sync, and auth resolves through the owning provider. Image generation is a one-shot API: `generateImages()` waits for the provider response and returns the final `AssistantImages` result — do not use the chat/stream APIs for it.
+
+### Basic Image Generation
 
 ```typescript
-import { getImageModel, generateImages } from '@earendil-works/pi-ai/compat';
+import { builtinImagesModels } from '@earendil-works/pi-ai/providers/all';
 
-const model = getImageModel('openrouter', 'google/gemini-2.5-flash-image');
+// Every built-in image-generation provider; accepts the same options as createModels()
+const imagesModels = builtinImagesModels();
 
-const result = await generateImages(model, {
+const model = imagesModels.getModel('openrouter', 'google/gemini-2.5-flash-image')!;
+
+// Auth resolves through the provider (OPENROUTER_API_KEY here); explicit apiKey wins
+const result = await imagesModels.generateImages(model, {
   input: [{ type: 'text', text: 'Generate a red circle on a plain white background.' }]
-}, {
-  apiKey: process.env.OPENROUTER_API_KEY
 });
 
 for (const block of result.output) {
@@ -613,11 +641,52 @@ for (const block of result.output) {
 }
 ```
 
-Notes:
+Like the chat side, you can build the collection from parts: `createImagesModels({ credentials?, authContext? })`, the `openrouterImagesProvider()` factory from `@earendil-works/pi-ai/providers/openrouter-images`, and `createImagesProvider({ id, auth, models, refreshModels?, api })` for custom image providers (with `imagesModels.refresh(provider?)` for dynamic lists). Failures never reject — they return an `AssistantImages` with `stopReason: "error"`. The collection's `getAuth(model)` works exactly like the chat-side one.
 
-- Use `getImageModel(...)` and `generateImages()`; image-generation models do not work with the chat/stream APIs and do not participate in tool calling.
-- Outputs are returned in `AssistantImages.output` and can include both base64-encoded `ImageContent` blocks and `TextContent` blocks. Check `model.output` and `model.input` for capabilities.
-- Options such as `apiKey`, `signal`, `headers`, `onPayload`, and `onResponse` are supported; results may include `stopReason`, `responseId`, and `usage`.
+The old global API (`getImageModel()` / `getImageModels()` / `getImageProviders()` / `generateImages()`) remains available on the [compat entrypoint](#migrating-from-the-old-global-api):
+
+```typescript
+import { getImageModel, generateImages } from '@earendil-works/pi-ai/compat';
+
+const model = getImageModel('openrouter', 'google/gemini-2.5-flash-image');
+const result = await generateImages(model, {
+  input: [{ type: 'text', text: 'Generate a red circle on a plain white background.' }]
+}, {
+  apiKey: process.env.OPENROUTER_API_KEY
+});
+```
+
+Some models also support image input:
+
+```typescript
+import { readFileSync } from 'fs';
+
+const imageBuffer = readFileSync('input.png');
+const result = await imagesModels.generateImages(model, {
+  input: [
+    { type: 'text', text: 'Create a variation of this image with a blue background.' },
+    { type: 'image', data: imageBuffer.toString('base64'), mimeType: 'image/png' }
+  ]
+});
+```
+
+Check capabilities on the model metadata:
+
+```typescript
+console.log(model.input);   // ['text', 'image']
+console.log(model.output);  // ['image'] or ['image', 'text']
+```
+
+### Notes and Limitations
+
+- Image models live in `ImagesModels` collections, chat models in `Models` collections; the two are separate surfaces.
+- Use `generateImages()`, not the chat/stream APIs.
+- Image-generation models do not participate in tool calling.
+- Outputs are returned in `AssistantImages.output` and can include both base64-encoded `ImageContent` blocks and `TextContent` blocks.
+- Some models return only images, others return images plus text. Check `model.output`.
+- Some models accept image input, others are text-to-image only. Check `model.input`.
+- Like the streaming APIs, image generation supports options such as `apiKey`, `signal`, `headers`, `onPayload`, and `onResponse`, and results may include `stopReason`, `responseId`, and `usage`.
+- If you want a model to analyze images in a conversation or call tools, use the regular chat APIs with a model that supports image input.
 - At the moment, image generation is available through only one provider, OpenRouter.
 
 ## Thinking/Reasoning
@@ -1171,7 +1240,7 @@ Models are plain serializable data too — no functions or implementations attac
 
 ## Browser Usage
 
-The library supports browser environments. The core entrypoint and provider factories are side-effect free and bundle cleanly. Pass API keys explicitly since environment variables are not available in browsers:
+The library supports browser environments. The core entrypoint and provider factories are side-effect free and bundle cleanly. Environment variables are not available in browsers, so pass API keys explicitly — or inject a `CredentialStore` (e.g. localStorage-backed) and let provider auth resolve from stored credentials:
 
 ```typescript
 import { createModels } from '@earendil-works/pi-ai';
@@ -1312,16 +1381,90 @@ Compat is a strict superset of the root entrypoint, so a file can switch its imp
 
 ### Adding a New Provider
 
-The layered layout: API implementations live in `src/api/`, provider factories in `src/providers/`, generated catalogs in `src/providers/<id>.models.ts`.
+Adding a new LLM provider requires changes across multiple files. The layered layout: API implementations live in `src/api/`, provider factories in `src/providers/`, generated catalogs in `src/providers/<id>.models.ts`. This checklist covers all necessary steps:
 
-1. **Core types** (`src/types.ts`): add the API id to `KnownApi` (if it is a new API), the provider id to `KnownProvider`, and the options type to `ApiOptionsMap`.
-2. **API implementation** (`src/api/<api-id>.ts`, only for a new API): export exactly `stream` and `streamSimple`, plus the options interface extending `StreamOptions`. Add a lazy wrapper `src/api/<api-id>.lazy.ts` (`<name>Api()` via `lazyApi()`).
-3. **Catalog** (`scripts/generate-models.ts`): add fetching/mapping for the provider's models (e.g. from models.dev); regeneration emits `src/providers/<id>.models.ts` and the aggregator.
-4. **Provider factory** (`src/providers/<id>.ts`): `createProvider()` wiring catalog + auth (`envApiKeyAuth` for standard key providers, custom `ApiKeyAuth` for ambient auth, `lazyOAuth` where OAuth exists) + the lazy API wrapper. Register it in `src/providers/all.ts`.
-5. **Compat**: if it is a new API, register it in the builtin list in `src/compat.ts` and add the legacy subpath in `package.json` if warranted.
-6. **Tests** (`test/`): cover streaming/tools/abort/tokens for new APIs (`stream.test.ts` and friends, env-gated), `cross-provider-handoff.test.ts` pairs, and provider listing/auth in `providers.test.ts`.
-7. **Docs**: this README (Supported Providers, env var table) and `CHANGELOG.md` under `## [Unreleased]`.
-8. **coding-agent**: default model id in `src/core/model-resolver.ts`, env var docs in `src/cli/args.ts`.
+#### 1. Core Types (`src/types.ts`)
+
+- Add the API identifier to `KnownApi` (for example `"bedrock-converse-stream"`), if it is a new API
+- Add the provider name to `KnownProvider` (for example `"amazon-bedrock"`)
+- Add the options type to `ApiOptionsMap`
+
+#### 2. API Implementation (`src/api/<api-id>.ts`, only for a new API)
+
+Create a new API implementation file (for example `bedrock-converse-stream.ts`) that exports exactly `stream` and `streamSimple`, plus:
+
+- An options interface extending `StreamOptions` (for example `BedrockOptions`)
+- Message conversion functions to transform `Context` to provider format
+- Tool conversion if the provider supports tools
+- Response parsing to emit standardized events (`text`, `tool_call`, `thinking`, `usage`, `stop`)
+
+Add a lazy wrapper `src/api/<api-id>.lazy.ts` (`<name>Api()` via `lazyApi()`) so providers can reference the implementation without importing its SDK. Add any root-level `export type` re-exports in `src/index.ts` that should remain available from `@earendil-works/pi-ai`.
+
+#### 3. Model Generation (`scripts/generate-models.ts`, `scripts/generate-image-models.ts`)
+
+- Add logic to fetch and parse models from the provider's source (e.g., models.dev API)
+- Map chat/tool-capable provider model data to the standardized `Model` interface via `scripts/generate-models.ts`; regeneration emits `src/providers/<id>.models.ts` and the aggregator
+- Map image-generation provider model data to the standardized `ImagesModel` interface via `scripts/generate-image-models.ts`
+- Handle provider-specific quirks (pricing format, capability flags, model ID transformations)
+
+#### 4. Provider Factory (`src/providers/<id>.ts`)
+
+- `createProvider()` wiring catalog + auth + the lazy API wrapper
+- Auth: `envApiKeyAuth` for standard key providers, a custom `ApiKeyAuth` for ambient auth (AWS profiles, ADC), `lazyOAuth` where an OAuth flow exists
+- Register the factory in `src/providers/all.ts`
+- If it is a new API: register it in the builtin list in `src/compat.ts` and add the package subpath export in `package.json`
+
+#### 5. Tests (`test/`)
+
+Create or update test files to cover the new provider:
+
+- `stream.test.ts` - Basic streaming and tool use
+- `tokens.test.ts` - Token usage reporting
+- `abort.test.ts` - Request cancellation
+- `empty.test.ts` - Empty message handling
+- `context-overflow.test.ts` - Context limit errors
+- `image-limits.test.ts` - Image support (if applicable)
+- `unicode-surrogate.test.ts` - Unicode handling
+- `tool-call-without-result.test.ts` - Orphaned tool calls
+- `image-tool-result.test.ts` - Images in tool results
+- `total-tokens.test.ts` - Token counting accuracy
+- `cross-provider-handoff.test.ts` - Cross-provider context replay
+- `providers.test.ts` - Provider listing and auth resolution
+
+For `cross-provider-handoff.test.ts`, add at least one provider/model pair. If the provider exposes multiple model families (for example GPT and Claude), add at least one pair per family.
+
+For providers with non-standard auth (AWS, Google Vertex), create a utility like `bedrock-utils.ts` with credential detection helpers.
+
+#### 6. Coding Agent Integration (`../coding-agent/`)
+
+Update `src/core/model-resolver.ts`:
+
+- Add a default model ID for the provider in `DEFAULT_MODELS`
+
+Update `src/cli/args.ts`:
+
+- Add environment variable documentation in the help text
+
+Update `README.md`:
+
+- Add the provider to the providers section with setup instructions
+
+#### 7. Documentation
+
+Update `packages/ai/README.md`:
+
+- Add to the Supported Providers table
+- Document any provider-specific options or authentication requirements
+- Add environment variable to the Environment Variables section
+
+#### 8. Changelog
+
+Add an entry to `packages/ai/CHANGELOG.md` under `## [Unreleased]`:
+
+```markdown
+### Added
+- Added support for [Provider Name] provider ([#PR](link) by [@author](link))
+```
 
 ## License
 
