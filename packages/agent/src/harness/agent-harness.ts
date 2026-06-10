@@ -1,10 +1,4 @@
-import {
-	type AssistantMessage,
-	type ImageContent,
-	type Model,
-	streamSimple,
-	type UserMessage,
-} from "@earendil-works/pi-ai/compat";
+import type { AssistantMessage, ImageContent, Model, Models, UserMessage } from "@earendil-works/pi-ai";
 import { runAgentLoop } from "../agent-loop.ts";
 import type {
 	AgentContext,
@@ -178,6 +172,7 @@ export class AgentHarness<
 > {
 	readonly env: ExecutionEnv;
 	private session: Session;
+	readonly models: Models;
 	private phase: AgentHarnessPhase = "idle";
 	private runAbortController?: AbortController;
 	private runPromise?: Promise<void>;
@@ -200,6 +195,7 @@ export class AgentHarness<
 	constructor(options: AgentHarnessOptions<TSkill, TPromptTemplate, TTool>) {
 		this.env = options.env;
 		this.session = options.session;
+		this.models = options.models;
 		this.resources = options.resources ?? {};
 		this.streamOptions = cloneStreamOptions(options.streamOptions);
 		this.systemPrompt = options.systemPrompt;
@@ -382,7 +378,7 @@ export class AgentHarness<
 				headers: mergeHeaders(turnState.streamOptions.headers, auth?.headers),
 			};
 			const requestOptions = await this.emitBeforeProviderRequest(model, turnState.sessionId, snapshotOptions);
-			return streamSimple(model, context, {
+			return this.models.streamSimple(model, context, {
 				cacheRetention: requestOptions.cacheRetention,
 				headers: requestOptions.headers,
 				maxRetries: requestOptions.maxRetries,
@@ -713,8 +709,8 @@ export class AgentHarness<
 		try {
 			const model = this.model;
 			if (!model) throw new AgentHarnessError("invalid_state", "No model set for compaction");
+			// Explicit auth wins; otherwise the request resolves through provider auth.
 			const auth = await this.getApiKeyAndHeaders?.(model);
-			if (!auth) throw new AgentHarnessError("auth", "No auth available for compaction");
 			const branchEntries = await this.session.getBranch();
 			const preparationResult = prepareCompaction(branchEntries, DEFAULT_COMPACTION_SETTINGS);
 			if (!preparationResult.ok) throw preparationResult.error;
@@ -733,9 +729,10 @@ export class AgentHarness<
 				? { ok: true as const, value: provided }
 				: await compact(
 						preparation,
+						this.models,
 						model,
-						auth.apiKey,
-						auth.headers,
+						auth?.apiKey,
+						auth?.headers,
 						customInstructions,
 						undefined,
 						this.thinkingLevel,
@@ -792,12 +789,13 @@ export class AgentHarness<
 			if (!summaryText && options?.summarize && entries.length > 0) {
 				const model = this.model;
 				if (!model) throw new AgentHarnessError("invalid_state", "No model set for branch summary");
+				// Explicit auth wins; otherwise the request resolves through provider auth.
 				const auth = await this.getApiKeyAndHeaders?.(model);
-				if (!auth) throw new AgentHarnessError("auth", "No auth available for branch summary");
 				const branchSummary = await generateBranchSummary(entries, {
+					models: this.models,
 					model,
-					apiKey: auth.apiKey,
-					headers: auth.headers,
+					apiKey: auth?.apiKey,
+					headers: auth?.headers,
 					signal: new AbortController().signal,
 					customInstructions: hookResult?.customInstructions ?? options?.customInstructions,
 					replaceInstructions: hookResult?.replaceInstructions ?? options?.replaceInstructions,

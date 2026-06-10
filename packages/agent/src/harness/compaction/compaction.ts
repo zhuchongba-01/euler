@@ -1,5 +1,4 @@
-import type { AssistantMessage, ImageContent, Model, TextContent, Usage } from "@earendil-works/pi-ai/compat";
-import { completeSimple } from "@earendil-works/pi-ai/compat";
+import type { AssistantMessage, ImageContent, Model, Models, TextContent, Usage } from "@earendil-works/pi-ai";
 import type { AgentMessage, ThinkingLevel } from "../../types.ts";
 import {
 	convertToLlm,
@@ -455,9 +454,10 @@ Keep each section concise. Preserve exact file paths, function names, and error 
 /** Generate or update a conversation summary for compaction. */
 export async function generateSummary(
 	currentMessages: AgentMessage[],
+	models: Models,
 	model: Model<any>,
 	reserveTokens: number,
-	apiKey: string,
+	apiKey?: string,
 	headers?: Record<string, string>,
 	signal?: AbortSignal,
 	customInstructions?: string,
@@ -493,7 +493,7 @@ export async function generateSummary(
 			? { maxTokens, signal, apiKey, headers, reasoning: thinkingLevel }
 			: { maxTokens, signal, apiKey, headers };
 
-	const response = await completeSimple(
+	const response = await models.completeSimple(
 		model,
 		{ systemPrompt: SUMMARIZATION_SYSTEM_PROMPT, messages: summarizationMessages },
 		completionOptions,
@@ -626,8 +626,9 @@ export { serializeConversation } from "./utils.ts";
 /** Generate compaction summary data from prepared session history. */
 export async function compact(
 	preparation: CompactionPreparation,
+	models: Models,
 	model: Model<any>,
-	apiKey: string,
+	apiKey?: string,
 	headers?: Record<string, string>,
 	customInstructions?: string,
 	signal?: AbortSignal,
@@ -655,6 +656,7 @@ export async function compact(
 			messagesToSummarize.length > 0
 				? generateSummary(
 						messagesToSummarize,
+						models,
 						model,
 						settings.reserveTokens,
 						apiKey,
@@ -667,6 +669,7 @@ export async function compact(
 				: Promise.resolve(ok<string, CompactionError>("No prior history.")),
 			generateTurnPrefixSummary(
 				turnPrefixMessages,
+				models,
 				model,
 				settings.reserveTokens,
 				apiKey,
@@ -681,6 +684,7 @@ export async function compact(
 	} else {
 		const summaryResult = await generateSummary(
 			messagesToSummarize,
+			models,
 			model,
 			settings.reserveTokens,
 			apiKey,
@@ -706,9 +710,10 @@ export async function compact(
 }
 async function generateTurnPrefixSummary(
 	messages: AgentMessage[],
+	models: Models,
 	model: Model<any>,
 	reserveTokens: number,
-	apiKey: string,
+	apiKey?: string,
 	headers?: Record<string, string>,
 	signal?: AbortSignal,
 	thinkingLevel?: ThinkingLevel,
@@ -728,7 +733,7 @@ async function generateTurnPrefixSummary(
 		},
 	];
 
-	const response = await completeSimple(
+	const response = await models.completeSimple(
 		model,
 		{ systemPrompt: SUMMARIZATION_SYSTEM_PROMPT, messages: summarizationMessages },
 		model.reasoning && thinkingLevel && thinkingLevel !== "off"

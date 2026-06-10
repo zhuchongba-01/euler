@@ -1,4 +1,4 @@
-import type { ImageContent, Model, SimpleStreamOptions, TextContent, Transport } from "@earendil-works/pi-ai";
+import type { ImageContent, Model, Models, SimpleStreamOptions, TextContent, Transport } from "@earendil-works/pi-ai";
 import type { AgentEvent, AgentMessage, AgentTool, QueueMode, ThinkingLevel } from "../index.ts";
 import type { Session } from "./session/session.ts";
 
@@ -802,6 +802,12 @@ export interface AgentHarnessOptions<
 > {
 	env: ExecutionEnv;
 	session: Session;
+	/**
+	 * Provider collection used for all model requests (turn streaming,
+	 * compaction, branch summarization). Auth resolves through the providers'
+	 * auth; explicit per-request values (`getApiKeyAndHeaders`) win per field.
+	 */
+	models: Models;
 	tools?: TTool[];
 	/**
 	 * Concrete resources available to explicit invocation methods and system-prompt callbacks.

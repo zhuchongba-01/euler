@@ -820,9 +820,9 @@ Check items off as they land. Keep this list current; it is the working state fo
 
 ### Phase 6 — AgentHarness
 
-- [ ] `AgentHarnessOptions.models` required; harness stream path uses `models.streamSimple()`.
-- [ ] Compaction/branch-summarization paths use the harness `Models` instance.
-- [ ] Harness tests use `createModels()` + faux provider.
+- [x] `AgentHarnessOptions.models` required (`readonly models` on the harness); the harness stream path uses `models.streamSimple()`. `StreamFn` redefined structurally (no compat type dependency); `Models.streamSimple` satisfies it.
+- [x] Compaction/branch-summarization take the harness `Models` instance; explicit `getApiKeyAndHeaders` auth stays and wins per-field, but is no longer required — requests resolve through provider auth otherwise (the hard "No auth available" throws are gone).
+- [x] Harness tests use `createModels()` + `fauxProvider()` with unique per-fake provider ids; no global api-registry state, no unregister bookkeeping.
 
 ### Phase 7 — coding-agent bridge (minimal)
 
@@ -843,8 +843,9 @@ The full AuthStorage deletion (`FileCredentialStore` + decorators, see "Replacin
 
 ### Deferred / follow-ups
 
-- [ ] Web OAuth implementations (sitegeist-style) behind `oauth: "web"`.
+- [ ] Web OAuth implementations (sitegeist-style) as an alternative `OAuthAuth`.
 - [ ] coding-agent `ModelRegistry` -> session `ModelManager` migration; delete `/compat`.
+- [ ] Move ALL internal `/compat` imports to the new API before compat is deleted: every package's src, all tests, and the example extensions (examples then demonstrate the new API; the extension-loader root-to-compat alias dies with compat). Nothing inside the repo may import `/compat` at that point.
 - [ ] Images API registry redesign (untouched in this pass).
 
 ## Error behavior

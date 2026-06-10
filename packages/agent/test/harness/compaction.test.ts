@@ -1,13 +1,14 @@
 import {
 	type AssistantMessage,
-	type FauxProviderRegistration,
+	createModels,
+	type FauxProviderHandle,
 	fauxAssistantMessage,
+	fauxProvider,
 	type Message,
 	type Model,
-	registerFauxProvider,
 	type Usage,
 } from "@earendil-works/pi-ai";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
 	type CompactionPreparation,
 	calculateContextTokens,
@@ -121,11 +122,13 @@ function createModelChangeEntry(provider: string, modelId: string, parentId: str
 	};
 }
 
-function createFauxModel(
-	reasoning: boolean,
-	maxTokens = 8192,
-): { faux: FauxProviderRegistration; model: Model<string> } {
-	const faux = registerFauxProvider({
+/** Shared collection; each faux provider gets a unique id so coexisting fakes route correctly. */
+const models = createModels();
+let fauxCount = 0;
+
+function createFauxModel(reasoning: boolean, maxTokens = 8192): { faux: FauxProviderHandle; model: Model<string> } {
+	const faux = fauxProvider({
+		provider: `faux-${++fauxCount}`,
 		models: [
 			{
 				id: reasoning ? "reasoning-model" : "non-reasoning-model",
@@ -135,17 +138,9 @@ function createFauxModel(
 			},
 		],
 	});
-	fauxRegistrations.push(faux);
+	models.setProvider(faux.provider);
 	return { faux, model: faux.getModel() };
 }
-
-const fauxRegistrations: FauxProviderRegistration[] = [];
-
-afterEach(() => {
-	while (fauxRegistrations.length > 0) {
-		fauxRegistrations.pop()?.unregister();
-	}
-});
 
 describe("harness compaction", () => {
 	beforeEach(() => {
@@ -447,6 +442,7 @@ describe("harness compaction", () => {
 		getOrThrow(
 			await generateSummary(
 				messages,
+				models,
 				reasoningModel,
 				2000,
 				"test-key",
@@ -467,7 +463,18 @@ describe("harness compaction", () => {
 			},
 		]);
 		getOrThrow(
-			await generateSummary(messages, offModel, 2000, "test-key", undefined, undefined, undefined, undefined, "off"),
+			await generateSummary(
+				messages,
+				models,
+				offModel,
+				2000,
+				"test-key",
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				"off",
+			),
 		);
 		expect(seenOptions[1]).not.toHaveProperty("reasoning");
 
@@ -481,6 +488,7 @@ describe("harness compaction", () => {
 		getOrThrow(
 			await generateSummary(
 				messages,
+				models,
 				nonReasoningModel,
 				2000,
 				"test-key",
@@ -510,6 +518,7 @@ describe("harness compaction", () => {
 		const summary = getOrThrow(
 			await generateSummary(
 				messages,
+				models,
 				model,
 				2000,
 				"test-key",
@@ -529,7 +538,7 @@ describe("harness compaction", () => {
 		const messages: AgentMessage[] = [createUserMessage("Summarize this.")];
 		const { faux: errorFaux, model: errorModel } = createFauxModel(false);
 		errorFaux.setResponses([fauxAssistantMessage("", { stopReason: "error", errorMessage: "boom" })]);
-		const errorResult = await generateSummary(messages, errorModel, 2000, "test-key");
+		const errorResult = await generateSummary(messages, models, errorModel, 2000, "test-key");
 		expect(errorResult).toMatchObject({
 			ok: false,
 			error: { code: "summarization_failed", message: "Summarization failed: boom" },
@@ -537,7 +546,7 @@ describe("harness compaction", () => {
 
 		const { faux: abortedFaux, model: abortedModel } = createFauxModel(false);
 		abortedFaux.setResponses([fauxAssistantMessage("", { stopReason: "aborted", errorMessage: "stopped" })]);
-		const abortedResult = await generateSummary(messages, abortedModel, 2000, "test-key");
+		const abortedResult = await generateSummary(messages, models, abortedModel, 2000, "test-key");
 		expect(abortedResult).toMatchObject({ ok: false, error: { code: "aborted", message: "stopped" } });
 	});
 
@@ -565,7 +574,7 @@ describe("harness compaction", () => {
 			settings: { enabled: true, reserveTokens: 500000, keepRecentTokens: 20000 },
 		};
 
-		getOrThrow(await compact(preparation, model, "test-key"));
+		getOrThrow(await compact(preparation, models, model, "test-key"));
 
 		expect(seenOptions.map((options) => options?.maxTokens)).toEqual([128000, 128000]);
 	});
@@ -583,7 +592,7 @@ describe("harness compaction", () => {
 		};
 		const { faux: historyFaux, model: historyModel } = createFauxModel(false);
 		historyFaux.setResponses([fauxAssistantMessage("", { stopReason: "error", errorMessage: "history failed" })]);
-		expect(await compact(preparation, historyModel, "test-key")).toMatchObject({
+		expect(await compact(preparation, models, historyModel, "test-key")).toMatchObject({
 			ok: false,
 			error: { code: "summarization_failed", message: "Summarization failed: history failed" },
 		});
@@ -591,6 +600,7 @@ describe("harness compaction", () => {
 		const { model: invalidModel } = createFauxModel(false);
 		const invalidResult = await compact(
 			{ ...preparation, messagesToSummarize: [], firstKeptEntryId: "" },
+			models,
 			invalidModel,
 			"test-key",
 		);
@@ -617,7 +627,7 @@ describe("harness compaction", () => {
 			settings: { enabled: true, reserveTokens: 2000, keepRecentTokens: 20 },
 		};
 
-		getOrThrow(await compact(preparation, model, "test-key", undefined, undefined, undefined, "high"));
+		getOrThrow(await compact(preparation, models, model, "test-key", undefined, undefined, undefined, "high"));
 
 		expect(seenOptions[0]).toMatchObject({ reasoning: "high" });
 	});
@@ -636,14 +646,14 @@ describe("harness compaction", () => {
 		const { faux, model } = createFauxModel(false);
 		faux.setResponses([fauxAssistantMessage("", { stopReason: "error", errorMessage: "prefix failed" })]);
 
-		expect(await compact(preparation, model, "test-key")).toMatchObject({
+		expect(await compact(preparation, models, model, "test-key")).toMatchObject({
 			ok: false,
 			error: { code: "summarization_failed", message: "Turn prefix summarization failed: prefix failed" },
 		});
 
 		const { faux: abortedFaux, model: abortedModel } = createFauxModel(false);
 		abortedFaux.setResponses([fauxAssistantMessage("", { stopReason: "aborted", errorMessage: "prefix stopped" })]);
-		expect(await compact(preparation, abortedModel, "test-key")).toMatchObject({
+		expect(await compact(preparation, models, abortedModel, "test-key")).toMatchObject({
 			ok: false,
 			error: { code: "aborted", message: "prefix stopped" },
 		});
@@ -662,7 +672,7 @@ describe("harness compaction", () => {
 		expect(preparation).toBeDefined();
 		const { faux, model } = createFauxModel(false);
 		faux.setResponses([fauxAssistantMessage("## Goal\nTest summary")]);
-		const result = getOrThrow(await compact(preparation!, model, "test-key"));
+		const result = getOrThrow(await compact(preparation!, models, model, "test-key"));
 		expect(result.summary.length).toBeGreaterThan(0);
 		expect(result.firstKeptEntryId).toBeTruthy();
 		expect(result.details).toBeDefined();

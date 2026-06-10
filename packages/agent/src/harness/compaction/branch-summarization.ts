@@ -1,5 +1,5 @@
-import type { Model } from "@earendil-works/pi-ai/compat";
-import { completeSimple } from "@earendil-works/pi-ai/compat";
+import type { Model, Models } from "@earendil-works/pi-ai";
+
 import type { AgentMessage } from "../../types.ts";
 import {
 	convertToLlm,
@@ -49,10 +49,12 @@ export interface CollectEntriesResult {
 
 /** Options for generating a branch summary. */
 export interface GenerateBranchSummaryOptions {
+	/** Provider collection the summarization request goes through. */
+	models: Models;
 	/** Model used for summarization. */
 	model: Model<any>;
-	/** API key forwarded to the provider. */
-	apiKey: string;
+	/** Explicit API key; wins over provider-resolved auth. */
+	apiKey?: string;
 	/** Optional request headers forwarded to the provider. */
 	headers?: Record<string, string>;
 	/** Abort signal for the summarization request. */
@@ -202,7 +204,16 @@ export async function generateBranchSummary(
 	entries: SessionTreeEntry[],
 	options: GenerateBranchSummaryOptions,
 ): Promise<Result<BranchSummaryResult, BranchSummaryError>> {
-	const { model, apiKey, headers, signal, customInstructions, replaceInstructions, reserveTokens = 16384 } = options;
+	const {
+		models,
+		model,
+		apiKey,
+		headers,
+		signal,
+		customInstructions,
+		replaceInstructions,
+		reserveTokens = 16384,
+	} = options;
 	const contextWindow = model.contextWindow || 128000;
 	const tokenBudget = contextWindow - reserveTokens;
 
@@ -230,7 +241,7 @@ export async function generateBranchSummary(
 			timestamp: Date.now(),
 		},
 	];
-	const response = await completeSimple(
+	const response = await models.completeSimple(
 		model,
 		{ systemPrompt: SUMMARIZATION_SYSTEM_PROMPT, messages: summarizationMessages },
 		{ apiKey, headers, signal, maxTokens: 2048 },
