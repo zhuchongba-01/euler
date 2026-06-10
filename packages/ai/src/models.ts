@@ -22,6 +22,7 @@ import type {
 	KnownProvider,
 	Model,
 	ModelThinkingLevel,
+	ProviderStreams,
 	SimpleStreamOptions,
 	StreamOptions,
 	Usage,
@@ -349,6 +350,61 @@ class ModelsImpl implements MutableModels {
 
 export function createModels(options?: CreateModelsOptions): MutableModels {
 	return new ModelsImpl(options);
+}
+
+export interface CreateProviderOptions<TApi extends Api = Api> {
+	id: string;
+	/** Display name. Default: `id`. */
+	name?: string;
+	baseUrl?: string;
+	headers?: Record<string, string>;
+	/** Required — every provider has auth semantics, even ambient/keyless ones. */
+	auth: ProviderAuth;
+	models:
+		| readonly Model<TApi>[]
+		| ((options?: { forceRefresh?: boolean }) => Promise<readonly Model<TApi>[]> | readonly Model<TApi>[]);
+	/** Single implementation, or map keyed by `model.api` for mixed-API providers. */
+	api: ProviderStreams | Partial<Record<TApi, ProviderStreams>>;
+}
+
+/**
+ * Builds a provider from parts. Built-in provider factories and models.json
+ * custom providers both go through this. A single `api` streams all models;
+ * an `api` map dispatches on `model.api`, and a model whose api has no entry
+ * produces a stream error.
+ */
+export function createProvider<TApi extends Api = Api>(input: CreateProviderOptions<TApi>): Provider<TApi> {
+	const { models } = input;
+	const single =
+		typeof (input.api as ProviderStreams).stream === "function" ? (input.api as ProviderStreams) : undefined;
+	const byApi = single ? undefined : (input.api as Partial<Record<string, ProviderStreams>>);
+
+	const apiFor = (model: Model<Api>): ProviderStreams | undefined => single ?? byApi?.[model.api];
+
+	const dispatch = (
+		model: Model<Api>,
+		run: (streams: ProviderStreams) => AssistantMessageEventStream,
+	): AssistantMessageEventStream => {
+		const streams = apiFor(model);
+		if (!streams) {
+			return lazyStream(model, async () => {
+				throw new ModelsError("stream", `Provider ${input.id} has no API implementation for "${model.api}"`);
+			});
+		}
+		return run(streams);
+	};
+
+	return {
+		id: input.id,
+		name: input.name ?? input.id,
+		baseUrl: input.baseUrl,
+		headers: input.headers,
+		auth: input.auth,
+		getModels: typeof models === "function" ? (options) => models(options) : () => models,
+		stream: (model, context, options) => dispatch(model, (streams) => streams.stream(model, context, options)),
+		streamSimple: (model, context, options) =>
+			dispatch(model, (streams) => streams.streamSimple(model, context, options)),
+	};
 }
 
 /**

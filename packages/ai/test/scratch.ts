@@ -2,52 +2,20 @@
 // Run from packages/ai: node test/scratch.ts
 // Requires ANTHROPIC_API_KEY.
 
-import { anthropicMessagesApi } from "../src/api/anthropic-messages.lazy.ts";
-import { createModels, getModels, type Provider } from "../src/models.ts";
+import { createModels } from "../src/models.ts";
+import { anthropicProvider } from "../src/providers/anthropic.ts";
 import type { Context } from "../src/types.ts";
 
-const anthropicApi = anthropicMessagesApi();
-
 // ---------------------------------------------------------------------------
-// 1. Define a provider. In the final design this comes from
-//    `@earendil-works/pi-ai/providers/anthropic` as `anthropicProvider()`;
-//    until Phase 3 lands we wire it by hand from existing parts.
-// ---------------------------------------------------------------------------
-
-const anthropic: Provider<"anthropic-messages"> = {
-	id: "anthropic",
-	name: "Anthropic",
-	baseUrl: "https://api.anthropic.com/v1",
-
-	auth: {
-		apiKey: {
-			name: "Anthropic API key",
-			resolve: async ({ ctx, credential }) => {
-				// stored credential (from a /login flow) wins, env is the ambient fallback
-				const key = credential?.key ?? (await ctx.env("ANTHROPIC_API_KEY"));
-				if (!key) return undefined;
-				return { auth: { apiKey: key }, source: credential ? "stored credential" : "ANTHROPIC_API_KEY" };
-			},
-		},
-	},
-
-	// static catalog source; a dynamic provider would fetch here
-	getModels: async () => getModels("anthropic"),
-
-	// shared lazy API implementation (loads the SDK on first request)
-	stream: anthropicApi.stream,
-	streamSimple: anthropicApi.streamSimple,
-};
-
-// ---------------------------------------------------------------------------
-// 2. Build a Models runtime and register the provider.
+// 1. Build a Models runtime and register a built-in provider factory.
+//    (Apps wanting everything use `builtinModels()` from providers/all.)
 // ---------------------------------------------------------------------------
 
 const models = createModels();
-models.setProvider(anthropic);
+models.setProvider(anthropicProvider());
 
 // ---------------------------------------------------------------------------
-// 3. Look up a model and check auth.
+// 2. Look up a model and check auth.
 // ---------------------------------------------------------------------------
 
 const model = await models.getModel("anthropic", "claude-haiku-4-5");
@@ -64,14 +32,14 @@ const context: Context = {
 };
 
 // ---------------------------------------------------------------------------
-// 4. Simple completion (request-level auth resolution happens inside).
+// 3. Simple completion (request-level auth resolution happens inside).
 // ---------------------------------------------------------------------------
 
 const message = await models.completeSimple(model, context);
 console.log(`completeSimple -> [${message.stopReason}]`, message.content);
 
 // ---------------------------------------------------------------------------
-// 5. Streaming with deltas.
+// 4. Streaming with deltas.
 // ---------------------------------------------------------------------------
 
 context.messages.push(message, {

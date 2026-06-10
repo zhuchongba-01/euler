@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const aiEntryUrl = new URL("../src/index.ts", import.meta.url).href;
+const providersAllUrl = new URL("../src/providers/all.ts", import.meta.url).href;
 
 const SDK_SPECIFIERS = [
 	"@anthropic-ai/sdk",
@@ -63,6 +64,15 @@ function runProbe(action: string): ProbeResult {
 describe("lazy provider module loading", () => {
 	it("does not load provider SDKs when importing the root barrel", () => {
 		const result = runProbe("");
+		expect(result.loadedSpecifiers).toEqual([]);
+	});
+
+	it("does not load provider SDKs when building all builtin providers", () => {
+		const result = runProbe(`
+			const all = await import(${JSON.stringify(providersAllUrl)});
+			const models = all.builtinModels();
+			await models.getModels();
+		`);
 		expect(result.loadedSpecifiers).toEqual([]);
 	});
 

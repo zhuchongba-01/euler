@@ -108,7 +108,7 @@ All built-ins, explicitly heavy metadata entrypoint:
 ```ts
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 
-const models = builtinModels({ oauth: "node" });
+const models = builtinModels();
 ```
 
 `providers/all` may import all provider metadata/catalogs. It still must not eagerly import SDK implementations; provider streams use lazy wrappers.
@@ -581,41 +581,28 @@ export type AuthEvent =
 
 `prompt()` returns the entered/selected string (`select` returns the option id). Flows race a `manual_code` prompt against a callback server by setting `AuthPrompt.signal` and aborting the prompt when the callback wins.
 
-### OAuth implementation target
+### OAuth attachment
 
-OAuth must not force Node-only code (`node:http`, `node:crypto`) into browser bundles. Keep OAuth lazy; the provider factory decides which implementation to attach:
+Providers that support OAuth always attach it. There is no factory toggle: the flow is lazy-loaded, so advertising OAuth costs nothing until `login()`/`refresh()` actually runs, and a host that never logs in never loads it.
 
 ```ts
-export type OAuthTarget = "node" | "web" | false;
-
-export interface AnthropicProviderOptions {
-  oauth?: OAuthTarget; // default false
-}
-
-export function anthropicProvider(options: AnthropicProviderOptions = {}): Provider {
+export function anthropicProvider(): Provider {
   return createProvider({
     id: "anthropic",
     name: "Anthropic",
     baseUrl: "https://api.anthropic.com/v1",
     auth: {
       apiKey: envApiKeyAuth("Anthropic API key", ["ANTHROPIC_API_KEY"]),
-      oauth:
-        options.oauth === "node"
-          ? lazyOAuth({
-              name: "Anthropic (Claude Pro/Max)",
-              load: () => import("../utils/oauth/anthropic.ts").then((m) => m.anthropicOAuth),
-            })
-          : undefined,
+      oauth: lazyOAuth({
+        name: "Anthropic (Claude Pro/Max)",
+        load: () => import("../utils/oauth/anthropic.ts").then((m) => m.anthropicOAuth),
+      }),
     },
     models: ANTHROPIC_MODELS,
     api: anthropicMessagesApi(),
   });
 }
 ```
-
-- Individual factories default to `oauth: false`.
-- `builtinModels({ oauth: "node" })` for pi CLI/coding-agent.
-- `"web"` is reserved; web flows (sitegeist-style: Web Crypto PKCE, auth tab, extension tab APIs watching the localhost redirect, fetch token exchange, device-code polling for Copilot) are a follow-up. Until implemented, passing `"web"` throws at login time with a clear message.
 
 `lazyOAuth()` wraps a dynamically imported `OAuthAuth` so provider definitions can advertise OAuth without importing the implementation (`toAuth` is async for exactly this reason):
 
@@ -625,6 +612,8 @@ export function lazyOAuth(input: {
   load: () => Promise<OAuthAuth>;
 }): OAuthAuth;
 ```
+
+OAuth must not force Node-only code (`node:http`, `node:crypto`) into browser bundles: the dynamic import inside `lazyOAuth()` uses the same bundler-opaque variable-specifier trick as the bedrock lazy wrapper. Browser hosts never trigger the load (no stored node OAuth credentials, no login flow). If web OAuth lands later (sitegeist proved feasibility: Web Crypto PKCE, auth tab, fetch token exchange, device-code polling), it is just a different `OAuthAuth` implementation — no reserved option values.
 
 The existing flows in `src/utils/oauth/` (anthropic, openai-codex, github-copilot) are adapted to `OAuthAuth` (`login`/`refresh`/`toAuth`, replacing `login`/`refreshToken`/`getApiKey`/`modifyModels`) with the new callbacks, staying Node-targeted and lazy-loaded. Copilot's `modifyModels` baseUrl rewriting becomes `toAuth` returning `ModelAuth.baseUrl`.
 
@@ -699,7 +688,7 @@ Built-in provider factories use `createProvider()` internally. models.json custo
 
 Old semantics being preserved: global `stream()` dispatched purely on `model.api` via the api-registry, with env API key injection. The compat module reproduces this:
 
-- Lazily creates a default `Models` singleton from `builtinModels({ oauth: "node" })` on first use.
+- Lazily creates a default `Models` singleton from `builtinModels()` on first use.
 - `stream/complete/streamSimple/completeSimple(model, ctx, opts)`: look up `getProvider(model.provider)`; if found, route through the singleton (auth resolution included). If not found (custom models.json/extension models), fall back to api-dispatch through a hidden `createProvider()` map containing all builtin API implementations plus anything registered via compat `registerApiProvider()`.
 - `registerApiProvider()/unregisterApiProviders()` feed that fallback dispatch map. `api-registry.ts` dies as a real mechanism.
 - Sync `getModel/getModels/getProviders` become deprecated aliases of `getBuiltinModel/getBuiltinModels/getBuiltinProviders` (they were always pure generated-catalog reads — verified: nothing ever mutated the old `modelRegistry`).
@@ -730,7 +719,7 @@ Rules:
 2. Provider modules import their catalog, auth helpers, and lazy API wrappers only.
 3. Lazy API wrappers dynamically import real API implementations.
 4. Real API implementations import SDK dependencies.
-5. OAuth implementations are selected by factory option (`oauth: "node" | "web" | false`) and lazy-loaded; provider metadata never eagerly imports Node-only OAuth code.
+5. OAuth implementations are always attached via `lazyOAuth()` and lazy-loaded behind a bundler-opaque dynamic import; provider metadata never eagerly imports Node-only OAuth code.
 6. `providers/all` may import all provider metadata, but no eager SDK imports.
 7. Provider modules are side-effect-free; importing a provider does not register anything globally.
 8. `package.json` sets `sideEffects: false`.
@@ -809,18 +798,17 @@ Check items off as they land. Keep this list current; it is the working state fo
 
 ### Phase 3 — provider factories + catalogs
 
-- [ ] Auth helpers in `src/auth/`: `envApiKeyAuth()`, `lazyOAuth()`, `OAuthTarget`.
-- [ ] `createProvider()` (single + mixed `api` map, dispatch on `model.api`).
-- [ ] Per-provider factories under `src/providers/` for all built-in catalog providers, `oauth` factory options where applicable.
-- [ ] `providers/all.ts`: `builtinModels({ oauth? })`, `getBuiltinModel/getBuiltinModels/getBuiltinProviders`.
-- [ ] Faux provider factory (`providers/faux.ts`) for tests.
-- [ ] Split generated catalogs per provider via `scripts/generate-models.ts` (`providers/<id>.models.ts`) — or record explicitly that this is deferred.
+- [x] Auth helpers in `src/auth/helpers.ts`: `envApiKeyAuth()` (with secret-prompt `login`), `lazyOAuth()`. OAuth flow loads go through `utils/oauth/load.ts` (bundler-opaque dynamic import); the `OAuthAuth` exports it references land in Phase 4.
+- [x] `createProvider()` in `models.ts` (single + mixed `api` map, dispatch on `model.api`, unknown api -> stream error).
+- [x] Per-provider factories under `src/providers/` for all built-in catalog providers; OAuth attached via `lazyOAuth()` (anthropic, openai-codex, github-copilot); ambient `ApiKeyAuth` for amazon-bedrock (AWS env/profile) and google-vertex (key or ADC+project+location).
+- [x] `providers/all.ts`: `builtinProviders()`, `builtinModels()`, `getBuiltinModel/getBuiltinModels/getBuiltinProviders` re-exports.
+- [x] Faux provider factory (`fauxProvider()` in `providers/faux.ts`) for tests; legacy `registerFauxProvider()` kept until compat dies.
+- [x] Split generated catalogs per provider via `scripts/generate-models.ts` (`providers/<id>.models.ts`); `models.generated.ts` becomes a generated aggregator.
 
 ### Phase 4 — OAuth adaptation
 
 - [ ] Adapt `utils/oauth/anthropic.ts`, `openai-codex.ts`, `github-copilot.ts` to `OAuthAuth` (`login`/`refresh`/`toAuth`) + `prompt()/notify()`; `modifyModels` baseUrl rewriting becomes `toAuth().baseUrl`.
 - [ ] Remove `usesCallbackServer`; callback-server flows race a `manual_code` prompt instead.
-- [ ] `oauth: "web"` reserved: throws at login with clear message.
 
 ### Phase 5 — packaging
 

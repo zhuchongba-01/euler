@@ -24,6 +24,7 @@ export type { OpenAIResponsesOptions } from "./api/openai-responses.ts";
 export * from "./api-registry.ts";
 export * from "./auth/context.ts";
 export * from "./auth/credential-store.ts";
+export * from "./auth/helpers.ts";
 export * from "./auth/types.ts";
 export * from "./env-api-keys.ts";
 export * from "./image-models.ts";
