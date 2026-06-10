@@ -686,16 +686,17 @@ Built-in provider factories use `createProvider()` internally. models.json custo
 
 `@earendil-works/pi-ai/compat` preserves the old global API surface until the coding-agent migration deletes it. New code never imports it.
 
-Old semantics being preserved: global `stream()` dispatched purely on `model.api` via the api-registry, with env API key injection. The compat module reproduces this:
+Old semantics being preserved: global `stream()` dispatched purely on `model.api` via the api-registry, with env API key injection. The compat module reproduces this exactly — it does not route through a `Models` collection, so compat consumers get zero behavioral drift (a `Models`-routed variant was considered and dropped: a model with a known provider id but a different api would dispatch wrong, and auth semantics would shift mid-migration). The harness `Models` instance (Phase 6/7) is where new-path streaming happens.
 
-- Lazily creates a default `Models` singleton from `builtinModels()` on first use.
-- `stream/complete/streamSimple/completeSimple(model, ctx, opts)`: look up `getProvider(model.provider)`; if found, route through the singleton (auth resolution included). If not found (custom models.json/extension models), fall back to api-dispatch through a hidden `createProvider()` map containing all builtin API implementations plus anything registered via compat `registerApiProvider()`.
-- `registerApiProvider()/unregisterApiProviders()` feed that fallback dispatch map. `api-registry.ts` dies as a real mechanism.
-- Sync `getModel/getModels/getProviders` become deprecated aliases of `getBuiltinModel/getBuiltinModels/getBuiltinProviders` (they were always pure generated-catalog reads — verified: nothing ever mutated the old `modelRegistry`).
-- Re-exports `setBedrockProviderModule` from the bedrock lazy wrapper.
-- `getEnvApiKey`/`env-api-keys.ts` stays available from compat only; provider auth methods own env lookup in the new design.
+- `stream/complete/streamSimple/completeSimple(model, ctx, opts)`: api-dispatch via the api-registry plus `getEnvApiKey` injection, verbatim old behavior.
+- The builtin api registration side effect moves from the root barrel into compat. It skips api ids that already have a registration, since compat may load after a test or extension registered an override. `registerApiProvider()/unregisterApiProviders()` keep feeding the registry; `resetApiProviders()` clears and re-registers builtins.
+- Sync `getModel/getModels/getProviders` are deprecated aliases of `getBuiltinModel/getBuiltinModels/getBuiltinProviders` from `providers/all` (they were always pure generated-catalog reads — verified: nothing ever mutated the old `modelRegistry`).
+- Re-exports the per-API lazy stream wrappers (incl. `setBedrockProviderModule`), `env-api-keys.ts`, and the image-generation registry/catalogs; none of these stay on the root barrel.
+- `export * from "./index.ts"`: compat is a strict superset of the core entrypoint, so consumers switch a file's import path wholesale without symbol surgery.
 
-coding-agent switches imports of these symbols from `@earendil-works/pi-ai` to `@earendil-works/pi-ai/compat` (import-path-only change) and is otherwise untouched until the ModelManager migration.
+coding-agent (and the interim agent package) switch imports of these symbols from `@earendil-works/pi-ai` to `@earendil-works/pi-ai/compat` (import-path-only change) and are otherwise untouched until the ModelManager migration.
+
+Extension grace period: the coding-agent extension loader (jiti aliases + Bun `virtualModules`) resolves the `@earendil-works/pi-ai` ROOT specifier to the compat entrypoint. Existing user extensions using the old global API (`complete`, `getModel`, `registerApiProvider`, ...) keep working at runtime without changes; they break only when compat is removed at the ModelManager migration, with a migration guide in the changelog. Typechecking is the nudge: editors resolve the root to the slim core types, so extension sources that typecheck must import old globals from `/compat` — which is what the repo example extensions demonstrate.
 
 ## Builtin static helpers
 
@@ -812,10 +813,10 @@ Check items off as they land. Keep this list current; it is the working state fo
 
 ### Phase 5 — packaging
 
-- [ ] `index.ts` core-only (no catalogs, no provider factories, no OAuth, no compat).
-- [ ] `compat.ts`: default builtin singleton, `stream/complete/streamSimple/completeSimple` with api-dispatch fallback, `registerApiProvider`/`unregisterApiProviders`, deprecated `getModel/getModels/getProviders` aliases, `setBedrockProviderModule` re-export, `getEnvApiKey`.
-- [ ] Subpath exports map; `sideEffects: false`.
-- [ ] Browser smoke + shrinkwrap checks green.
+- [x] `index.ts` core-only and side-effect free (no catalogs, no provider factories, no api-registry, no env-api-keys, no images, no OAuth, no compat). Typed catalog reads (`getBuiltin*`) implemented in `providers/all.ts`; `models.ts` no longer imports `models.generated.ts`.
+- [x] `compat.ts`: superset of index + old api-dispatch globals, deprecated `getModel/getModels/getProviders` aliases, lazy api wrappers + `setBedrockProviderModule`, `getEnvApiKey`, images. Registration side effect lives here (skip-if-present).
+- [x] Subpath exports map (`./compat`, `./providers/*`, `./api/*`); `sideEffects` array listing the effectful modules (`compat`, images registration) instead of `false`.
+- [x] Browser smoke (entry now imports old globals from `/compat`) + shrinkwrap checks green. Internal old-global imports switched to `/compat` already (42 files in agent/coding-agent/examples; vitest configs alias `/compat` to src; spawn-CLI tests resolve workspace dist, so `packages/ai` + `packages/agent` dists were rebuilt).
 
 ### Phase 6 — AgentHarness
 
@@ -828,6 +829,7 @@ Check items off as they land. Keep this list current; it is the working state fo
 - [ ] Construct `Models` for the harness (builtins + legacy api-dispatch fallback for ModelRegistry custom providers).
 - [ ] Switch old-global imports to `@earendil-works/pi-ai/compat`.
 - [ ] Login dialog adapter for `prompt()/notify()` callbacks.
+- [ ] Cloudflare cleanup (only after builtin streaming goes through `Models.getAuth`): the cloudflare provider factories' `ApiKeyAuth.resolve` reads key + `CLOUDFLARE_ACCOUNT_ID` (+ `CLOUDFLARE_GATEWAY_ID`) from credential metadata/env, substitutes the `{...}` placeholders in `model.baseUrl`, and returns it as `ModelAuth.baseUrl` (Copilot pattern); unconfigured ids report "not configured" instead of throwing mid-request. Then `resolveCloudflareBaseUrl`/`isCloudflareProvider` drop out of `api/anthropic-messages.ts`, `api/openai-completions.ts`, and `api/openai-responses.ts`; `api/cloudflare.ts` shrinks to the generator's baseUrl constants.
 
 The full AuthStorage deletion (`FileCredentialStore` + decorators, see "Replacing AuthStorage") happens in the later ModelManager migration, not this pass.
 

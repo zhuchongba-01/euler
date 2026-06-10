@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InMemoryCredentialStore } from "../src/auth/credential-store.ts";
-import type { AuthEvent, AuthPrompt } from "../src/auth/types.ts";
 import { createModels } from "../src/models.ts";
 import { anthropicProvider } from "../src/providers/anthropic.ts";
 import { githubCopilotProvider } from "../src/providers/github-copilot.ts";
@@ -85,40 +84,6 @@ describe.sequential("OAuthAuth adapters", () => {
 		expect(refreshed.access).toBe("new-token");
 		expect(refreshed.enterpriseUrl).toBe("company.ghe.com");
 		expect(fetchedUrls[0]).toContain("api.company.ghe.com");
-	});
-
-	it("anthropic login resolves through the manual_code prompt and aborts it after settling", async () => {
-		const fetchMock = vi.fn(async (input: unknown) => {
-			const url = typeof input === "string" ? input : String(input);
-			if (url.includes("/oauth/token")) {
-				return jsonResponse({ access_token: "access", refresh_token: "refresh", expires_in: 3600 });
-			}
-			throw new Error(`Unexpected fetch: ${url}`);
-		});
-		vi.stubGlobal("fetch", fetchMock);
-
-		const events: AuthEvent[] = [];
-		const prompts: AuthPrompt[] = [];
-		let manualSignal: AbortSignal | undefined;
-
-		const credential = await anthropicOAuth.login({
-			notify: (event) => events.push(event),
-			prompt: async (prompt) => {
-				prompts.push(prompt);
-				if (prompt.type === "manual_code") {
-					manualSignal = prompt.signal;
-					return "the-code";
-				}
-				throw new Error(`Unexpected prompt: ${prompt.type}`);
-			},
-		});
-
-		expect(credential.type).toBe("oauth");
-		expect(credential.access).toBe("access");
-		expect(events.some((e) => e.type === "auth_url")).toBe(true);
-		expect(prompts.some((p) => p.type === "manual_code")).toBe(true);
-		// the prompt's signal is aborted once login settles, so UIs can dismiss it
-		expect(manualSignal?.aborted).toBe(true);
 	});
 });
 

@@ -3,7 +3,7 @@
  */
 
 import type { OAuthAuth, OAuthCredential } from "../../auth/types.ts";
-import { getModels } from "../../models.ts";
+import { GITHUB_COPILOT_MODELS } from "../../providers/github-copilot.models.ts";
 import type { Api, Model } from "../../types.ts";
 import { pollOAuthDeviceCodeFlow } from "./device-code.ts";
 import type { OAuthCredentials, OAuthDeviceCodeInfo, OAuthLoginCallbacks, OAuthProviderInterface } from "./types.ts";
@@ -274,7 +274,7 @@ async function enableAllGitHubCopilotModels(
 	enterpriseDomain?: string,
 	onProgress?: (model: string, success: boolean) => void,
 ): Promise<void> {
-	const models = getModels("github-copilot");
+	const models = Object.values(GITHUB_COPILOT_MODELS);
 	await Promise.all(
 		models.map(async (model) => {
 			const success = await enableGitHubCopilotModel(token, model.id, enterpriseDomain);

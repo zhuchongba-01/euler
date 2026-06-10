@@ -16,7 +16,7 @@ import {
 	resetOpenAICodexWebSocketDebugStats,
 	stream as streamOpenAICodexResponses,
 } from "../src/api/openai-codex-responses.ts";
-import { getModel } from "../src/models.ts";
+import { getModel } from "../src/compat.ts";
 import type { AssistantMessage, Context, Message, Model, Tool, ToolResultMessage, Transport } from "../src/types.ts";
 
 type ThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh";

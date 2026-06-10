@@ -1,8 +1,7 @@
 import { Type } from "typebox";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { convertMessages } from "../src/api/openai-completions.ts";
-import { getModel } from "../src/models.ts";
-import { stream, streamSimple } from "../src/stream.ts";
+import { getModel, stream, streamSimple } from "../src/compat.ts";
 import type { AssistantMessage, Model, Tool, ToolResultMessage } from "../src/types.ts";
 
 const mockState = vi.hoisted(() => ({

@@ -5,10 +5,27 @@
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"sideEffects": [
+		"./dist/compat.js",
+		"./dist/images.js",
+		"./dist/providers/images/register-builtins.js"
+	],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
+		},
+		"./compat": {
+			"types": "./dist/compat.d.ts",
+			"import": "./dist/compat.js"
+		},
+		"./providers/*": {
+			"types": "./dist/providers/*.d.ts",
+			"import": "./dist/providers/*.js"
+		},
+		"./api/*": {
+			"types": "./dist/api/*.d.ts",
+			"import": "./dist/api/*.js"
 		},
 		"./anthropic": {
 			"types": "./dist/api/anthropic-messages.d.ts",
