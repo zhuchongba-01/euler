@@ -118,17 +118,31 @@ const models = builtinModels({ oauth: "node" });
 `Models` is a provider collection plus auth application and stream convenience. No stream registry, no auth resolver strategy object.
 
 ```ts
-export function createModels(options?: { credentials?: CredentialStore }): MutableModels;
+export function createModels(options?: {
+  /** App-owned credential storage. Default: in-memory store. */
+  credentials?: CredentialStore;
+  /** Environment access for auth resolution (env vars, file existence). Default: process.env/node:fs backed; injectable for tests and non-Node hosts. */
+  authContext?: AuthContext;
+}): MutableModels;
 
 export interface Models {
   getProviders(): readonly Provider[];
   getProvider(id: string): Provider | undefined;
 
+  /** Best-effort aggregation: provider source failures yield the models that did list. */
+  getModels(options?: { forceRefresh?: boolean }): Promise<readonly Model<Api>[]>;
   getModels(provider?: string, options?: { forceRefresh?: boolean }): Promise<readonly Model<Api>[]>;
+  /** Dynamic lists are honestly Model<Api>; narrow with the hasApi() guard. */
   getModel(provider: string, id: string, options?: { forceRefresh?: boolean }): Promise<Model<Api> | undefined>;
 
-  /** Resolve request auth for a model. Includes source label for status UI. */
-  getAuth(model: Model<Api>): Promise<AuthResolution | undefined>;
+  /**
+   * Resolve request auth for a model. Includes source label for status UI.
+   * Resolves undefined when the provider is unknown or unconfigured. Rejects
+   * with ModelsError ("oauth" on refresh failure, "auth" on api-key/store
+   * failure); status/availability UIs catch rejections and render
+   * "needs re-login" instead of treating them as unconfigured.
+   */
+  getAuth(model: Model<Api>): Promise<AuthResult | undefined>;
 
   stream<TApi extends Api>(
     model: Model<TApi>,
@@ -169,26 +183,30 @@ If an app needs different auth policy, it wraps providers (wrap auth methods or 
 
 A provider is the concrete runtime unit. It owns id/name/base metadata, auth methods, model listing, and stream behavior.
 
+`Provider` is generic over the APIs its models use. Concrete factories declare what they emit (`openaiProvider(): Provider<"openai-responses" | "openai-completions">`), giving typed model lists to direct factory users. A `Models` collection holds providers as `Provider<Api>`.
+
 ```ts
-export interface Provider {
+export interface Provider<TApi extends Api = Api> {
   readonly id: string;
   readonly name: string;
 
   readonly baseUrl?: string;
   readonly headers?: Record<string, string>;
 
-  /** Required. Empty array for no-auth providers. */
-  readonly auth: readonly AuthMethod[];
+  /**
+   * Required: at least one of apiKey/oauth. Even ambient-credential providers
+   * (env vars, AWS profiles, ADC) and keyless local servers provide apiKey
+   * auth whose resolve() reports whether the provider is configured.
+   * getAuth() returning undefined = not configured.
+   */
+  readonly auth: ProviderAuth;
 
-  getModels(options?: { forceRefresh?: boolean }): Promise<readonly Model<Api>[]>;
+  /** Sync return suits static catalogs; Models always exposes a Promise. */
+  getModels(options?: { forceRefresh?: boolean }): Promise<readonly Model<TApi>[]> | readonly Model<TApi>[];
 
-  stream<TApi extends Api>(
-    model: Model<TApi>,
-    context: Context,
-    options?: ApiStreamOptions<TApi>,
-  ): AssistantMessageEventStream;
+  stream<T extends TApi>(model: Model<T>, context: Context, options?: ApiStreamOptions<T>): AssistantMessageEventStream;
 
-  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
+  streamSimple(model: Model<TApi>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
 }
 ```
 
@@ -220,6 +238,29 @@ export type ApiStreamOptions<TApi extends Api> = TApi extends keyof ApiOptionsMa
 ```
 
 Custom api strings fall back to the generic shape.
+
+### Typed model narrowing
+
+Runtime model lists are dynamic, so `models.getModel()`/`getModels()` honestly return `Model<Api>`. Typing improves at three points:
+
+1. **`hasApi()` type guard** — runtime-checked narrowing for dynamic lookups (no blind casts):
+
+   ```ts
+   export function hasApi<TApi extends Api>(model: Model<Api>, api: TApi): model is Model<TApi>;
+
+   const model = await models.getModel("anthropic", "claude-opus-4-7");
+   if (model && hasApi(model, "anthropic-messages")) {
+     // model: Model<"anthropic-messages">, stream options fully typed
+   }
+   ```
+
+2. **`getBuiltinModel()`** — sync, generated-catalog lookup with typed overloads: `(provider, id) -> Model<exact-api-literal>`. The path for hardcoded known models.
+
+3. **`Provider<TApi>` factories** — typed model lists when using a provider directly, without a `Models` collection.
+
+Deliberately not done: tying `models.getModel(provider, ...)` to typed provider/model ids would require statically knowing which providers are installed in a mutable runtime collection. The harness path (`streamSimple` + `SimpleStreamOptions`) is API-agnostic and unaffected.
+
+For comparison: Vercel AI SDK attaches the implementation to the model object, which dissolves dispatch typing but makes models non-serializable (no sessions/RPC/catalogs as plain data), and its `providerOptions` bag is `Record<string, JSON>` checked only by `satisfies` convention. Plain-data models + provider-owned behavior keeps stronger typing where it matters.
 
 ### Name collision
 
@@ -316,7 +357,7 @@ export function openrouterProvider(): Provider {
     id: "openrouter",
     name: "OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
-    auth: [envApiKeyMethod({ id: "api-key", name: "OpenRouter API key", env: ["OPENROUTER_API_KEY"] })],
+    auth: { apiKey: envApiKeyAuth("OpenRouter API key", ["OPENROUTER_API_KEY"]) },
     models: OPENROUTER_MODELS,
     api: openAICompletionsApi(),
   });
@@ -339,108 +380,181 @@ export interface ModelAuth {
 
 If a value cannot be expressed as `apiKey`, `headers`, or `baseUrl`, it is provider config, not auth (Vertex project/location, Bedrock region/profile, Azure apiVersion are provider factory options).
 
-### Auth methods
+### Provider auth
 
-`Provider.auth` is a list of uniform auth methods. The `kind` discriminant keeps the UI's oauth-vs-api-key split and types the credential:
+`Provider.auth` has exactly two slots; real providers have at most one api-key path and at most one OAuth path, and the slot names carry the UI's oauth-vs-api-key split without a `kind` discriminant or method ids:
 
 ```ts
-export interface ApiKeyAuthMethod {
-  kind: "api-key";
-  id: string;   // unique within provider, e.g. "api-key"
+export interface ProviderAuth {
+  apiKey?: ApiKeyAuth; // stored key/metadata + ambient env/files/ADC/IAM
+  oauth?: OAuthAuth;   // login flow + refresh
+}
+
+export interface ApiKeyAuth {
   name: string; // "Anthropic API key"
 
   /** Interactive setup (prompt for key/metadata). Absent = ambient-only (env, ADC, IAM). */
-  login?(callbacks: AuthLoginCallbacks): Promise<LocalCredential>;
+  login?(callbacks: AuthLoginCallbacks): Promise<ApiKeyCredential>;
 
+  /**
+   * Resolve auth from the stored credential and/or ambient sources, merging
+   * per field (credential.key ?? env("..."), metadata.accountId ?? env("...")).
+   * undefined = not configured.
+   */
   resolve(input: {
     model: Model<Api>;
-    ctx: ProviderAuthContext;
-    credential?: LocalCredential;
-  }): Promise<AuthResolution | undefined>;
+    ctx: AuthContext;
+    credential?: ApiKeyCredential;
+  }): Promise<AuthResult | undefined>;
 }
 
-export interface OAuthAuthMethod {
-  kind: "oauth";
-  id: string;   // e.g. "oauth"
+export interface OAuthAuth {
   name: string; // "Anthropic (Claude Pro/Max)"
 
   login(callbacks: AuthLoginCallbacks): Promise<OAuthCredential>;
 
-  resolve(input: {
-    model: Model<Api>;
-    ctx: ProviderAuthContext;
-    credential?: OAuthCredential;
-  }): Promise<AuthResolution | undefined>;
+  /** Exchange the refresh token. Network call; throws on failure (invalid_grant etc.). Runs under the store lock. */
+  refresh(credential: OAuthCredential): Promise<OAuthCredential>;
+
+  /** Side-effect-free derivation of request auth from a valid credential. Covers Copilot-style per-credential baseUrl. Async so lazy wrappers can load the implementation. */
+  toAuth(credential: OAuthCredential): Promise<ModelAuth>;
 }
 
-export type AuthMethod = ApiKeyAuthMethod | OAuthAuthMethod;
-
-export interface AuthResolution {
+export interface AuthResult {
   auth: ModelAuth;
   /** Human-readable label for status UI: "ANTHROPIC_API_KEY", "OAuth", "~/.aws/credentials". */
   source?: string;
-  /** Present when the method refreshed/updated the credential; Models persists it via the store. */
-  credential?: Credential;
 }
 
-export interface ProviderAuthContext {
+export interface AuthContext {
   env(name: string): Promise<string | undefined>;
   fileExists(path: string): Promise<boolean>; // supports leading ~
 }
 ```
 
+The OAuth split (`refresh` + `toAuth` instead of one `resolve`) matches the old `OAuthProviderInterface` (`refreshToken` + `getApiKey`) and lets `Models` own the locking pattern without closure gymnastics: refresh produces a credential, `toAuth` derives request auth from whatever credential ends up stored.
+
 There is no `usesCallbackServer` flag. With `prompt()/notify()` callbacks the flow self-describes at runtime: a flow that runs a callback server issues a `manual_code` prompt racing the server and aborts the prompt when the callback wins. The UI needs no static foreknowledge.
 
 ### Credentials
 
+One credential per provider, type-tagged — exactly the shape of today's auth.json (`type: "api_key" | "oauth"` per provider id):
+
 ```ts
-export interface LocalCredential {
-  type: "local";
+export interface ApiKeyCredential {
+  type: "api-key";
   key?: string;
   metadata?: Record<string, string>; // e.g. Cloudflare accountId/gatewayId
 }
 
 export interface OAuthCredential extends OAuthCredentials {
-  type: "oauth";
+  type: "oauth"; // access, refresh, expires from OAuthCredentials
 }
 
-export type Credential = LocalCredential | OAuthCredential;
+export type Credential = ApiKeyCredential | OAuthCredential;
 ```
 
-`LocalCredential.metadata` exists for providers like Cloudflare that store non-key values (account id, gateway id) alongside or instead of a key. The method's `resolve()` merges per field: `credential.key ?? env("CLOUDFLARE_API_TOKEN")`, `credential.metadata?.accountId ?? env("CLOUDFLARE_ACCOUNT_ID")`, etc.
+`ApiKeyCredential.metadata` exists for providers like Cloudflare that store non-key values (account id, gateway id) alongside or instead of a key. `ApiKeyAuth.resolve()` merges per field: `credential.key ?? env("CLOUDFLARE_API_TOKEN")`, `credential.metadata?.accountId ?? env("CLOUDFLARE_ACCOUNT_ID")`, etc.
 
 ### Credential store
 
-The app injects storage; `pi-ai` ships an in-memory default.
+The app injects storage; `pi-ai` ships an in-memory default. Keyed by provider id, one credential per provider:
 
 ```ts
 export interface CredentialStore {
-  get(providerId: string, methodId: string): Promise<Credential | undefined>;
-  set(providerId: string, methodId: string, credential: Credential): Promise<void>;
-  delete(providerId: string, methodId: string): Promise<void>;
+  /** Read the stored credential, possibly expired. Display/status use; request auth comes from Models.getAuth(). */
+  read(providerId: string): Promise<Credential | undefined>;
+
+  /**
+   * Serialized write — the only write path. fn sees the current credential
+   * because correct writes (refresh, login-during-refresh) depend on it;
+   * return the new credential, or undefined to leave the entry unchanged.
+   * Mutual exclusion per provider id, cross-process too where the backing
+   * store supports it (file lock). Resolves with the post-write credential.
+   */
+  modify(
+    providerId: string,
+    fn: (current: Credential | undefined) => Promise<Credential | undefined>,
+  ): Promise<Credential | undefined>;
+
+  /** Remove (logout). Serialized against modify. */
+  delete(providerId: string): Promise<void>;
 }
 ```
 
-coding-agent later implements this over AuthStorage. Login/logout orchestration is app-owned: the app calls `method.login(callbacks)` and persists the returned credential itself. `Models` only *reads* the store during resolution, and *writes* refreshed credentials when `resolve()` returns an updated one (OAuth token refresh).
+There is deliberately no `set`: an unserialized write path invites read-modify-write races (login-during-refresh clobbering a fresh credential, double token refresh). Call sites:
+
+```ts
+await store.modify(pid, async () => credential);      // login: store this
+await store.read(pid);                                // status UI ("logged in via OAuth")
+await store.delete(pid);                               // logout
+// refresh RMW happens inside Models.getAuth
+```
+
+Error semantics: `read` resolves `undefined` for missing entries; methods reject only on storage failure, and `Models` wraps such rejections in `ModelsError` code `"auth"`. Best-effort stores that serve an in-memory view and record persistence errors internally (today's AuthStorage behavior) are valid implementations.
 
 ### Resolution policy (fixed)
 
-`Models.getAuth(model)` resolves with a fixed policy. Precedence, highest first:
+`Models.getAuth(model)` is a decision tree, not a loop. A stored credential owns the provider — ambient/env is consulted only when nothing is stored (AuthStorage parity: no silent env fallback after a failed refresh or for an unmatched credential type):
 
-```txt
-1. explicit request auth (stream options apiKey/headers) — merged per-field on top, in stream()
-2. methods with a stored credential, in provider auth list order
-3. methods resolving without a credential (ambient/env), in provider auth list order
+```ts
+const stored = await store.read(provider.id);
+if (stored) {
+  if (stored.type === "oauth" && provider.auth.oauth) {
+    const oauth = provider.auth.oauth;
+    let credential = stored;
+    if (Date.now() >= credential.expires) {                 // optimistic check, lock-free
+      const post = await store.modify(provider.id, async (current) => {
+        if (current?.type !== "oauth") return undefined;    // logged out meanwhile
+        return Date.now() >= current.expires                // authoritative check, under lock
+          ? oauth.refresh(current)                          // throws -> ModelsError("oauth")
+          : undefined;                                      // another process/request refreshed
+      });
+      if (post?.type !== "oauth") return undefined;
+      credential = post;
+    }
+    return { auth: await oauth.toAuth(credential), source: "OAuth" };
+  }
+  if (stored.type === "api-key" && provider.auth.apiKey) {
+    return provider.auth.apiKey.resolve({ model, ctx, credential: stored });
+  }
+  return undefined; // stored credential without matching handler blocks ambient
+}
+return provider.auth.apiKey?.resolve({ model, ctx, credential: undefined }); // ambient
 ```
 
-Two-pass over `provider.auth`:
+Properties:
 
-- Pass 1: for each method with a credential in the store, call `resolve({ model, ctx, credential })`; first non-undefined resolution wins.
-- Pass 2: for each method, call `resolve({ model, ctx })`; first non-undefined resolution wins.
+- Double-checked locking, same as today's `refreshOAuthTokenWithLock`: valid tokens cost one `read` and zero locks; expired tokens lock, re-check under the lock, refresh once globally, persist before release.
+- Explicit request auth (stream options `apiKey`/`headers`) is merged per-field on top in `stream()`, winning over everything.
+- Refresh failure rejects with `ModelsError("oauth")`; the stored credential is untouched (preserved for retry). Request paths surface this as a stream error with the real cause ("run /login"); status/availability UIs catch the rejection and render "needs re-login" — documented contract on `getAuth`.
 
-So an explicit login (stored credential) beats ambient env vars regardless of list order; list order breaks ties. Per-field merging *within* one method (stored key + env account id) happens inside that method's `resolve()`.
+### Replacing AuthStorage
 
-If a resolution carries an updated `credential`, `Models` persists it via the store before returning.
+The end state for coding-agent: AuthStorage is deleted; its capabilities map onto a `CredentialStore` implementation plus composition.
+
+Today's `getApiKey` priority and its new home:
+
+| AuthStorage today | New design |
+|---|---|
+| runtime override (CLI `--api-key`) | `withRuntimeOverrides(store, overrides)` decorator: `read` returns the override as an `ApiKeyCredential`; never persisted |
+| stored `api_key` (with `$ENV`/`!command` via `resolveConfigValue`) | stored `ApiKeyCredential`; config-value resolution happens at `read` in coding-agent's adapter/decorator (command execution stays app policy) |
+| stored `oauth` + locked refresh, undefined on failure | `getAuth` decision tree above; failure rejects with cause instead of silently unconfiguring |
+| env var (only when nothing stored) | ambient branch of `apiKey.resolve` |
+| `fallbackResolver` (models.json custom providers) | gone — custom providers carry their own `auth.apiKey` |
+
+```txt
+FileCredentialStore        ports AuthStorage's lock backend: read = memory snapshot,
+                           modify = withLockAsync(re-read, fn, merge-write), delete,
+                           internal error recording (drainErrors equivalent)
+└─ withConfigValues        $ENV / !command at read
+   └─ withRuntimeOverrides --api-key
+      └─ createModels({ credentials: store })
+
+login/logout UI            provider.auth.{oauth,apiKey}.login(callbacks) + store.modify/delete
+status UI                  store.read(pid) + getAuth try/catch ("needs /login" on rejection)
+getOAuthProviders          presence of provider.auth.oauth across registered providers
+```
 
 ### Login callbacks
 
@@ -448,17 +562,20 @@ One interface serves api-key and OAuth login:
 
 ```ts
 export interface AuthLoginCallbacks {
+  /** Aborts the whole login flow. Per-prompt cancellation uses AuthPrompt.signal. */
   signal?: AbortSignal;
 
-  prompt(prompt: AuthPrompt, options?: { signal?: AbortSignal }): Promise<string>;
+  prompt(prompt: AuthPrompt): Promise<string>;
   notify(event: AuthEvent): void;
 }
 
-export type AuthPrompt =
+/** `signal` lets the flow cancel a pending prompt when an out-of-band event resolves the step. */
+export type AuthPrompt = { signal?: AbortSignal } & (
   | { type: "text"; message: string; placeholder?: string }
   | { type: "secret"; message: string; placeholder?: string }
   | { type: "select"; message: string; options: readonly { id: string; label: string; description?: string }[] }
-  | { type: "manual_code"; message: string; placeholder?: string };
+  | { type: "manual_code"; message: string; placeholder?: string }
+);
 
 export type AuthEvent =
   | { type: "auth_url"; url: string; instructions?: string }
@@ -466,7 +583,7 @@ export type AuthEvent =
   | { type: "progress"; message: string };
 ```
 
-`prompt()` returns the entered/selected string (`select` returns the option id). Flows race a `manual_code` prompt against a callback server by passing a per-prompt abort signal and aborting when the callback wins.
+`prompt()` returns the entered/selected string (`select` returns the option id). Flows race a `manual_code` prompt against a callback server by setting `AuthPrompt.signal` and aborting the prompt when the callback wins.
 
 ### OAuth implementation target
 
@@ -484,16 +601,16 @@ export function anthropicProvider(options: AnthropicProviderOptions = {}): Provi
     id: "anthropic",
     name: "Anthropic",
     baseUrl: "https://api.anthropic.com/v1",
-    auth: [
-      ...(options.oauth === "node"
-        ? [lazyOAuthMethod({
-            id: "oauth",
-            name: "Anthropic (Claude Pro/Max)",
-            load: () => import("../utils/oauth/anthropic.ts").then((m) => m.anthropicOAuthMethod),
-          })]
-        : []),
-      envApiKeyMethod({ id: "api-key", name: "Anthropic API key", env: ["ANTHROPIC_API_KEY"] }),
-    ],
+    auth: {
+      apiKey: envApiKeyAuth("Anthropic API key", ["ANTHROPIC_API_KEY"]),
+      oauth:
+        options.oauth === "node"
+          ? lazyOAuth({
+              name: "Anthropic (Claude Pro/Max)",
+              load: () => import("../utils/oauth/anthropic.ts").then((m) => m.anthropicOAuth),
+            })
+          : undefined,
+    },
     models: ANTHROPIC_MODELS,
     api: anthropicMessagesApi(),
   });
@@ -504,17 +621,16 @@ export function anthropicProvider(options: AnthropicProviderOptions = {}): Provi
 - `builtinModels({ oauth: "node" })` for pi CLI/coding-agent.
 - `"web"` is reserved; web flows (sitegeist-style: Web Crypto PKCE, auth tab, extension tab APIs watching the localhost redirect, fetch token exchange, device-code polling for Copilot) are a follow-up. Until implemented, passing `"web"` throws at login time with a clear message.
 
-`lazyOAuthMethod()` wraps a dynamically imported `OAuthAuthMethod` so provider definitions can advertise OAuth without importing the implementation:
+`lazyOAuth()` wraps a dynamically imported `OAuthAuth` so provider definitions can advertise OAuth without importing the implementation (`toAuth` is async for exactly this reason):
 
 ```ts
-export function lazyOAuthMethod(input: {
-  id: string;
+export function lazyOAuth(input: {
   name: string;
-  load: () => Promise<OAuthAuthMethod>;
-}): OAuthAuthMethod;
+  load: () => Promise<OAuthAuth>;
+}): OAuthAuth;
 ```
 
-The existing flows in `src/utils/oauth/` (anthropic, openai-codex, github-copilot) are adapted to `OAuthAuthMethod` with the new callbacks, staying Node-targeted and lazy-loaded.
+The existing flows in `src/utils/oauth/` (anthropic, openai-codex, github-copilot) are adapted to `OAuthAuth` (`login`/`refresh`/`toAuth`, replacing `login`/`refreshToken`/`getApiKey`/`modifyModels`) with the new callbacks, staying Node-targeted and lazy-loaded. Copilot's `modifyModels` baseUrl rewriting becomes `toAuth` returning `ModelAuth.baseUrl`.
 
 ## Provider wrappers and models.json
 
@@ -541,7 +657,7 @@ function withProviderOverrides(base: Provider, overrides: ProviderOverrides): Pr
 
 This composes with dynamic providers because `getModels()` delegates to the base source.
 
-Request-auth config from models.json (`$ENV`, `!command`, inline keys) remains app-owned sidecar state, surfaced either as explicit request auth or as a custom `ApiKeyAuthMethod` the app prepends to the wrapped provider's auth list.
+Request-auth config from models.json (`$ENV`, `!command`, inline keys) remains app-owned sidecar state, surfaced either as explicit request auth or as a custom `ApiKeyAuth` the app sets on the wrapped provider's `auth.apiKey`.
 
 ## Custom providers: createProvider()
 
@@ -553,7 +669,7 @@ export function createProvider(input: {
   name?: string;                 // default: id
   baseUrl?: string;
   headers?: Record<string, string>;
-  auth?: readonly AuthMethod[];  // default: []
+  auth: ProviderAuth;            // required, at least one of apiKey/oauth (no "no-auth" providers)
   models:
     | readonly Model<Api>[]
     | ((options?: { forceRefresh?: boolean }) => Promise<readonly Model<Api>[]>);
@@ -666,7 +782,7 @@ sessionModels.clearProviders();
 for (const provider of layeredProviders) sessionModels.setProvider(provider);
 ```
 
-coding-agent owns: AuthStorage-backed `CredentialStore`, models.json auth sidecar (`$ENV`, `!command`), command execution policy, provider status labels (from `AuthResolution.source`), login/logout UI (driving `method.login()` with `prompt()/notify()`), extension lifecycle, provider-management slash commands.
+coding-agent owns: `FileCredentialStore` + decorators replacing AuthStorage (see "Replacing AuthStorage"), models.json auth sidecar (`$ENV`, `!command`), command execution policy, provider status labels (from `AuthResult.source`), login/logout UI (driving `auth.{apiKey,oauth}.login()` with `prompt()/notify()`), extension lifecycle, provider-management slash commands.
 
 Until then, the only coding-agent changes in this pass are:
 
@@ -680,11 +796,11 @@ Check items off as they land. Keep this list current; it is the working state fo
 
 ### Phase 1 — core types/runtime
 
-- [ ] Rename `types.ts` `Provider` alias to `ProviderId`; fix call sites.
-- [ ] Add `ApiOptionsMap` and `ApiStreamOptions<TApi>` to `types.ts` (type-only imports).
-- [ ] New `models.ts`: `Provider` interface, `AuthMethod` union (`ApiKeyAuthMethod`/`OAuthAuthMethod`), `LocalCredential`/`OAuthCredential`/`Credential`, `CredentialStore` (+ in-memory default), `AuthResolution`, `ProviderAuthContext`, `ModelAuth`, `ModelsError` + codes.
-- [ ] `Models`/`MutableModels`/`createModels({ credentials? })` with provider map, async `getModel(s)` (per-provider failure isolation), `getAuth` (two-pass fixed policy, persists refreshed credentials), `stream/complete/streamSimple/completeSimple` with per-field auth merge.
-- [ ] Keep metadata helpers: `calculateCost`, `getSupportedThinkingLevels`, `clampThinkingLevel`, `modelsAreEqual`.
+- [x] Rename `types.ts` `Provider` alias to `ProviderId`; fix call sites.
+- [x] Add `ApiOptionsMap` and `ApiStreamOptions<TApi>` to `types.ts` (type-only imports).
+- [x] New `models.ts`: `Provider<TApi>` interface, `hasApi()` guard, `ModelsError` + codes. Auth types live in `src/auth/types.ts` (`ProviderAuth` = `{ apiKey?, oauth? }`, credentials, `CredentialStore` (`read`/`modify`/`delete`, one credential per provider), `AuthResult`, `AuthContext`, `ModelAuth`, login callbacks), in-memory store in `src/auth/credential-store.ts`, default context in `src/auth/context.ts` (browser-safe node:fs trick), `lazyStream()` in `src/api/lazy.ts`.
+- [x] `Models`/`MutableModels`/`createModels({ credentials?, authContext? })` with provider map, async `getModel(s)` (per-provider failure isolation), `getAuth` (decision tree, double-checked locked refresh), `stream/complete/streamSimple/completeSimple` with per-field auth merge. Tests: `packages/ai/test/models-runtime.test.ts`.
+- [x] Keep metadata helpers: `calculateCost`, `getSupportedThinkingLevels`, `clampThinkingLevel`, `modelsAreEqual`.
 
 ### Phase 2 — `src/api/`
 
@@ -697,7 +813,7 @@ Check items off as they land. Keep this list current; it is the working state fo
 
 ### Phase 3 — provider factories + catalogs
 
-- [ ] Auth helpers in `src/auth/`: `envApiKeyMethod()`, `lazyOAuthMethod()`, `OAuthTarget`, `AuthLoginCallbacks`/`AuthPrompt`/`AuthEvent`.
+- [ ] Auth helpers in `src/auth/`: `envApiKeyAuth()`, `lazyOAuth()`, `OAuthTarget`.
 - [ ] `createProvider()` (single + mixed `api` map, dispatch on `model.api`).
 - [ ] Per-provider factories under `src/providers/` for all built-in catalog providers, `oauth` factory options where applicable.
 - [ ] `providers/all.ts`: `builtinModels({ oauth? })`, `getBuiltinModel/getBuiltinModels/getBuiltinProviders`.
@@ -706,7 +822,7 @@ Check items off as they land. Keep this list current; it is the working state fo
 
 ### Phase 4 — OAuth adaptation
 
-- [ ] Adapt `utils/oauth/anthropic.ts`, `openai-codex.ts`, `github-copilot.ts` to `OAuthAuthMethod` + `prompt()/notify()`.
+- [ ] Adapt `utils/oauth/anthropic.ts`, `openai-codex.ts`, `github-copilot.ts` to `OAuthAuth` (`login`/`refresh`/`toAuth`) + `prompt()/notify()`; `modifyModels` baseUrl rewriting becomes `toAuth().baseUrl`.
 - [ ] Remove `usesCallbackServer`; callback-server flows race a `manual_code` prompt instead.
 - [ ] `oauth: "web"` reserved: throws at login with clear message.
 
@@ -728,6 +844,8 @@ Check items off as they land. Keep this list current; it is the working state fo
 - [ ] Construct `Models` for the harness (builtins + legacy api-dispatch fallback for ModelRegistry custom providers).
 - [ ] Switch old-global imports to `@earendil-works/pi-ai/compat`.
 - [ ] Login dialog adapter for `prompt()/notify()` callbacks.
+
+The full AuthStorage deletion (`FileCredentialStore` + decorators, see "Replacing AuthStorage") happens in the later ModelManager migration, not this pass.
 
 ### Phase 8 — wrap-up
 
@@ -758,4 +876,6 @@ export type ModelsErrorCode =
 ```
 
 - `Models.stream()` produces stream errors (error event + error result) for async setup failures; it does not throw after returning the stream.
-- `Models.getModels()` with no provider filter isolates per-provider source failures so one dynamic provider failure does not prevent listing others.
+- `Models.getModels()` is best-effort aggregation in all forms: provider source failures yield the models that did list (empty for a single failing provider). Apps that need the concrete failure call `getProvider(id).getModels()` directly.
+- Auth resolution and credential store failures reject loudly (`ModelsError` codes `auth`/`oauth`); silent fallback to a different auth path after a failure risks billing surprises. A stored credential always blocks ambient/env fallback, including after a failed refresh.
+- Status/availability UIs catch `getAuth` rejections and render "needs re-login"; they do not treat rejection as "unconfigured".

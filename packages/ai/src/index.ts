@@ -1,7 +1,11 @@
 export type { Static, TSchema } from "typebox";
 export { Type } from "typebox";
 
+export * from "./api/lazy.ts";
 export * from "./api-registry.ts";
+export * from "./auth/context.ts";
+export * from "./auth/credential-store.ts";
+export * from "./auth/types.ts";
 export * from "./env-api-keys.ts";
 export * from "./image-models.ts";
 export * from "./images.ts";

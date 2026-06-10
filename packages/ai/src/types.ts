@@ -1,3 +1,12 @@
+import type { BedrockOptions } from "./providers/amazon-bedrock.ts";
+import type { AnthropicOptions } from "./providers/anthropic.ts";
+import type { AzureOpenAIResponsesOptions } from "./providers/azure-openai-responses.ts";
+import type { GoogleOptions } from "./providers/google.ts";
+import type { GoogleVertexOptions } from "./providers/google-vertex.ts";
+import type { MistralOptions } from "./providers/mistral.ts";
+import type { OpenAICodexResponsesOptions } from "./providers/openai-codex-responses.ts";
+import type { OpenAICompletionsOptions } from "./providers/openai-completions.ts";
+import type { OpenAIResponsesOptions } from "./providers/openai-responses.ts";
 import type { AssistantMessageDiagnostic } from "./utils/diagnostics.ts";
 import type { AssistantMessageEventStream } from "./utils/event-stream.ts";
 
@@ -56,7 +65,7 @@ export type KnownProvider =
 	| "xiaomi-token-plan-cn"
 	| "xiaomi-token-plan-ams"
 	| "xiaomi-token-plan-sgp";
-export type Provider = KnownProvider | string;
+export type ProviderId = KnownProvider | string;
 
 export type KnownImagesProvider = "openrouter";
 
@@ -156,6 +165,31 @@ export interface StreamOptions {
 }
 
 export type ProviderStreamOptions = StreamOptions & Record<string, unknown>;
+
+/**
+ * Maps known APIs to their full provider-specific stream option types.
+ * Type-only imports from API implementation modules are erased at emit, so
+ * this is tree-shake safe.
+ */
+export interface ApiOptionsMap {
+	"anthropic-messages": AnthropicOptions;
+	"openai-completions": OpenAICompletionsOptions;
+	"openai-responses": OpenAIResponsesOptions;
+	"openai-codex-responses": OpenAICodexResponsesOptions;
+	"azure-openai-responses": AzureOpenAIResponsesOptions;
+	"google-generative-ai": GoogleOptions;
+	"google-vertex": GoogleVertexOptions;
+	"mistral-conversations": MistralOptions;
+	"bedrock-converse-stream": BedrockOptions;
+}
+
+/**
+ * Full stream options for an API. Known APIs resolve to their concrete option
+ * type; custom API strings fall back to the generic shape.
+ */
+export type ApiStreamOptions<TApi extends Api> = TApi extends keyof ApiOptionsMap
+	? ApiOptionsMap[TApi]
+	: StreamOptions & Record<string, unknown>;
 
 export interface ImagesOptions {
 	signal?: AbortSignal;
@@ -289,7 +323,7 @@ export interface AssistantMessage {
 	role: "assistant";
 	content: (TextContent | ThinkingContent | ToolCall)[];
 	api: Api;
-	provider: Provider;
+	provider: ProviderId;
 	model: string;
 	responseModel?: string; // Concrete `chunk.model` when different from the requested `model` (e.g. OpenRouter `auto` -> `anthropic/...`)
 	responseId?: string; // Provider-specific response/message identifier when the upstream API exposes one
@@ -569,7 +603,7 @@ export interface Model<TApi extends Api> {
 	id: string;
 	name: string;
 	api: TApi;
-	provider: Provider;
+	provider: ProviderId;
 	baseUrl: string;
 	reasoning: boolean;
 	/**
