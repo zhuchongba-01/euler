@@ -807,8 +807,8 @@ Check items off as they land. Keep this list current; it is the working state fo
 
 ### Phase 4 — OAuth adaptation
 
-- [ ] Adapt `utils/oauth/anthropic.ts`, `openai-codex.ts`, `github-copilot.ts` to `OAuthAuth` (`login`/`refresh`/`toAuth`) + `prompt()/notify()`; `modifyModels` baseUrl rewriting becomes `toAuth().baseUrl`.
-- [ ] Remove `usesCallbackServer`; callback-server flows race a `manual_code` prompt instead.
+- [x] Adapt `utils/oauth/anthropic.ts`, `openai-codex.ts`, `github-copilot.ts` to `OAuthAuth` (`login`/`refresh`/`toAuth`) + `prompt()/notify()`; `modifyModels` baseUrl rewriting becomes `toAuth().baseUrl`. New exports (`anthropicOAuth`, `openaiCodexOAuth`, `githubCopilotOAuth`) sit next to the old `OAuthProviderInterface` objects, which survive until Phase 7.
+- [x] No `usesCallbackServer` on `OAuthAuth`: callback-server flows race a `manual_code` prompt (aborted via `AuthPrompt.signal` once the flow settles). The old interface keeps its flag until it dies with compat.
 
 ### Phase 5 — packaging
 
