@@ -143,10 +143,13 @@ export const streamBedrock: StreamFunction<"bedrock-converse-stream", BedrockOpt
 
 		// in Node.js/Bun environment only
 		if (typeof process !== "undefined" && (process.versions?.node || process.versions?.bun)) {
-			// Region resolution: explicit option > env vars > SDK default chain.
-			// When AWS_PROFILE is set, we leave region undefined so the SDK can
-			// resovle it from aws profile configs. Otherwise fall back to us-east-1.
-			if (configuredRegion) {
+			// Region resolution: ARN-embedded > explicit option > env vars > SDK default chain.
+			// When the model ID is an inference profile ARN, extract the region from it.
+			// This avoids conflicts with AWS_REGION set for other services.
+			const arnRegionMatch = model.id.match(/^arn:aws(?:-[a-z0-9-]+)?:bedrock:([a-z0-9-]+):/);
+			if (arnRegionMatch) {
+				config.region = arnRegionMatch[1];
+			} else if (configuredRegion) {
 				config.region = configuredRegion;
 			} else if (endpointRegion && useExplicitEndpoint) {
 				config.region = endpointRegion;
@@ -288,6 +291,13 @@ const BEDROCK_ERROR_PREFIXES: Record<string, string> = {
 };
 
 /**
+ * Some models reject the account/profile's configured Bedrock data retention mode
+ * (e.g. "data retention mode 'default' is not available for this model"). Point
+ * users at the AWS docs explaining how to configure a supported mode.
+ */
+const BEDROCK_DATA_RETENTION_DOCS_URL = "https://docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html";
+
+/**
  * Format a Bedrock error with a human-readable prefix.
  * AWS SDK exceptions (both from `client.send()` and from stream event items)
  * extend BedrockRuntimeServiceException. We map the `.name` to a stable
@@ -296,11 +306,14 @@ const BEDROCK_ERROR_PREFIXES: Record<string, string> = {
  */
 function formatBedrockError(error: unknown): string {
 	const message = error instanceof Error ? error.message : JSON.stringify(error);
+	const dataRetentionHint = /data retention mode/i.test(message)
+		? ` See ${BEDROCK_DATA_RETENTION_DOCS_URL} for supported data retention modes.`
+		: "";
 	if (error instanceof BedrockRuntimeServiceException) {
 		const prefix = BEDROCK_ERROR_PREFIXES[error.name] ?? error.name;
-		return `${prefix}: ${message}`;
+		return `${prefix}: ${message}${dataRetentionHint}`;
 	}
-	return message;
+	return `${message}${dataRetentionHint}`;
 }
 
 /**
@@ -525,13 +538,18 @@ function getModelMatchCandidates(modelId: string, modelName?: string): string[] 
 function supportsAdaptiveThinking(modelId: string, modelName?: string): boolean {
 	const candidates = getModelMatchCandidates(modelId, modelName);
 	return candidates.some(
-		(s) => s.includes("opus-4-6") || s.includes("opus-4-7") || s.includes("opus-4-8") || s.includes("sonnet-4-6"),
+		(s) =>
+			s.includes("opus-4-6") ||
+			s.includes("opus-4-7") ||
+			s.includes("opus-4-8") ||
+			s.includes("sonnet-4-6") ||
+			s.includes("fable-5"),
 	);
 }
 
 function supportsNativeXhighEffort(model: Model<"bedrock-converse-stream">): boolean {
 	const candidates = getModelMatchCandidates(model.id, model.name);
-	return candidates.some((s) => s.includes("opus-4-7") || s.includes("opus-4-8"));
+	return candidates.some((s) => s.includes("opus-4-7") || s.includes("opus-4-8") || s.includes("fable-5"));
 }
 
 function mapThinkingLevelToEffort(
