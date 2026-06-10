@@ -44,7 +44,7 @@ export interface GoogleOptions extends StreamOptions {
 // Counter for generating unique tool call IDs
 let toolCallCounter = 0;
 
-export const streamGoogle: StreamFunction<"google-generative-ai", GoogleOptions> = (
+export const stream: StreamFunction<"google-generative-ai", GoogleOptions> = (
 	model: Model<"google-generative-ai">,
 	context: Context,
 	options?: GoogleOptions,
@@ -277,7 +277,7 @@ export const streamGoogle: StreamFunction<"google-generative-ai", GoogleOptions>
 	return stream;
 };
 
-export const streamSimpleGoogle: StreamFunction<"google-generative-ai", SimpleStreamOptions> = (
+export const streamSimple: StreamFunction<"google-generative-ai", SimpleStreamOptions> = (
 	model: Model<"google-generative-ai">,
 	context: Context,
 	options?: SimpleStreamOptions,
@@ -289,7 +289,7 @@ export const streamSimpleGoogle: StreamFunction<"google-generative-ai", SimpleSt
 
 	const base = buildBaseOptions(model, options, apiKey);
 	if (!options?.reasoning) {
-		return streamGoogle(model, context, { ...base, thinking: { enabled: false } } satisfies GoogleOptions);
+		return stream(model, context, { ...base, thinking: { enabled: false } } satisfies GoogleOptions);
 	}
 
 	const clampedReasoning = clampThinkingLevel(model, options.reasoning);
@@ -297,7 +297,7 @@ export const streamSimpleGoogle: StreamFunction<"google-generative-ai", SimpleSt
 	const googleModel = model as Model<"google-generative-ai">;
 
 	if (isGemini3ProModel(googleModel) || isGemini3FlashModel(googleModel) || isGemma4Model(googleModel)) {
-		return streamGoogle(model, context, {
+		return stream(model, context, {
 			...base,
 			thinking: {
 				enabled: true,
@@ -306,7 +306,7 @@ export const streamSimpleGoogle: StreamFunction<"google-generative-ai", SimpleSt
 		} satisfies GoogleOptions);
 	}
 
-	return streamGoogle(model, context, {
+	return stream(model, context, {
 		...base,
 		thinking: {
 			enabled: true,

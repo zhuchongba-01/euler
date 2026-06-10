@@ -1,7 +1,26 @@
 export type { Static, TSchema } from "typebox";
 export { Type } from "typebox";
 
+export * from "./api/anthropic-messages.lazy.ts";
+export type { AnthropicEffort, AnthropicOptions, AnthropicThinkingDisplay } from "./api/anthropic-messages.ts";
+export * from "./api/azure-openai-responses.lazy.ts";
+export type { AzureOpenAIResponsesOptions } from "./api/azure-openai-responses.ts";
+export * from "./api/bedrock-converse-stream.lazy.ts";
+export type { BedrockOptions, BedrockThinkingDisplay } from "./api/bedrock-converse-stream.ts";
+export * from "./api/google-generative-ai.lazy.ts";
+export type { GoogleOptions } from "./api/google-generative-ai.ts";
+export type { GoogleThinkingLevel } from "./api/google-shared.ts";
+export * from "./api/google-vertex.lazy.ts";
+export type { GoogleVertexOptions } from "./api/google-vertex.ts";
 export * from "./api/lazy.ts";
+export * from "./api/mistral-conversations.lazy.ts";
+export type { MistralOptions } from "./api/mistral-conversations.ts";
+export * from "./api/openai-codex-responses.lazy.ts";
+export type { OpenAICodexResponsesOptions, OpenAICodexWebSocketDebugStats } from "./api/openai-codex-responses.ts";
+export * from "./api/openai-completions.lazy.ts";
+export type { OpenAICompletionsOptions } from "./api/openai-completions.ts";
+export * from "./api/openai-responses.lazy.ts";
+export type { OpenAIResponsesOptions } from "./api/openai-responses.ts";
 export * from "./api-registry.ts";
 export * from "./auth/context.ts";
 export * from "./auth/credential-store.ts";
@@ -11,22 +30,8 @@ export * from "./image-models.ts";
 export * from "./images.ts";
 export * from "./images-api-registry.ts";
 export * from "./models.ts";
-export type { BedrockOptions, BedrockThinkingDisplay } from "./providers/amazon-bedrock.ts";
-export type { AnthropicEffort, AnthropicOptions, AnthropicThinkingDisplay } from "./providers/anthropic.ts";
-export type { AzureOpenAIResponsesOptions } from "./providers/azure-openai-responses.ts";
 export * from "./providers/faux.ts";
-export type { GoogleOptions } from "./providers/google.ts";
-export type { GoogleThinkingLevel } from "./providers/google-shared.ts";
-export type { GoogleVertexOptions } from "./providers/google-vertex.ts";
 export * from "./providers/images/register-builtins.ts";
-export type { MistralOptions } from "./providers/mistral.ts";
-export type {
-	OpenAICodexResponsesOptions,
-	OpenAICodexWebSocketDebugStats,
-} from "./providers/openai-codex-responses.ts";
-export type { OpenAICompletionsOptions } from "./providers/openai-completions.ts";
-export type { OpenAIResponsesOptions } from "./providers/openai-responses.ts";
-export * from "./providers/register-builtins.ts";
 export * from "./session-resources.ts";
 export * from "./stream.ts";
 export * from "./types.ts";

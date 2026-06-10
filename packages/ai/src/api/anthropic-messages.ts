@@ -186,7 +186,7 @@ export interface AnthropicOptions extends StreamOptions {
 	 * Enable extended thinking.
 	 * For adaptive thinking models: the model decides when/how much to think.
 	 * For older models: uses budget-based thinking with thinkingBudgetTokens.
-	 * Default: undefined (thinking is omitted unless `streamSimpleAnthropic()` maps
+	 * Default: undefined (thinking is omitted unless `streamSimple()` maps
 	 * a simple reasoning level to this option, or callers set it explicitly).
 	 */
 	thinkingEnabled?: boolean;
@@ -205,7 +205,7 @@ export interface AnthropicOptions extends StreamOptions {
 	 * - "medium": Moderate thinking, may skip for simple queries
 	 * - "low": Minimal thinking, skips for simple tasks
 	 * Ignored for older models.
-	 * Default: omitted unless `streamSimpleAnthropic()` maps a simple reasoning
+	 * Default: omitted unless `streamSimple()` maps a simple reasoning
 	 * level to this option.
 	 */
 	effort?: AnthropicEffort;
@@ -445,7 +445,7 @@ async function* iterateAnthropicEvents(
 	}
 }
 
-export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOptions> = (
+export const stream: StreamFunction<"anthropic-messages", AnthropicOptions> = (
 	model: Model<"anthropic-messages">,
 	context: Context,
 	options?: AnthropicOptions,
@@ -733,7 +733,7 @@ function mapThinkingLevelToEffort(
 	}
 }
 
-export const streamSimpleAnthropic: StreamFunction<"anthropic-messages", SimpleStreamOptions> = (
+export const streamSimple: StreamFunction<"anthropic-messages", SimpleStreamOptions> = (
 	model: Model<"anthropic-messages">,
 	context: Context,
 	options?: SimpleStreamOptions,
@@ -745,14 +745,14 @@ export const streamSimpleAnthropic: StreamFunction<"anthropic-messages", SimpleS
 
 	const base = buildBaseOptions(model, options, apiKey);
 	if (!options?.reasoning) {
-		return streamAnthropic(model, context, { ...base, thinkingEnabled: false } satisfies AnthropicOptions);
+		return stream(model, context, { ...base, thinkingEnabled: false } satisfies AnthropicOptions);
 	}
 
 	// For models with adaptive thinking: use an effort level.
 	// For older models: use budget-based thinking.
 	if (model.compat?.forceAdaptiveThinking === true) {
 		const effort = mapThinkingLevelToEffort(model, options.reasoning);
-		return streamAnthropic(model, context, {
+		return stream(model, context, {
 			...base,
 			thinkingEnabled: true,
 			effort,
@@ -768,7 +768,7 @@ export const streamSimpleAnthropic: StreamFunction<"anthropic-messages", SimpleS
 		options.thinkingBudgets,
 	);
 
-	return streamAnthropic(model, context, {
+	return stream(model, context, {
 		...base,
 		maxTokens: adjusted.maxTokens,
 		thinkingEnabled: true,

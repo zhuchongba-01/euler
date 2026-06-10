@@ -60,7 +60,7 @@ const THINKING_LEVEL_MAP: Record<GoogleThinkingLevel, ThinkingLevel> = {
 // Counter for generating unique tool call IDs
 let toolCallCounter = 0;
 
-export const streamGoogleVertex: StreamFunction<"google-vertex", GoogleVertexOptions> = (
+export const stream: StreamFunction<"google-vertex", GoogleVertexOptions> = (
 	model: Model<"google-vertex">,
 	context: Context,
 	options?: GoogleVertexOptions,
@@ -292,14 +292,14 @@ export const streamGoogleVertex: StreamFunction<"google-vertex", GoogleVertexOpt
 	return stream;
 };
 
-export const streamSimpleGoogleVertex: StreamFunction<"google-vertex", SimpleStreamOptions> = (
+export const streamSimple: StreamFunction<"google-vertex", SimpleStreamOptions> = (
 	model: Model<"google-vertex">,
 	context: Context,
 	options?: SimpleStreamOptions,
 ): AssistantMessageEventStream => {
 	const base = buildBaseOptions(model, options, undefined);
 	if (!options?.reasoning) {
-		return streamGoogleVertex(model, context, {
+		return stream(model, context, {
 			...base,
 			thinking: { enabled: false },
 		} satisfies GoogleVertexOptions);
@@ -310,7 +310,7 @@ export const streamSimpleGoogleVertex: StreamFunction<"google-vertex", SimpleStr
 	const geminiModel = model as unknown as Model<"google-generative-ai">;
 
 	if (isGemini3ProModel(geminiModel) || isGemini3FlashModel(geminiModel)) {
-		return streamGoogleVertex(model, context, {
+		return stream(model, context, {
 			...base,
 			thinking: {
 				enabled: true,
@@ -319,7 +319,7 @@ export const streamSimpleGoogleVertex: StreamFunction<"google-vertex", SimpleStr
 		} satisfies GoogleVertexOptions);
 	}
 
-	return streamGoogleVertex(model, context, {
+	return stream(model, context, {
 		...base,
 		thinking: {
 			enabled: true,

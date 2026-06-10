@@ -1,6 +1,13 @@
-import "./providers/register-builtins.ts";
-
-import { getApiProvider } from "./api-registry.ts";
+import { anthropicMessagesApi } from "./api/anthropic-messages.lazy.ts";
+import { azureOpenAIResponsesApi } from "./api/azure-openai-responses.lazy.ts";
+import { bedrockConverseStreamApi } from "./api/bedrock-converse-stream.lazy.ts";
+import { googleGenerativeAIApi } from "./api/google-generative-ai.lazy.ts";
+import { googleVertexApi } from "./api/google-vertex.lazy.ts";
+import { mistralConversationsApi } from "./api/mistral-conversations.lazy.ts";
+import { openAICodexResponsesApi } from "./api/openai-codex-responses.lazy.ts";
+import { openAICompletionsApi } from "./api/openai-completions.lazy.ts";
+import { openAIResponsesApi } from "./api/openai-responses.lazy.ts";
+import { clearApiProviders, getApiProvider, registerApiProvider } from "./api-registry.ts";
 import { getEnvApiKey } from "./env-api-keys.ts";
 import type {
 	Api,
@@ -9,11 +16,37 @@ import type {
 	Context,
 	Model,
 	ProviderStreamOptions,
+	ProviderStreams,
 	SimpleStreamOptions,
 	StreamOptions,
 } from "./types.ts";
 
 export { getEnvApiKey } from "./env-api-keys.ts";
+
+const BUILTIN_APIS: [Api, ProviderStreams][] = [
+	["anthropic-messages", anthropicMessagesApi()],
+	["openai-completions", openAICompletionsApi()],
+	["openai-responses", openAIResponsesApi()],
+	["openai-codex-responses", openAICodexResponsesApi()],
+	["azure-openai-responses", azureOpenAIResponsesApi()],
+	["google-generative-ai", googleGenerativeAIApi()],
+	["google-vertex", googleVertexApi()],
+	["mistral-conversations", mistralConversationsApi()],
+	["bedrock-converse-stream", bedrockConverseStreamApi()],
+];
+
+export function registerBuiltInApiProviders(): void {
+	for (const [api, streams] of BUILTIN_APIS) {
+		registerApiProvider({ api, stream: streams.stream, streamSimple: streams.streamSimple });
+	}
+}
+
+export function resetApiProviders(): void {
+	clearApiProviders();
+	registerBuiltInApiProviders();
+}
+
+registerBuiltInApiProviders();
 
 function hasExplicitApiKey(apiKey: string | undefined): apiKey is string {
 	return typeof apiKey === "string" && apiKey.trim().length > 0;

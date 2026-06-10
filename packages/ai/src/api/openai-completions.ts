@@ -108,7 +108,7 @@ function resolveCacheRetention(cacheRetention?: CacheRetention): CacheRetention 
 	return "short";
 }
 
-export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenAICompletionsOptions> = (
+export const stream: StreamFunction<"openai-completions", OpenAICompletionsOptions> = (
 	model: Model<"openai-completions">,
 	context: Context,
 	options?: OpenAICompletionsOptions,
@@ -425,7 +425,7 @@ export const streamOpenAICompletions: StreamFunction<"openai-completions", OpenA
 	return stream;
 };
 
-export const streamSimpleOpenAICompletions: StreamFunction<"openai-completions", SimpleStreamOptions> = (
+export const streamSimple: StreamFunction<"openai-completions", SimpleStreamOptions> = (
 	model: Model<"openai-completions">,
 	context: Context,
 	options?: SimpleStreamOptions,
@@ -440,7 +440,7 @@ export const streamSimpleOpenAICompletions: StreamFunction<"openai-completions",
 	const reasoningEffort = clampedReasoning === "off" ? undefined : clampedReasoning;
 	const toolChoice = (options as OpenAICompletionsOptions | undefined)?.toolChoice;
 
-	return streamOpenAICompletions(model, context, {
+	return stream(model, context, {
 		...base,
 		reasoningEffort,
 		toolChoice,

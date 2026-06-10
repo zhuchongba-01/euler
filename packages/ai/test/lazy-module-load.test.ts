@@ -66,7 +66,7 @@ describe("lazy provider module loading", () => {
 		expect(result.loadedSpecifiers).toEqual([]);
 	});
 
-	it("loads only the Anthropic SDK when calling the root lazy wrapper", () => {
+	it("loads only the Anthropic SDK when streaming through the lazy API wrapper", () => {
 		const result = runProbe(`
 			const model = {
 				id: "claude-sonnet-4-6",
@@ -81,7 +81,7 @@ describe("lazy provider module loading", () => {
 				maxTokens: 8192,
 			};
 			const context = { messages: [{ role: "user", content: "hi" }] };
-			await mod.streamSimpleAnthropic(model, context).result();
+			await mod.anthropicMessagesApi().streamSimple(model, context).result();
 		`);
 
 		expect(result.loadedSpecifiers).toEqual(["@anthropic-ai/sdk"]);

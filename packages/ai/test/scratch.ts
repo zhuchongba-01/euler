@@ -2,9 +2,11 @@
 // Run from packages/ai: node test/scratch.ts
 // Requires ANTHROPIC_API_KEY.
 
+import { anthropicMessagesApi } from "../src/api/anthropic-messages.lazy.ts";
 import { createModels, getModels, type Provider } from "../src/models.ts";
-import { streamAnthropic, streamSimpleAnthropic } from "../src/providers/register-builtins.ts";
 import type { Context } from "../src/types.ts";
+
+const anthropicApi = anthropicMessagesApi();
 
 // ---------------------------------------------------------------------------
 // 1. Define a provider. In the final design this comes from
@@ -33,8 +35,8 @@ const anthropic: Provider<"anthropic-messages"> = {
 	getModels: async () => getModels("anthropic"),
 
 	// shared lazy API implementation (loads the SDK on first request)
-	stream: streamAnthropic,
-	streamSimple: streamSimpleAnthropic,
+	stream: anthropicApi.stream,
+	streamSimple: anthropicApi.streamSimple,
 };
 
 // ---------------------------------------------------------------------------

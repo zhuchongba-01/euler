@@ -33,23 +33,23 @@ packages/ai/src/
   auth/                       # auth method types, helpers, login callbacks
   api/                        # API implementations and lazy wrappers
     openai-completions.ts     # real implementation, imports SDKs, exports stream/streamSimple
-    openai-completions-lazy.ts
+    openai-completions.lazy.ts
     openai-responses.ts
-    openai-responses-lazy.ts
+    openai-responses.lazy.ts
     openai-codex-responses.ts
-    openai-codex-responses-lazy.ts
+    openai-codex-responses.lazy.ts
     azure-openai-responses.ts
-    azure-openai-responses-lazy.ts
+    azure-openai-responses.lazy.ts
     anthropic-messages.ts
-    anthropic-messages-lazy.ts
+    anthropic-messages.lazy.ts
     google-generative-ai.ts
-    google-generative-ai-lazy.ts
+    google-generative-ai.lazy.ts
     google-vertex.ts
-    google-vertex-lazy.ts
+    google-vertex.lazy.ts
     mistral-conversations.ts
-    mistral-conversations-lazy.ts
+    mistral-conversations.lazy.ts
     bedrock-converse-stream.ts
-    bedrock-converse-stream-lazy.ts
+    bedrock-converse-stream.lazy.ts
     lazy.ts                   # lazyStream()/lazyApi() helpers
     (shared helpers: openai-responses-shared, google-shared, transform-messages, ...)
   providers/                  # concrete provider factories and per-provider catalogs
@@ -315,22 +315,18 @@ export function stream(model, context, options) { ... }
 export function streamSimple(model, context, options) { ... }
 ```
 
-This makes the module itself satisfy `ProviderStreams`, so the lazy wrapper is one generic helper instead of bespoke per-API plumbing:
+This makes the module itself satisfy `ProviderStreams`, so the lazy wrapper is one generic helper instead of bespoke per-API plumbing. `ProviderStreams` is the untyped dispatch shape (implementation modules export concretely typed functions, which would not be assignable to a generic method); per-API option typing lives on the modules themselves and on `Provider.stream()` via `ApiStreamOptions`:
 
 ```ts
 export interface ProviderStreams {
-  stream<TApi extends Api>(
-    model: Model<TApi>,
-    context: Context,
-    options?: ApiStreamOptions<TApi>,
-  ): AssistantMessageEventStream;
+  stream(model: Model<Api>, context: Context, options?: StreamOptions): AssistantMessageEventStream;
   streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
 }
 
 // src/api/lazy.ts
 export function lazyApi(load: () => Promise<ProviderStreams>): ProviderStreams;
 
-// src/api/anthropic-messages-lazy.ts
+// src/api/anthropic-messages.lazy.ts
 export const anthropicMessagesApi = (): ProviderStreams => lazyApi(() => import("./anthropic-messages.ts"));
 ```
 
@@ -350,7 +346,7 @@ Notes:
 Many concrete providers share an API implementation (OpenAI-completions: OpenRouter, Groq, Cerebras, xAI, ZAI, ...). They share lazy API objects by reference:
 
 ```ts
-import { openAICompletionsApi } from "../api/openai-completions-lazy.ts";
+import { openAICompletionsApi } from "../api/openai-completions.lazy.ts";
 
 export function openrouterProvider(): Provider {
   return createProvider({
@@ -804,12 +800,12 @@ Check items off as they land. Keep this list current; it is the working state fo
 
 ### Phase 2 — `src/api/`
 
-- [ ] Move stream implementations from `src/providers/` to `src/api/`, renamed by API id (`anthropic.ts` -> `api/anthropic-messages.ts`, etc.).
-- [ ] Normalize each implementation module to export exactly `stream` and `streamSimple`.
-- [ ] Move shared helpers (`openai-responses-shared`, `google-shared`, `transform-messages`, `openai-prompt-cache`, `github-copilot-headers`) to `src/api/`.
-- [ ] Extract `lazyStream()`/`lazyApi()` into `src/api/lazy.ts`.
-- [ ] Add `*-lazy.ts` wrappers per API; bedrock keeps node-only import trick and `setBedrockProviderModule()`.
-- [ ] Delete `providers/register-builtins.ts`.
+- [x] Move stream implementations from `src/providers/` to `src/api/`, renamed by API id (`anthropic.ts` -> `api/anthropic-messages.ts`, etc.).
+- [x] Normalize each implementation module to export exactly `stream` and `streamSimple`.
+- [x] Move shared helpers (`openai-responses-shared`, `google-shared`, `transform-messages`, `openai-prompt-cache`, `github-copilot-headers`, `cloudflare`, `simple-options`) to `src/api/`.
+- [x] Extract `lazyStream()`/`lazyApi()` into `src/api/lazy.ts`.
+- [x] Add `*.lazy.ts` wrappers per API; bedrock keeps node-only import trick and `setBedrockProviderModule()`.
+- [x] Delete `providers/register-builtins.ts`. Interim until Phase 5 compat: builtin api-registry registration lives in `stream.ts`; lazy API wrappers are exported from the root barrel.
 
 ### Phase 3 — provider factories + catalogs
 

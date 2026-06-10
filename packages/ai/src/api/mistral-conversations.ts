@@ -45,7 +45,7 @@ export interface MistralOptions extends StreamOptions {
 /**
  * Stream responses from Mistral using `chat.stream`.
  */
-export const streamMistral: StreamFunction<"mistral-conversations", MistralOptions> = (
+export const stream: StreamFunction<"mistral-conversations", MistralOptions> = (
 	model: Model<"mistral-conversations">,
 	context: Context,
 	options?: MistralOptions,
@@ -107,7 +107,7 @@ export const streamMistral: StreamFunction<"mistral-conversations", MistralOptio
 /**
  * Maps provider-agnostic `SimpleStreamOptions` to Mistral options.
  */
-export const streamSimpleMistral: StreamFunction<"mistral-conversations", SimpleStreamOptions> = (
+export const streamSimple: StreamFunction<"mistral-conversations", SimpleStreamOptions> = (
 	model: Model<"mistral-conversations">,
 	context: Context,
 	options?: SimpleStreamOptions,
@@ -122,7 +122,7 @@ export const streamSimpleMistral: StreamFunction<"mistral-conversations", Simple
 	const reasoning = clampedReasoning === "off" ? undefined : clampedReasoning;
 	const shouldUseReasoning = model.reasoning && reasoning !== undefined;
 
-	return streamMistral(model, context, {
+	return stream(model, context, {
 		...base,
 		promptMode: shouldUseReasoning && usesPromptModeReasoning(model) ? "reasoning" : undefined,
 		reasoningEffort:

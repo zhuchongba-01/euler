@@ -1,12 +1,12 @@
-import type { BedrockOptions } from "./providers/amazon-bedrock.ts";
-import type { AnthropicOptions } from "./providers/anthropic.ts";
-import type { AzureOpenAIResponsesOptions } from "./providers/azure-openai-responses.ts";
-import type { GoogleOptions } from "./providers/google.ts";
-import type { GoogleVertexOptions } from "./providers/google-vertex.ts";
-import type { MistralOptions } from "./providers/mistral.ts";
-import type { OpenAICodexResponsesOptions } from "./providers/openai-codex-responses.ts";
-import type { OpenAICompletionsOptions } from "./providers/openai-completions.ts";
-import type { OpenAIResponsesOptions } from "./providers/openai-responses.ts";
+import type { AnthropicOptions } from "./api/anthropic-messages.ts";
+import type { AzureOpenAIResponsesOptions } from "./api/azure-openai-responses.ts";
+import type { BedrockOptions } from "./api/bedrock-converse-stream.ts";
+import type { GoogleOptions } from "./api/google-generative-ai.ts";
+import type { GoogleVertexOptions } from "./api/google-vertex.ts";
+import type { MistralOptions } from "./api/mistral-conversations.ts";
+import type { OpenAICodexResponsesOptions } from "./api/openai-codex-responses.ts";
+import type { OpenAICompletionsOptions } from "./api/openai-completions.ts";
+import type { OpenAIResponsesOptions } from "./api/openai-responses.ts";
 import type { AssistantMessageDiagnostic } from "./utils/diagnostics.ts";
 import type { AssistantMessageEventStream } from "./utils/event-stream.ts";
 
@@ -190,6 +190,19 @@ export interface ApiOptionsMap {
 export type ApiStreamOptions<TApi extends Api> = TApi extends keyof ApiOptionsMap
 	? ApiOptionsMap[TApi]
 	: StreamOptions & Record<string, unknown>;
+
+/**
+ * The uniform stream contract of an API implementation module: every module
+ * under `src/api/` exports exactly `stream` and `streamSimple`, so the module
+ * itself satisfies this interface. Lazy wrappers (`lazyApi()`) and provider
+ * factories pass these around as values. This is the untyped dispatch shape;
+ * per-API option typing lives on the implementation modules themselves and on
+ * `Provider.stream()` via `ApiStreamOptions`.
+ */
+export interface ProviderStreams {
+	stream(model: Model<Api>, context: Context, options?: StreamOptions): AssistantMessageEventStream;
+	streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
+}
 
 export interface ImagesOptions {
 	signal?: AbortSignal;

@@ -90,7 +90,7 @@ type Block = (TextContent | ThinkingContent | ToolCall) & { index?: number; part
 
 const EMPTY_TEXT_PLACEHOLDER = "<empty>";
 
-export const streamBedrock: StreamFunction<"bedrock-converse-stream", BedrockOptions> = (
+export const stream: StreamFunction<"bedrock-converse-stream", BedrockOptions> = (
 	model: Model<"bedrock-converse-stream">,
 	context: Context,
 	options: BedrockOptions = {},
@@ -352,19 +352,19 @@ function addCustomHeadersMiddleware(client: BedrockRuntimeClient, headers: Recor
 	client.middlewareStack.add(middleware, { step: "build", name: "pi-ai-custom-headers", priority: "low" });
 }
 
-export const streamSimpleBedrock: StreamFunction<"bedrock-converse-stream", SimpleStreamOptions> = (
+export const streamSimple: StreamFunction<"bedrock-converse-stream", SimpleStreamOptions> = (
 	model: Model<"bedrock-converse-stream">,
 	context: Context,
 	options?: SimpleStreamOptions,
 ): AssistantMessageEventStream => {
 	const base = buildBaseOptions(model, options, undefined);
 	if (!options?.reasoning) {
-		return streamBedrock(model, context, { ...base, reasoning: undefined } satisfies BedrockOptions);
+		return stream(model, context, { ...base, reasoning: undefined } satisfies BedrockOptions);
 	}
 
 	if (isAnthropicClaudeModel(model)) {
 		if (supportsAdaptiveThinking(model.id, model.name)) {
-			return streamBedrock(model, context, {
+			return stream(model, context, {
 				...base,
 				reasoning: options.reasoning,
 				thinkingBudgets: options.thinkingBudgets,
@@ -380,7 +380,7 @@ export const streamSimpleBedrock: StreamFunction<"bedrock-converse-stream", Simp
 			options.thinkingBudgets,
 		);
 
-		return streamBedrock(model, context, {
+		return stream(model, context, {
 			...base,
 			maxTokens: adjusted.maxTokens,
 			reasoning: options.reasoning,
@@ -391,7 +391,7 @@ export const streamSimpleBedrock: StreamFunction<"bedrock-converse-stream", Simp
 		} satisfies BedrockOptions);
 	}
 
-	return streamBedrock(model, context, {
+	return stream(model, context, {
 		...base,
 		reasoning: options.reasoning,
 		thinkingBudgets: options.thinkingBudgets,

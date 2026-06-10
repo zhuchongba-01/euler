@@ -69,7 +69,7 @@ export interface AzureOpenAIResponsesOptions extends StreamOptions {
 /**
  * Generate function for Azure OpenAI Responses API
  */
-export const streamAzureOpenAIResponses: StreamFunction<"azure-openai-responses", AzureOpenAIResponsesOptions> = (
+export const stream: StreamFunction<"azure-openai-responses", AzureOpenAIResponsesOptions> = (
 	model: Model<"azure-openai-responses">,
 	context: Context,
 	options?: AzureOpenAIResponsesOptions,
@@ -147,7 +147,7 @@ export const streamAzureOpenAIResponses: StreamFunction<"azure-openai-responses"
 	return stream;
 };
 
-export const streamSimpleAzureOpenAIResponses: StreamFunction<"azure-openai-responses", SimpleStreamOptions> = (
+export const streamSimple: StreamFunction<"azure-openai-responses", SimpleStreamOptions> = (
 	model: Model<"azure-openai-responses">,
 	context: Context,
 	options?: SimpleStreamOptions,
@@ -161,7 +161,7 @@ export const streamSimpleAzureOpenAIResponses: StreamFunction<"azure-openai-resp
 	const clampedReasoning = options?.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
 	const reasoningEffort = clampedReasoning === "off" ? undefined : clampedReasoning;
 
-	return streamAzureOpenAIResponses(model, context, {
+	return stream(model, context, {
 		...base,
 		reasoningEffort,
 	} satisfies AzureOpenAIResponsesOptions);
