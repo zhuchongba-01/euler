@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed OpenCode/OpenCode Go completion models that reject `prompt_cache_retention` to omit long-retention cache fields when `cacheRetention` is `long` ([#5702](https://github.com/earendil-works/pi/issues/5702)).
+
 ## [0.79.3] - 2026-06-13
 
 ### Fixed

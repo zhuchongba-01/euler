@@ -187,6 +187,15 @@ const OPENAI_RESPONSES_NONE_REASONING_MODELS = new Set([
 	"gpt-5.5",
 ]);
 
+const OPENCODE_OPENAI_COMPLETIONS_LONG_CACHE_RETENTION_UNSUPPORTED_MODELS = new Set([
+	"opencode:deepseek-v4-flash",
+	"opencode:deepseek-v4-pro",
+	"opencode:kimi-k2.5",
+	"opencode:kimi-k2.6",
+	"opencode:minimax-m2.7",
+	"opencode-go:kimi-k2.6",
+]);
+
 function mergeThinkingLevelMap(model: Model<any>, map: NonNullable<Model<any>["thinkingLevelMap"]>): void {
 	model.thinkingLevelMap = { ...model.thinkingLevelMap, ...map };
 }
@@ -1070,6 +1079,13 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 
 				if (api === "openai-completions") {
 					compat = { ...(compat ?? {}), maxTokensField: "max_tokens" };
+					if (
+						OPENCODE_OPENAI_COMPLETIONS_LONG_CACHE_RETENTION_UNSUPPORTED_MODELS.has(
+							`${variant.provider}:${modelId}`,
+						)
+					) {
+						compat = { ...compat, supportsLongCacheRetention: false };
+					}
 				}
 
 				models.push({

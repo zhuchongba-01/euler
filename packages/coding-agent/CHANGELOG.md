@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed inherited OpenCode/OpenCode Go completion model metadata to omit long-retention cache fields for routes that reject `prompt_cache_retention` ([#5702](https://github.com/earendil-works/pi/issues/5702)).
 - Fixed custom provider config so plain uppercase API key and header values remain literals instead of being treated as legacy environment references; use explicit `$ENV_VAR` syntax for environment variables ([#5661](https://github.com/earendil-works/pi/issues/5661)).
 
 ## [0.79.3] - 2026-06-13
