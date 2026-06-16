@@ -12985,11 +12985,11 @@ export const MODELS = {
 			cost: {
 				input: 1.4,
 				output: 4.4,
-				cacheRead: 0.25,
+				cacheRead: 0.26,
 				cacheWrite: 0,
 			},
 			contextWindow: 1048576,
-			maxTokens: 16384,
+			maxTokens: 262144,
 		} satisfies Model<"openai-completions">,
 		"~anthropic/claude-fable-latest": {
 			id: "~anthropic/claude-fable-latest",
