@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Exported `sliceByColumn` for ANSI-aware horizontal column slicing.
+
 ## [0.79.6] - 2026-06-16
 
 ## [0.79.5] - 2026-06-16
