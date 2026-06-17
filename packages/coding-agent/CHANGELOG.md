@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed `/model` autocomplete and model selection searches to match provider/model queries regardless of whether the provider or model token is typed first.
 - Fixed the tree navigator to horizontally pan deep entries so the selected item remains readable ([#5830](https://github.com/earendil-works/pi/issues/5830)).
 
 ## [0.79.6] - 2026-06-16
