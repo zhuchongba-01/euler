@@ -948,7 +948,7 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					cost: {
 						input: m.cost?.input || 0,
 						output: m.cost?.output || 0,
-						cacheRead: m.cost?.cache_read || 0,
+						cacheRead: m.cost?.cache_read ?? (m.cost?.input ? roundCost(m.cost.input * 0.1) : 0),
 						cacheWrite: m.cost?.cache_write || 0,
 					},
 					contextWindow: m.limit?.context || 4096,
