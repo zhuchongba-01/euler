@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added estimated post-compaction token counts to compact results and compaction events ([#5877](https://github.com/earendil-works/pi/issues/5877)).
+
 ### Fixed
 
 - Fixed compaction to refuse sessions with no eligible messages instead of producing empty summaries ([#4811](https://github.com/earendil-works/pi/issues/4811)).
