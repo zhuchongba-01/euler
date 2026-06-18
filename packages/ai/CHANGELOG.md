@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added the OpenRouter Fusion alias as `openrouter/fusion` ([#5866](https://github.com/earendil-works/pi/pull/5866) by [@dannote](https://github.com/dannote)).
+
 ## [0.79.7] - 2026-06-18
 
 ### Added
