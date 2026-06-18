@@ -35,10 +35,8 @@ body:
       label: What are you reporting?
       options:
         - Malicious or unsafe behavior
-        - Broken package or install instructions
-        - Misleading metadata or impersonation
-        - Spam or low-quality package
-        - Other
+        - Impersonation
+        - Trademark / TOS Violations
     validations:
       required: true
 
