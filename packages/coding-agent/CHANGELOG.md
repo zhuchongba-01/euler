@@ -4,7 +4,7 @@
 
 ### Added
 
-- Exported `CONFIG_DIR_NAME` from the coding-agent public API so extensions can resolve project config paths without hardcoding `.pi`.
+- Exported `CONFIG_DIR_NAME` from the coding-agent public API so extensions can resolve project config paths without hardcoding `.pi` ([#5869](https://github.com/earendil-works/pi/pulls/5869) by [@xl0](https://github.com/xl0))
 
 ### Changed
 
