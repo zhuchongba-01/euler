@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed compaction to refuse sessions with no eligible messages instead of producing empty summaries ([#4811](https://github.com/earendil-works/pi/issues/4811)).
 - Fixed successful overflow-triggered auto-compaction to avoid retrying completed assistant responses ([#5720](https://github.com/earendil-works/pi/issues/5720)).
 
 ## [0.79.7] - 2026-06-18

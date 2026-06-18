@@ -1892,19 +1892,10 @@ export class AgentSession {
 	 */
 	private async _runAutoCompaction(reason: "overflow" | "threshold", willRetry: boolean): Promise<boolean> {
 		const settings = this.settingsManager.getCompactionSettings();
-
-		this._emit({ type: "compaction_start", reason });
-		this._autoCompactionAbortController = new AbortController();
+		let started = false;
 
 		try {
 			if (!this.model) {
-				this._emit({
-					type: "compaction_end",
-					reason,
-					result: undefined,
-					aborted: false,
-					willRetry: false,
-				});
 				return false;
 			}
 
@@ -1914,13 +1905,6 @@ export class AgentSession {
 			if (this.agent.streamFn === streamSimple) {
 				const authResult = await this._modelRegistry.getApiKeyAndHeaders(this.model);
 				if (!authResult.ok || !authResult.apiKey) {
-					this._emit({
-						type: "compaction_end",
-						reason,
-						result: undefined,
-						aborted: false,
-						willRetry: false,
-					});
 					return false;
 				}
 				apiKey = authResult.apiKey;
@@ -1934,15 +1918,12 @@ export class AgentSession {
 
 			const preparation = prepareCompaction(pathEntries, settings);
 			if (!preparation) {
-				this._emit({
-					type: "compaction_end",
-					reason,
-					result: undefined,
-					aborted: false,
-					willRetry: false,
-				});
 				return false;
 			}
+
+			this._emit({ type: "compaction_start", reason });
+			this._autoCompactionAbortController = new AbortController();
+			started = true;
 
 			let extensionCompaction: CompactionResult | undefined;
 			let fromExtension = false;
@@ -2054,17 +2035,19 @@ export class AgentSession {
 			return this.agent.hasQueuedMessages();
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : "compaction failed";
-			this._emit({
-				type: "compaction_end",
-				reason,
-				result: undefined,
-				aborted: false,
-				willRetry: false,
-				errorMessage:
-					reason === "overflow"
-						? `Context overflow recovery failed: ${errorMessage}`
-						: `Auto-compaction failed: ${errorMessage}`,
-			});
+			if (started) {
+				this._emit({
+					type: "compaction_end",
+					reason,
+					result: undefined,
+					aborted: false,
+					willRetry: false,
+					errorMessage:
+						reason === "overflow"
+							? `Context overflow recovery failed: ${errorMessage}`
+							: `Auto-compaction failed: ${errorMessage}`,
+				});
+			}
 			return false;
 		} finally {
 			this._autoCompactionAbortController = undefined;
