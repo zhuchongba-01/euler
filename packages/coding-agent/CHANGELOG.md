@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- Fixed RPC unknown-command errors to include the request id so clients do not hang waiting for a response ([#5868](https://github.com/earendil-works/pi/issues/5868)).
 - Fixed `/model` autocomplete and model selection searches to match provider/model queries regardless of whether the provider or model token is typed first.
 - Fixed the tree navigator to horizontally pan deep entries so the selected item remains readable ([#5830](https://github.com/earendil-works/pi/issues/5830)).
 
