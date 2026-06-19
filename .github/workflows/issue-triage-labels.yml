@@ -110,6 +110,15 @@ jobs:
               });
               console.log(`Added ${NO_ACTION_LABEL} to #${issue.number}`);
 
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'not_planned',
+              });
+              console.log(`Closed #${issue.number} as not planned`);
+
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
