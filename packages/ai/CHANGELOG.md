@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added `@earendil-works/pi-ai/base` and direct provider registration exports for bundlers that want selective provider transports without root built-in registration ([#5348](https://github.com/earendil-works/pi/pull/5348) by [@FredKSchott](https://github.com/FredKSchott)).
 - Added prompt caching for Mistral requests using the pi session ID as `prompt_cache_key`, including cached-token usage and cost accounting ([#5854](https://github.com/earendil-works/pi/issues/5854)).
 - Added the OpenRouter Fusion alias as `openrouter/fusion` ([#5866](https://github.com/earendil-works/pi/pull/5866) by [@dannote](https://github.com/dannote)).
 
