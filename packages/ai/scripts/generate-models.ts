@@ -374,6 +374,9 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 		// Pi's low/medium/high pass through verbatim; OpenRouter normalizes to Mercury's vocabulary.
 		mergeThinkingLevelMap(model, { off: null });
 	}
+	if (model.provider === "openrouter" && model.id === "z-ai/glm-5.2") {
+		mergeThinkingLevelMap(model, { xhigh: "xhigh" });
+	}
 	if (model.provider === "opencode-go" && model.id === "kimi-k2.6") {
 		// OpenCode Go exposes Kimi K2.6 thinking as on/off, not distinct effort tiers.
 		mergeThinkingLevelMap(model, { minimal: null, low: null, medium: null });
