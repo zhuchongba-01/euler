@@ -3930,11 +3930,12 @@ export const MODELS = {
 		"accounts/fireworks/models/glm-5p2": {
 			id: "accounts/fireworks/models/glm-5p2",
 			name: "GLM 5.2",
-			api: "anthropic-messages",
+			api: "openai-completions",
 			provider: "fireworks",
-			baseUrl: "https://api.fireworks.ai/inference",
-			compat: {"sendSessionAffinityHeaders":true,"supportsEagerToolInputStreaming":false,"supportsCacheControlOnTools":false,"supportsLongCacheRetention":false},
+			baseUrl: "https://api.fireworks.ai/inference/v1",
+			compat: {"supportsStore":false,"supportsDeveloperRole":false},
 			reasoning: true,
+			thinkingLevelMap: {"off":"none","minimal":null,"low":"high","medium":"high","xhigh":"max"},
 			input: ["text"],
 			cost: {
 				input: 1.4,
@@ -3944,7 +3945,7 @@ export const MODELS = {
 			},
 			contextWindow: 1048576,
 			maxTokens: 131072,
-		} satisfies Model<"anthropic-messages">,
+		} satisfies Model<"openai-completions">,
 		"accounts/fireworks/models/gpt-oss-120b": {
 			id: "accounts/fireworks/models/gpt-oss-120b",
 			name: "GPT OSS 120B",
