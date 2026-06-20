@@ -3714,7 +3714,7 @@ export class InteractiveMode {
 		const updateInstruction = theme.fg("muted", `New version ${release.version} is available. Run `) + action;
 		const changelogUrl = "https://pi.dev/changelog";
 		const changelogLink = getCapabilities().hyperlinks
-			? hyperlink(theme.fg("accent", "open changelog"), changelogUrl)
+			? hyperlink(theme.fg("accent", changelogUrl), changelogUrl)
 			: theme.fg("accent", changelogUrl);
 		const changelogLine = theme.fg("muted", "Changelog: ") + changelogLink;
 		const note = release.note?.trim();
