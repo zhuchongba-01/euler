@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed `pi update` to install the exact version returned by the Pi update check, make `--force` reinstall that checked version, fail instead of falling back to an unversioned reinstall when no version is available, and report both the old and updated versions.
+
 ## [0.79.9] - 2026-06-20
 
 ### New Features
