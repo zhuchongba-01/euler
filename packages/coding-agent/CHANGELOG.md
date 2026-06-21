@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed transient extension UI and session-start messages emitted during session replacement or reload so they remain visible, and kept reload input blocked until reload completes ([#5943](https://github.com/earendil-works/pi/issues/5943)).
 - Fixed the plan-mode example to preserve active custom tools, skip the action prompt when no plan is found, and queue refinement/execution follow-ups correctly from `agent_end` ([#5940](https://github.com/earendil-works/pi/issues/5940)).
 - Fixed `pi update` to install the exact version returned by the Pi update check, make `--force` reinstall that checked version, fail instead of falling back to an unversioned reinstall when no version is available, and report both the old and updated versions.
 
