@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed the `find` tool to respect nested git repository boundaries when parent `.gitignore` rules ignore the nested repo ([#5960](https://github.com/earendil-works/pi/issues/5960)).
 - Fixed the usage docs slash command table to include `/trust` and `/import` ([#5959](https://github.com/earendil-works/pi/issues/5959)).
 - Fixed broken TUI documentation links to the plan-mode extension example ([#5957](https://github.com/earendil-works/pi/issues/5957)).
 - Fixed transient extension UI and session-start messages emitted during session replacement or reload so they remain visible, and kept reload input blocked until reload completes ([#5943](https://github.com/earendil-works/pi/issues/5943)).
