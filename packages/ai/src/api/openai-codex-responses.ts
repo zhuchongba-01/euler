@@ -195,7 +195,7 @@ function createSSEHeaderTimeout(): { signal: AbortSignal; clear: () => void; err
 // Main Stream Function
 // ============================================================================
 
-export const streamOpenAICodexResponses: StreamFunction<"openai-codex-responses", OpenAICodexResponsesOptions> = (
+export const stream: StreamFunction<"openai-codex-responses", OpenAICodexResponsesOptions> = (
 	model: Model<"openai-codex-responses">,
 	context: Context,
 	options?: OpenAICodexResponsesOptions,
@@ -408,7 +408,7 @@ export const streamOpenAICodexResponses: StreamFunction<"openai-codex-responses"
 	return stream;
 };
 
-export const streamSimpleOpenAICodexResponses: StreamFunction<"openai-codex-responses", SimpleStreamOptions> = (
+export const streamSimple: StreamFunction<"openai-codex-responses", SimpleStreamOptions> = (
 	model: Model<"openai-codex-responses">,
 	context: Context,
 	options?: SimpleStreamOptions,
@@ -422,7 +422,7 @@ export const streamSimpleOpenAICodexResponses: StreamFunction<"openai-codex-resp
 	const clampedReasoning = options?.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
 	const reasoningEffort = clampedReasoning === "off" ? undefined : clampedReasoning;
 
-	return streamOpenAICodexResponses(model, context, {
+	return stream(model, context, {
 		...base,
 		reasoningEffort,
 	} satisfies OpenAICodexResponsesOptions);

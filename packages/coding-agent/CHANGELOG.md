@@ -6,6 +6,11 @@
 
 - Added `Ctrl+J` as a default newline keybinding alongside `Shift+Enter`.
 - Renamed the displayed `zai` provider label to ZAI Coding Plan (Global) for clarity ([#5965](https://github.com/earendil-works/pi/issues/5965)).
+- pi-ai's old global API (`stream`/`complete`/`completeSimple`, `getModel`/`getModels`/`getProviders`, `registerApiProvider`, `getEnvApiKey`, ...) moved off the `@earendil-works/pi-ai` root entrypoint to `@earendil-works/pi-ai/compat`. Extensions are not affected at runtime: the extension loader resolves the pi-ai root to the compat entrypoint (a strict superset), so existing extensions keep working unchanged. Extension sources that typecheck against pi-ai's published types should switch those imports to `@earendil-works/pi-ai/compat` (or migrate to the new `createModels()`/provider-factory API). The compat entrypoint and the loader alias will be removed in a future release with a migration guide.
+
+### Added
+
+- Added an experimental first-time setup flow behind `PI_EXPERIMENTAL=1` that asks for a dark/light theme choice (preselecting the detected appearance) and opt-in analytics data sharing on first launch with the default agent directory; opting in stores a `trackingId` in `settings.json`.
 
 ## [0.79.10] - 2026-06-22
 

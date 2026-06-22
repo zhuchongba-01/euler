@@ -14,9 +14,9 @@ import type {
 	ImagesModel,
 	ImagesOptions,
 	TextContent,
-} from "../../types.ts";
-import { headersToRecord } from "../../utils/headers.ts";
-import { sanitizeSurrogates } from "../../utils/sanitize-unicode.ts";
+} from "../types.ts";
+import { headersToRecord } from "../utils/headers.ts";
+import { sanitizeSurrogates } from "../utils/sanitize-unicode.ts";
 
 interface OpenRouterGeneratedImage {
 	image_url?: string | { url?: string };
@@ -34,7 +34,7 @@ type OpenRouterImageGenerationResponse = ChatCompletion & {
 	choices: OpenRouterImageGenerationChoice[];
 };
 
-export const generateImagesOpenRouter: ImagesFunction<"openrouter-images", ImagesOptions> = async (
+export const generateImages: ImagesFunction<"openrouter-images", ImagesOptions> = async (
 	model: ImagesModel<"openrouter-images">,
 	context: ImagesContext,
 	options?: ImagesOptions,

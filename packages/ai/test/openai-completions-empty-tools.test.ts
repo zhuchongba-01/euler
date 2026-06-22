@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getModel } from "../src/models.ts";
-import { streamSimple } from "../src/stream.ts";
+import { getModel, streamSimple } from "../src/compat.ts";
 
 // Empty tools arrays must NOT be serialized as `tools: []` — some OpenAI-compatible
 // backends (e.g. DashScope / Aliyun Qwen via compatible-mode) reject the request with
