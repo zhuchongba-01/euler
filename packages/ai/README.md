@@ -72,15 +72,17 @@ Unified LLM API with provider collections, automatic auth resolution, token and 
 - **OpenRouter**
 - **Vercel AI Gateway**
 - **ZAI Coding Plan (Global)** (with separate China provider)
-- **MiniMax**
+- **MiniMax** (with separate China provider)
 - **Together AI**
+- **Hugging Face**
+- **Moonshot AI** (with separate China provider)
 - **GitHub Copilot** (requires OAuth, see below)
 - **Amazon Bedrock**
 - **OpenCode Zen**
 - **OpenCode Go**
-- **Fireworks** (uses Anthropic-compatible API)
-- **Kimi For Coding** (Moonshot AI, uses Anthropic-compatible API)
-- **Xiaomi MiMo** (uses Anthropic-compatible API; defaults to API billing endpoint, with separate Token Plan providers for `cn`/`ams`/`sgp` regions)
+- **Fireworks** (uses OpenAI- and Anthropic-compatible APIs)
+- **Kimi For Coding** (Moonshot AI subscription endpoint, uses Anthropic-compatible API)
+- **Xiaomi MiMo** (defaults to API billing endpoint, with separate Token Plan providers for `cn`/`ams`/`sgp` regions)
 - **Any OpenAI-compatible API**: Ollama, vLLM, LM Studio, etc.
 
 ## Installation
@@ -382,9 +384,12 @@ Built-in providers resolve these env vars (Node.js; in browsers pass `apiKey` ex
 | Together AI | `TOGETHER_API_KEY` |
 | OpenRouter | `OPENROUTER_API_KEY` |
 | Vercel AI Gateway | `AI_GATEWAY_API_KEY` |
-| zAI | `ZAI_API_KEY` |
+| ZAI Coding Plan (Global) | `ZAI_API_KEY` |
 | ZAI Coding Plan (China) | `ZAI_CODING_CN_API_KEY` |
-| MiniMax | `MINIMAX_API_KEY` |
+| MiniMax (Global) | `MINIMAX_API_KEY` |
+| MiniMax (China) | `MINIMAX_CN_API_KEY` |
+| Moonshot AI / Moonshot AI (China) | `MOONSHOT_API_KEY` |
+| Hugging Face | `HF_TOKEN` |
 | OpenCode Zen / OpenCode Go | `OPENCODE_API_KEY` |
 | Kimi For Coding | `KIMI_API_KEY` |
 | Xiaomi MiMo (API billing) | `XIAOMI_API_KEY` |
