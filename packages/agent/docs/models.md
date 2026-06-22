@@ -93,7 +93,7 @@ import { openaiProvider } from "@earendil-works/pi-ai/providers/openai";
 const models = createModels();
 models.setProvider(openaiProvider());
 
-const model = await models.getModel("openai", "gpt-4o-mini");
+const model = models.getModel("openai", "gpt-4o-mini");
 if (!model) throw new Error("model not found");
 
 const response = await models.complete(model, context);
@@ -261,7 +261,7 @@ Runtime model lists are dynamic, so `models.getModel()`/`getModels()` honestly r
    ```ts
    export function hasApi<TApi extends Api>(model: Model<Api>, api: TApi): model is Model<TApi>;
 
-   const model = await models.getModel("anthropic", "claude-opus-4-7");
+   const model = models.getModel("anthropic", "claude-opus-4-7");
    if (model && hasApi(model, "anthropic-messages")) {
      // model: Model<"anthropic-messages">, stream options fully typed
    }
@@ -724,7 +724,7 @@ getBuiltinModels(provider)      // sync
 getBuiltinProviders()           // sync
 ```
 
-Runtime lookup is always the async instance API: `await models.getModel(...)`.
+Runtime lookup through a `Models` instance is sync over the last-known provider lists: `models.getModel(...)`. Freshness-critical callers run `await models.refresh(provider)` first.
 
 Generated catalogs are split per provider (`providers/<id>.models.ts`) by updating `packages/ai/scripts/generate-models.ts`. If the generator change turns out too large for this pass, splitting may be deferred; `providers/all` and provider factories may temporarily import the monolithic `models.generated.ts`, relying on `sideEffects: false` for pruning.
 
@@ -801,7 +801,7 @@ Check items off as they land. Keep this list current; it is the working state fo
 - [x] Rename `types.ts` `Provider` alias to `ProviderId`; fix call sites.
 - [x] Add `ApiOptionsMap` and `ApiStreamOptions<TApi>` to `types.ts` (type-only imports).
 - [x] New `models.ts`: `Provider<TApi>` interface, `hasApi()` guard, `ModelsError` + codes. Auth types live in `src/auth/types.ts` (`ProviderAuth` = `{ apiKey?, oauth? }`, credentials, `CredentialStore` (`read`/`modify`/`delete`, one credential per provider), `AuthResult`, `AuthContext`, `ModelAuth`, login callbacks), in-memory store in `src/auth/credential-store.ts`, default context in `src/auth/context.ts` (browser-safe node:fs trick), `lazyStream()` in `src/api/lazy.ts`.
-- [x] `Models`/`MutableModels`/`createModels({ credentials?, authContext? })` with provider map, async `getModel(s)` (per-provider failure isolation), `getAuth` (decision tree, double-checked locked refresh), `stream/complete/streamSimple/completeSimple` with per-field auth merge. Tests: `packages/ai/test/models-runtime.test.ts`.
+- [x] `Models`/`MutableModels`/`createModels({ credentials?, authContext? })` with provider map, sync `getModel(s)` (per-provider failure isolation), explicit async `refresh(provider?)`, `getAuth` (decision tree, double-checked locked refresh), `stream/complete/streamSimple/completeSimple` with per-field auth merge. Tests: `packages/ai/test/models-runtime.test.ts`.
 - [x] Keep metadata helpers: `calculateCost`, `getSupportedThinkingLevels`, `clampThinkingLevel`, `modelsAreEqual`.
 
 ### Phase 2 — `src/api/`
@@ -879,7 +879,7 @@ Decisions:
 
 Ordering:
 
-- [ ] pi-ai rework first: `Provider.getModels()` sync + optional `refreshModels()`; `Models.getModels`/`getModel` sync, `Models.refresh(provider?)` async; `createProvider` takes `models` array + optional `refreshModels` fetcher (in-flight dedupe). Reverses Phase 1's async-listing decision — see "Provider model listing" for rationale (sync-or-async unions breed latent sync assumptions; async-only breaks sync consumer surfaces like extension `find`/`getAll`).
+- [x] pi-ai rework first: `Provider.getModels()` sync + optional `refreshModels()`; `Models.getModels`/`getModel` sync, `Models.refresh(provider?)` async; `createProvider` takes `models` array + optional `refreshModels` fetcher (in-flight dedupe). Reverses Phase 1's async-listing decision — see "Provider model listing" for rationale (sync-or-async unions breed latent sync assumptions; async-only breaks sync consumer surfaces like extension `find`/`getAll`).
 - [ ] `FileCredentialStore` (ports the auth.json lock backend, reads legacy `type: "api_key"` tags) + `--api-key` overlay + `$ENV`/`!command` resolution; tests.
 - [ ] Cloudflare provider auth in pi-ai factories; copilot `getModels` baseUrl wrap.
 - [ ] Extension-OAuth adapter (old `OAuthProviderInterface` config -> `OAuthAuth`).
