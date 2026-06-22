@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Added `Ctrl+J` as a default newline keybinding alongside `Shift+Enter`.
 - Renamed the displayed `zai` provider label to ZAI Coding Plan (Global) for clarity ([#5965](https://github.com/earendil-works/pi/issues/5965)).
 
 ## [0.79.10] - 2026-06-22
