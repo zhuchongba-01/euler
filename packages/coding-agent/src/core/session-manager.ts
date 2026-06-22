@@ -357,9 +357,10 @@ export function buildSessionContext(
 	const path: SessionEntry[] = [];
 	let current: SessionEntry | undefined = leaf;
 	while (current) {
-		path.unshift(current);
+		path.push(current);
 		current = current.parentId ? byId.get(current.parentId) : undefined;
 	}
+	path.reverse();
 
 	// Extract settings and find compaction
 	let thinkingLevel = "off";
@@ -1152,9 +1153,10 @@ export class SessionManager {
 		const startId = fromId ?? this.leafId;
 		let current = startId ? this.byId.get(startId) : undefined;
 		while (current) {
-			path.unshift(current);
+			path.push(current);
 			current = current.parentId ? this.byId.get(current.parentId) : undefined;
 		}
+		path.reverse();
 		return path;
 	}
 
@@ -1290,8 +1292,16 @@ export class SessionManager {
 			throw new Error(`Entry ${leafId} not found`);
 		}
 
-		// Filter out LabelEntry from path - we'll recreate them from the resolved map
-		const pathWithoutLabels = path.filter((e) => e.type !== "label");
+		// Filter out LabelEntry from path - we'll recreate them from the resolved map.
+		// Because labels are real tree entries, later entries can be children of labels;
+		// removing labels requires re-chaining the retained path to avoid orphaned subtrees.
+		const pathWithoutLabels: SessionEntry[] = [];
+		let pathParentId: string | null = null;
+		for (const entry of path) {
+			if (entry.type === "label") continue;
+			pathWithoutLabels.push({ ...entry, parentId: pathParentId });
+			pathParentId = entry.id;
+		}
 
 		const newSessionId = createSessionId();
 		const timestamp = new Date().toISOString();

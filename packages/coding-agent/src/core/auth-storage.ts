@@ -24,6 +24,7 @@ import { resolveConfigValue } from "./resolve-config-value.ts";
 export type ApiKeyCredential = {
 	type: "api_key";
 	key: string;
+	env?: Record<string, string>;
 };
 
 export type OAuthCredential = {
@@ -39,6 +40,10 @@ export type AuthStatus = {
 	source?: "stored" | "runtime" | "environment" | "fallback" | "models_json_key" | "models_json_command";
 	label?: string;
 };
+
+export interface GetApiKeyOptions {
+	includeFallback?: boolean;
+}
 
 type LockResult<T> = {
 	result: T;
@@ -295,6 +300,14 @@ export class AuthStorage {
 	}
 
 	/**
+	 * Get provider-scoped environment values for an API key credential.
+	 */
+	getProviderEnv(provider: string): Record<string, string> | undefined {
+		const cred = this.data[provider];
+		return cred?.type === "api_key" && cred.env ? { ...cred.env } : undefined;
+	}
+
+	/**
 	 * Set credential for a provider.
 	 */
 	set(provider: string, credential: AuthCredential): void {
@@ -446,7 +459,7 @@ export class AuthStorage {
 	 * 3. OAuth token from auth.json (auto-refreshed with locking)
 	 * 4. Environment variable
 	 */
-	async getApiKey(providerId: string): Promise<string | undefined> {
+	async getApiKey(providerId: string, options: GetApiKeyOptions = {}): Promise<string | undefined> {
 		// Runtime override takes highest priority
 		const runtimeKey = this.runtimeOverrides.get(providerId);
 		if (runtimeKey) {
@@ -456,7 +469,7 @@ export class AuthStorage {
 		const cred = this.data[providerId];
 
 		if (cred?.type === "api_key") {
-			return resolveConfigValue(cred.key);
+			return resolveConfigValue(cred.key, cred.env);
 		}
 
 		if (cred?.type === "oauth") {
@@ -496,6 +509,8 @@ export class AuthStorage {
 				return provider.getApiKey(cred);
 			}
 		}
+
+		if (options.includeFallback === false) return undefined;
 
 		// Fall back to environment variable
 		const envKey = getEnvApiKey(providerId);

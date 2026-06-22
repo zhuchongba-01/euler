@@ -4,6 +4,25 @@
 import type { Model } from "../types.ts";
 
 export const GITHUB_COPILOT_MODELS = {
+	"claude-fable-5": {
+		id: "claude-fable-5",
+		name: "Claude Fable 5",
+		api: "openai-completions",
+		provider: "github-copilot",
+		baseUrl: "https://api.individual.githubcopilot.com",
+		headers: {"User-Agent":"GitHubCopilotChat/0.35.0","Editor-Version":"vscode/1.107.0","Editor-Plugin-Version":"copilot-chat/0.35.0","Copilot-Integration-Id":"vscode-chat"},
+		compat: {"supportsStore":false,"supportsDeveloperRole":false,"supportsReasoningEffort":false},
+		reasoning: true,
+		input: ["text", "image"],
+		cost: {
+			input: 10,
+			output: 50,
+			cacheRead: 1,
+			cacheWrite: 12.5,
+		},
+		contextWindow: 1000000,
+		maxTokens: 128000,
+	} satisfies Model<"openai-completions">,
 	"claude-haiku-4.5": {
 		id: "claude-haiku-4.5",
 		name: "Claude Haiku 4.5 (latest)",
@@ -70,7 +89,7 @@ export const GITHUB_COPILOT_MODELS = {
 		headers: {"User-Agent":"GitHubCopilotChat/0.35.0","Editor-Version":"vscode/1.107.0","Editor-Plugin-Version":"copilot-chat/0.35.0","Copilot-Integration-Id":"vscode-chat"},
 		compat: {"forceAdaptiveThinking":true,"supportsTemperature":false},
 		reasoning: true,
-		thinkingLevelMap: {"xhigh":"xhigh"},
+		thinkingLevelMap: {"xhigh":"xhigh","minimal":"low"},
 		input: ["text", "image"],
 		cost: {
 			input: 5,
@@ -90,7 +109,7 @@ export const GITHUB_COPILOT_MODELS = {
 		headers: {"User-Agent":"GitHubCopilotChat/0.35.0","Editor-Version":"vscode/1.107.0","Editor-Plugin-Version":"copilot-chat/0.35.0","Copilot-Integration-Id":"vscode-chat"},
 		compat: {"forceAdaptiveThinking":true,"supportsTemperature":false},
 		reasoning: true,
-		thinkingLevelMap: {"xhigh":"xhigh"},
+		thinkingLevelMap: {"xhigh":"xhigh","minimal":"low"},
 		input: ["text", "image"],
 		cost: {
 			input: 5,
@@ -148,6 +167,7 @@ export const GITHUB_COPILOT_MODELS = {
 		headers: {"User-Agent":"GitHubCopilotChat/0.35.0","Editor-Version":"vscode/1.107.0","Editor-Plugin-Version":"copilot-chat/0.35.0","Copilot-Integration-Id":"vscode-chat"},
 		compat: {"forceAdaptiveThinking":true},
 		reasoning: true,
+		thinkingLevelMap: {"minimal":"low","xhigh":"max"},
 		input: ["text", "image"],
 		cost: {
 			input: 3,
@@ -405,23 +425,4 @@ export const GITHUB_COPILOT_MODELS = {
 		contextWindow: 400000,
 		maxTokens: 128000,
 	} satisfies Model<"openai-responses">,
-	"raptor-mini": {
-		id: "raptor-mini",
-		name: "Raptor mini",
-		api: "openai-completions",
-		provider: "github-copilot",
-		baseUrl: "https://api.individual.githubcopilot.com",
-		headers: {"User-Agent":"GitHubCopilotChat/0.35.0","Editor-Version":"vscode/1.107.0","Editor-Plugin-Version":"copilot-chat/0.35.0","Copilot-Integration-Id":"vscode-chat"},
-		compat: {"supportsStore":false,"supportsDeveloperRole":false,"supportsReasoningEffort":false},
-		reasoning: true,
-		input: ["text", "image"],
-		cost: {
-			input: 0.25,
-			output: 2,
-			cacheRead: 0.025,
-			cacheWrite: 0,
-		},
-		contextWindow: 400000,
-		maxTokens: 128000,
-	} satisfies Model<"openai-completions">,
 } as const;

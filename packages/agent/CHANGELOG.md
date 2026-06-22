@@ -8,6 +8,36 @@
 - `compact()`, `generateSummary()`, and `generateBranchSummary()` take a `Models` parameter and no longer accept explicit `apiKey`/`headers`.
 - `StreamFn` is defined structurally (`(model, context, options?) => AssistantMessageEventStream | Promise<...>`); `Models.streamSimple` satisfies it.
 
+## [0.79.10] - 2026-06-22
+
+## [0.79.9] - 2026-06-20
+
+### Fixed
+
+- Fixed Node execution environment commands through legacy WSL `bash.exe` to pass scripts over stdin so shell variables expand in the target bash ([#5893](https://github.com/earendil-works/pi/issues/5893)).
+
+## [0.79.8] - 2026-06-19
+
+### Added
+
+- Added `@earendil-works/pi-agent-core/base` for bundlers that want to pair the agent core with selective `@earendil-works/pi-ai/base` provider registration ([#5348](https://github.com/earendil-works/pi/pull/5348) by [@FredKSchott](https://github.com/FredKSchott)).
+
+## [0.79.7] - 2026-06-18
+
+## [0.79.6] - 2026-06-16
+
+## [0.79.5] - 2026-06-16
+
+## [0.79.4] - 2026-06-15
+
+## [0.79.3] - 2026-06-13
+
+## [0.79.2] - 2026-06-12
+
+### Fixed
+
+- Fixed late tool progress callbacks after tool settlement to be ignored instead of emitting stale `tool_execution_update` events ([#5573](https://github.com/earendil-works/pi/issues/5573)).
+
 ## [0.79.1] - 2026-06-09
 
 ## [0.79.0] - 2026-06-08
