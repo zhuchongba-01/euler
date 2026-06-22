@@ -8594,6 +8594,7 @@ export const MODELS = {
 			baseUrl: "https://opencode.ai/zen/go/v1",
 			compat: {"maxTokensField":"max_tokens"},
 			reasoning: true,
+			thinkingLevelMap: {"off":null,"minimal":null,"low":null,"medium":null,"high":"high","xhigh":"max"},
 			input: ["text"],
 			cost: {
 				input: 1.4,
