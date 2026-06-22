@@ -12,6 +12,10 @@
 
 - Added an experimental first-time setup flow behind `PI_EXPERIMENTAL=1` that asks for a dark/light theme choice (preselecting the detected appearance) and opt-in analytics data sharing on first launch with the default agent directory; opting in stores a `trackingId` in `settings.json`.
 
+### Fixed
+
+- Fixed `pi --resume` to load user package themes and resolve automatic light/dark theme settings.
+
 ## [0.79.10] - 2026-06-22
 
 ### New Features
