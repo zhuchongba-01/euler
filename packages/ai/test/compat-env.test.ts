@@ -9,7 +9,7 @@ const model: Model<"openai-responses"> = {
 	id: "test-model",
 	name: "Test Model",
 	api: "openai-responses",
-	provider: "openai",
+	provider: "custom-openai",
 	baseUrl: "https://example.test/v1",
 	reasoning: false,
 	input: ["text"],
@@ -38,12 +38,12 @@ function message(): AssistantMessage {
 	};
 }
 
-describe("compat env API key injection", () => {
+describe("compat legacy API fallback", () => {
 	afterEach(() => {
 		resetApiProviders();
 	});
 
-	it("uses request-scoped env when injecting provider API keys", async () => {
+	it("dispatches unknown providers through the legacy API registry", async () => {
 		let capturedApiKey: string | undefined;
 		registerApiProvider({
 			api: "openai-responses",
@@ -67,8 +67,8 @@ describe("compat env API key injection", () => {
 			},
 		});
 
-		await complete(model, context, { env: { OPENAI_API_KEY: "scoped-key" } });
+		await complete(model, context, { apiKey: "request-key" });
 
-		expect(capturedApiKey).toBe("scoped-key");
+		expect(capturedApiKey).toBe("request-key");
 	});
 });

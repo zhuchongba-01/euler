@@ -5,6 +5,8 @@ import { createModels, createProvider } from "../src/models.ts";
 import { builtinModels, builtinProviders } from "../src/providers/all.ts";
 import { amazonBedrockProvider } from "../src/providers/amazon-bedrock.ts";
 import { anthropicProvider } from "../src/providers/anthropic.ts";
+import { cloudflareAIGatewayProvider } from "../src/providers/cloudflare-ai-gateway.ts";
+import { cloudflareWorkersAIProvider } from "../src/providers/cloudflare-workers-ai.ts";
 import { fauxAssistantMessage, fauxProvider } from "../src/providers/faux.ts";
 import { googleVertexProvider } from "../src/providers/google-vertex.ts";
 import type { Api, Context, Model, ProviderStreams } from "../src/types.ts";
@@ -64,6 +66,55 @@ describe("builtin providers", () => {
 		const unconfigured = createModels({ authContext: fakeAuthContext({}) });
 		unconfigured.setProvider(amazonBedrockProvider());
 		expect(await unconfigured.getAuth(model)).toBeUndefined();
+	});
+
+	it("requires Cloudflare Workers AI account config and returns scoped env", async () => {
+		const missingAccount = createModels({ authContext: fakeAuthContext({ CLOUDFLARE_API_KEY: "cf-key" }) });
+		missingAccount.setProvider(cloudflareWorkersAIProvider());
+		const model = missingAccount.getModels("cloudflare-workers-ai")[0];
+		expect(await missingAccount.getAuth(model)).toBeUndefined();
+
+		const configured = createModels({
+			authContext: fakeAuthContext({ CLOUDFLARE_API_KEY: "cf-key", CLOUDFLARE_ACCOUNT_ID: "account-id" }),
+		});
+		configured.setProvider(cloudflareWorkersAIProvider());
+		const result = await configured.getAuth(model);
+		expect(result?.auth).toEqual({
+			apiKey: "cf-key",
+			baseUrl: "https://api.cloudflare.com/client/v4/accounts/account-id/ai/v1",
+		});
+		expect(result?.env).toEqual({ CLOUDFLARE_ACCOUNT_ID: "account-id" });
+	});
+
+	it("requires Cloudflare AI Gateway account and gateway config and returns scoped env headers", async () => {
+		const missingGateway = createModels({
+			authContext: fakeAuthContext({ CLOUDFLARE_API_KEY: "cf-key", CLOUDFLARE_ACCOUNT_ID: "account-id" }),
+		});
+		missingGateway.setProvider(cloudflareAIGatewayProvider());
+		const model = missingGateway.getModels("cloudflare-ai-gateway")[0];
+		expect(await missingGateway.getAuth(model)).toBeUndefined();
+
+		const configured = createModels({
+			authContext: fakeAuthContext({
+				CLOUDFLARE_API_KEY: "cf-key",
+				CLOUDFLARE_ACCOUNT_ID: "account-id",
+				CLOUDFLARE_GATEWAY_ID: "gateway-id",
+			}),
+		});
+		configured.setProvider(cloudflareAIGatewayProvider());
+		const result = await configured.getAuth(model);
+		expect(result?.auth).toEqual({
+			headers: {
+				"cf-aig-authorization": "Bearer cf-key",
+				Authorization: null,
+				"x-api-key": null,
+			},
+			baseUrl: "https://gateway.ai.cloudflare.com/v1/account-id/gateway-id/anthropic",
+		});
+		expect(result?.env).toEqual({
+			CLOUDFLARE_ACCOUNT_ID: "account-id",
+			CLOUDFLARE_GATEWAY_ID: "gateway-id",
+		});
 	});
 
 	it("resolves vertex via ADC file plus project and location", async () => {

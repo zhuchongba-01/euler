@@ -702,10 +702,10 @@ Built-in provider factories use `createProvider()` internally. models.json custo
 
 `@earendil-works/pi-ai/compat` preserves the old global API surface until the coding-agent migration deletes it. New code never imports it.
 
-Old semantics being preserved: global `stream()` dispatched purely on `model.api` via the api-registry, with env API key injection. The compat module reproduces this exactly — it does not route through a `Models` collection, so compat consumers get zero behavioral drift (a `Models`-routed variant was considered and dropped: a model with a known provider id but a different api would dispatch wrong, and auth semantics would shift mid-migration). The harness `Models` instance (Phase 6/7) is where new-path streaming happens.
+Old semantics being preserved: global `stream()` can still dispatch by `model.api` through the legacy api-registry for custom providers, mutated models, and tests/extensions that override a built-in API implementation.
 
-- `stream/complete/streamSimple/completeSimple(model, ctx, opts)`: api-dispatch via the api-registry plus `getEnvApiKey` injection, verbatim old behavior.
-- The builtin api registration side effect moves from the root barrel into compat. It skips api ids that already have a registration, since compat may load after a test or extension registered an override. `registerApiProvider()/unregisterApiProviders()` keep feeding the registry; `resetApiProviders()` clears and re-registers builtins.
+- `stream/complete/streamSimple/completeSimple(model, ctx, opts)`: real built-in provider/model/api matches route through a singleton `builtinModels()` collection, so provider auth/env/baseUrl behavior is shared with the new runtime. Unknown providers, mutated models, or overridden API registrations fall back to api-registry dispatch plus `getEnvApiKey` injection.
+- The builtin api registration side effect moves from the root barrel into compat. It skips api ids that already have a registration, since compat may load after a test or extension has already registered an override. `registerApiProvider()/unregisterApiProviders()` keep feeding the compat-local registry; `resetApiProviders()` clears and re-registers builtins.
 - Sync `getModel/getModels/getProviders` are deprecated aliases of `getBuiltinModel/getBuiltinModels/getBuiltinProviders` from `providers/all` (they were always pure generated-catalog reads — verified: nothing ever mutated the old `modelRegistry`).
 - Re-exports the per-API lazy stream wrappers (incl. `setBedrockProviderModule`), `env-api-keys.ts`, and the image-generation registry/catalogs; none of these stay on the root barrel.
 - `export * from "./index.ts"`: compat is a strict superset of the core entrypoint, so consumers switch a file's import path wholesale without symbol surgery.
@@ -873,15 +873,16 @@ Decisions:
 - Runtime `--api-key` overrides are a store overlay (an override reads as an ephemeral stored api-key credential, masking stored OAuth — matches today's priority). Every registered provider is guaranteed an `apiKey` auth slot so overrides apply to OAuth-only providers too.
 - `ModelRegistry.getAll`/`find`/`getAvailable` become async, delegating to the collection (no materialized snapshot, no sync lies; dynamic providers like llama.cpp work). The extension-facing `modelRegistry` surface changes accordingly (breaking, changelogged); extensions also get the collection itself as the forward API.
 - models.json keeps FULL feature parity, implemented as provider decoration: builtin factories wrapped so `getModels()` applies provider `baseUrl`/`compat` overlays, `modelOverrides`, and custom-model merges (async-safe); provider `apiKey`/`headers`/`authHeader` configs become that provider's `ApiKeyAuth` (config first, factory auth fallback); parse errors keep `getError()` semantics.
-- Extension `ProviderConfig` parity: provider-keyed `streamSimple`, old-style `oauth` adapted to `OAuthAuth` (`modifyModels` -> `getModels` wrap + `toAuth`), full model replacement per provider. The api-registry `registerApiProvider` dual-write stays for compat consumers (extensions calling global `complete()`); it dies with compat.
+- Extension `ProviderConfig` parity: provider-keyed `streamSimple`, old-style `oauth` adapted to `OAuthAuth` (`modifyModels` -> `getModels` wrap + `toAuth`), full model replacement per provider. Legacy `registerApiProvider` writes stay compat-local for consumers that call global `complete()`; they die with compat.
 - Copilot: stored-credential baseUrl applied in the wrapped `getModels()` (extension-visible models stay correct) plus per-request `toAuth().baseUrl`.
-- Cloudflare: provider-auth substitution (key + `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_GATEWAY_ID` from credential metadata/env -> `ModelAuth.baseUrl`); impl-side `resolveCloudflareBaseUrl` stays until compat dies (it is idempotent on substituted URLs), keeping extension `complete()` calls working.
+- Cloudflare: provider-auth substitution (key + `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_GATEWAY_ID` from credential metadata/env -> `ModelAuth.baseUrl`). Built-in compat calls route through `Models`, so they use the same provider auth path.
 
 Ordering:
 
 - [x] pi-ai rework first: `Provider.getModels()` sync + optional `refreshModels()`; `Models.getModels`/`getModel` sync, `Models.refresh(provider?)` async; `createProvider` takes `models` array + optional `refreshModels` fetcher (in-flight dedupe). Reverses Phase 1's async-listing decision — see "Provider model listing" for rationale (sync-or-async unions breed latent sync assumptions; async-only breaks sync consumer surfaces like extension `find`/`getAll`).
 - [ ] `FileCredentialStore` (ports the auth.json lock backend, reads legacy `type: "api_key"` tags) + `--api-key` overlay + `$ENV`/`!command` resolution; tests.
-- [ ] Cloudflare provider auth in pi-ai factories; copilot `getModels` baseUrl wrap.
+- [x] Cloudflare provider auth in pi-ai factories.
+- [ ] Copilot `getModels` baseUrl wrap.
 - [ ] Extension-OAuth adapter (old `OAuthProviderInterface` config -> `OAuthAuth`).
 - [ ] ModelRegistry rebuild: owns `MutableModels`, async reads, models.json decoration, provider-keyed extension streams, facade auth ops; AuthStorage deleted.
 - [ ] Consumer rewiring: agent-session, sdk (`credentials?: CredentialStore` option replaces `authStorage`; sdk.md updated), model-resolver, interactive login/status UI on `prompt()/notify()`, cli `--api-key`.
@@ -891,7 +892,7 @@ Ordering:
 
 - [ ] AgentSession -> AgentHarness; the registry facade dies in favor of harness `Models`.
 - [ ] Move ALL internal `/compat` imports to the new API: every package's src, all tests, and the example extensions (examples then demonstrate the new API). Nothing inside the repo may import `/compat` at that point.
-- [ ] Delete `/compat`, `api-registry.ts`, `env-api-keys.ts`, the extension-loader root-to-compat alias, the old `pi-ai/oauth` registry and `OAuthProviderInterface` (incl. `usesCallbackServer`), and the impl-side cloudflare substitution. This is the extension-author breaking release; changelog carries the migration guide.
+- [ ] Delete `/compat`, `env-api-keys.ts`, the extension-loader root-to-compat alias, the old `pi-ai/oauth` registry and `OAuthProviderInterface` (incl. `usesCallbackServer`), and the compat-local legacy API registry. This is the extension-author breaking release; changelog carries the migration guide.
 
 ### Deferred / follow-ups
 

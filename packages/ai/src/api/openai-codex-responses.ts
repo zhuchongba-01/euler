@@ -28,6 +28,7 @@ import type {
 	Context,
 	Model,
 	ProviderEnv,
+	ProviderHeaders,
 	SimpleStreamOptions,
 	StreamFunction,
 	StreamOptions,
@@ -1467,13 +1468,17 @@ function createCodexRequestId(): string {
 
 function buildBaseCodexHeaders(
 	initHeaders: Record<string, string> | undefined,
-	additionalHeaders: Record<string, string> | undefined,
+	additionalHeaders: ProviderHeaders | undefined,
 	accountId: string,
 	token: string,
 ): Headers {
 	const headers = new Headers(initHeaders);
 	for (const [key, value] of Object.entries(additionalHeaders || {})) {
-		headers.set(key, value);
+		if (value === null) {
+			headers.delete(key);
+		} else {
+			headers.set(key, value);
+		}
 	}
 	headers.set("Authorization", `Bearer ${token}`);
 	headers.set("chatgpt-account-id", accountId);
@@ -1485,7 +1490,7 @@ function buildBaseCodexHeaders(
 
 function buildSSEHeaders(
 	initHeaders: Record<string, string> | undefined,
-	additionalHeaders: Record<string, string> | undefined,
+	additionalHeaders: ProviderHeaders | undefined,
 	accountId: string,
 	token: string,
 	sessionId?: string,
@@ -1505,7 +1510,7 @@ function buildSSEHeaders(
 
 function buildWebSocketHeaders(
 	initHeaders: Record<string, string> | undefined,
-	additionalHeaders: Record<string, string> | undefined,
+	additionalHeaders: ProviderHeaders | undefined,
 	accountId: string,
 	token: string,
 	requestId: string,

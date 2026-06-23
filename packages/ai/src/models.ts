@@ -11,6 +11,7 @@ import type {
 	Context,
 	Model,
 	ModelThinkingLevel,
+	ProviderHeaders,
 	ProviderStreams,
 	SimpleStreamOptions,
 	StreamOptions,
@@ -33,7 +34,7 @@ export interface Provider<TApi extends Api = Api> {
 	readonly name: string;
 
 	readonly baseUrl?: string;
-	readonly headers?: Record<string, string>;
+	readonly headers?: ProviderHeaders;
 
 	/**
 	 * Required: at least one of `apiKey`/`oauth`. Every provider has auth
@@ -287,7 +288,7 @@ export interface CreateProviderOptions<TApi extends Api = Api> {
 	/** Display name. Default: `id`. */
 	name?: string;
 	baseUrl?: string;
-	headers?: Record<string, string>;
+	headers?: ProviderHeaders;
 	/** Required — every provider has auth semantics, even ambient/keyless ones. */
 	auth: ProviderAuth;
 	/** Initial model list (empty for purely dynamic providers). */

@@ -1,4 +1,4 @@
-import type { Api, ImagesApi, ImagesModel, Model, ProviderEnv } from "../types.ts";
+import type { Api, ImagesApi, ImagesModel, Model, ProviderEnv, ProviderHeaders } from "../types.ts";
 import type { OAuthCredentials } from "../utils/oauth/types.ts";
 
 /**
@@ -7,7 +7,7 @@ import type { OAuthCredentials } from "../utils/oauth/types.ts";
  */
 export interface ModelAuth {
 	apiKey?: string;
-	headers?: Record<string, string>;
+	headers?: ProviderHeaders;
 	baseUrl?: string;
 }
 
