@@ -360,6 +360,30 @@ describe("Models runtime", () => {
 		await expect(models.getAuth(testModel("p1", "model-a"))).rejects.toMatchObject({ code: "auth" });
 	});
 
+	it("uses explicit request api key and env during provider auth resolution", async () => {
+		const calls: ProviderCall[] = [];
+		const apiKey: ApiKeyAuth = {
+			name: "Scoped",
+			resolve: async ({ credential, ctx }) => {
+				const account = credential?.env?.ACCOUNT_ID ?? (await ctx.env("ACCOUNT_ID"));
+				if (!credential?.key || !account) return undefined;
+				return {
+					auth: { apiKey: credential.key, baseUrl: `https://example.test/${account}` },
+					env: { ACCOUNT_ID: account },
+				};
+			},
+		};
+		const models = createModels();
+		models.setProvider(testProvider({ id: "p1", auth: { apiKey }, calls }));
+		const model = testModel("p1", "model-a");
+
+		await models.completeSimple(model, context, { apiKey: "explicit-key", env: { ACCOUNT_ID: "acct" } });
+
+		expect(calls[0].model.baseUrl).toBe("https://example.test/acct");
+		expect(calls[0].options?.apiKey).toBe("explicit-key");
+		expect(calls[0].options?.env).toEqual({ ACCOUNT_ID: "acct" });
+	});
+
 	it("merges resolved auth into stream options; explicit options win per field", async () => {
 		const calls: ProviderCall[] = [];
 		const apiKey: ApiKeyAuth = {
