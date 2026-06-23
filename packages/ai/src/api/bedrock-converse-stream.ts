@@ -127,7 +127,7 @@ export const stream: StreamFunction<"bedrock-converse-stream", BedrockOptions> =
 			profile: options.profile || getProviderEnvValue("AWS_PROFILE", options.env),
 		};
 		const configuredRegion = getConfiguredBedrockRegion(options);
-		const hasAmbientConfiguredProfile = Boolean(getProviderEnvValue("AWS_PROFILE"));
+		const hasAmbientConfiguredProfile = Boolean(getProviderEnvValue("AWS_PROFILE", options.env));
 		const endpointRegion = getStandardBedrockEndpointRegion(model.baseUrl);
 		const useExplicitEndpoint = shouldUseExplicitBedrockEndpoint(
 			model.baseUrl,
