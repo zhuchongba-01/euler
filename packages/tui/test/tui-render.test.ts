@@ -378,44 +378,6 @@ describe("TUI resize handling", () => {
 		});
 	});
 
-	it("full re-renders in Termux when height changes reveal skipped offscreen changes", async () => {
-		await withEnv({ TERMUX_VERSION: "1" }, async () => {
-			const terminal = new VirtualTerminal(20, 5);
-			const tui = new TUI(terminal);
-			const component = new TestComponent();
-			tui.addChild(component);
-
-			component.lines = Array.from({ length: 11 }, (_, i) => `Line ${i}`);
-			tui.start();
-			await terminal.waitForRender();
-
-			component.lines = Array.from({ length: 11 }, (_, i) => (i === 5 ? "Changed 5" : `Line ${i}`));
-			tui.requestRender();
-			await terminal.waitForRender();
-
-			const redrawsAfterSkippedChange = tui.fullRedraws;
-			assert.deepStrictEqual(terminal.getViewport(), ["Line 6", "Line 7", "Line 8", "Line 9", "Line 10"]);
-
-			terminal.resize(20, 6);
-			await terminal.waitForRender();
-
-			assert.ok(
-				tui.fullRedraws > redrawsAfterSkippedChange,
-				"Height change should redraw before skipped offscreen content becomes visible",
-			);
-			assert.deepStrictEqual(terminal.getViewport(), [
-				"Changed 5",
-				"Line 6",
-				"Line 7",
-				"Line 8",
-				"Line 9",
-				"Line 10",
-			]);
-
-			tui.stop();
-		});
-	});
-
 	it("triggers full re-render when terminal width changes", async () => {
 		const terminal = new VirtualTerminal(40, 10);
 		const tui = new TUI(terminal);
@@ -691,32 +653,6 @@ describe("TUI differential rendering", () => {
 		viewport = terminal.getViewport();
 		assert.ok(viewport[0]?.includes("New Line 0"), `New content rendered: ${viewport[0]}`);
 		assert.ok(viewport[1]?.includes("New Line 1"), `New content line 1: ${viewport[1]}`);
-
-		tui.stop();
-	});
-
-	it("does not full redraw for offscreen changes above the viewport", async () => {
-		const terminal = new VirtualTerminal(20, 5);
-		const tui = new TUI(terminal);
-		const component = new TestComponent();
-		tui.addChild(component);
-
-		const stableVisibleLines = Array.from({ length: 8 }, (_, i) => `Dialog ${i}`);
-		component.lines = ["Ticker 0", "Intro", "", ...stableVisibleLines];
-		tui.start();
-		await terminal.waitForRender();
-
-		const initialRedraws = tui.fullRedraws;
-		const initialViewport = terminal.getViewport();
-
-		for (let i = 1; i <= 3; i++) {
-			component.lines = [`Ticker ${i}`, "Intro", "", ...stableVisibleLines];
-			tui.requestRender();
-			await terminal.waitForRender();
-		}
-
-		assert.strictEqual(tui.fullRedraws, initialRedraws, "Offscreen changes should not force full redraws");
-		assert.deepStrictEqual(terminal.getViewport(), initialViewport, "Visible viewport should remain stable");
 
 		tui.stop();
 	});

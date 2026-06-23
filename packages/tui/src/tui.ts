@@ -313,7 +313,6 @@ export class TUI extends Container {
 	private clearOnShrink = process.env.PI_CLEAR_ON_SHRINK === "1"; // Clear empty rows when content shrinks (default: off)
 	private maxLinesRendered = 0; // Track terminal's working area (max lines ever rendered)
 	private previousViewportTop = 0; // Track previous viewport top for resize-aware cursor moves
-	private skippedOffscreenChangeRange: { first: number; last: number } | undefined;
 	private fullRedrawCount = 0;
 	private stopped = false;
 	private pendingOsc11BackgroundReplies = 0;
@@ -719,7 +718,6 @@ export class TUI extends Container {
 			this.hardwareCursorRow = 0;
 			this.maxLinesRendered = 0;
 			this.previousViewportTop = 0;
-			this.skippedOffscreenChangeRange = undefined;
 			if (this.renderTimer) {
 				clearTimeout(this.renderTimer);
 				this.renderTimer = undefined;
@@ -1174,30 +1172,6 @@ export class TUI extends Container {
 		return this.deleteKittyImages(ids);
 	}
 
-	private changedRangeContainsKittyImages(firstChanged: number, lastChanged: number, newLines: string[]): boolean {
-		for (let i = firstChanged; i <= lastChanged; i++) {
-			if (extractKittyImageIds(this.previousLines[i] ?? "").length > 0) return true;
-			if (extractKittyImageIds(newLines[i] ?? "").length > 0) return true;
-		}
-		return false;
-	}
-
-	private markSkippedOffscreenChange(first: number, last: number): void {
-		if (!this.skippedOffscreenChangeRange) {
-			this.skippedOffscreenChangeRange = { first, last };
-			return;
-		}
-		this.skippedOffscreenChangeRange = {
-			first: Math.min(this.skippedOffscreenChangeRange.first, first),
-			last: Math.max(this.skippedOffscreenChangeRange.last, last),
-		};
-	}
-
-	private skippedOffscreenChangesIntersect(first: number, last: number): boolean {
-		const range = this.skippedOffscreenChangeRange;
-		return range !== undefined && range.first <= last && range.last >= first;
-	}
-
 	/** Splice overlay content into a base line at a specific column. Single-pass optimized. */
 	private compositeLineAt(
 		baseLine: string,
@@ -1348,7 +1322,6 @@ export class TUI extends Container {
 			this.previousKittyImageIds = this.collectKittyImageIds(newLines);
 			this.previousWidth = width;
 			this.previousHeight = height;
-			this.skippedOffscreenChangeRange = undefined;
 		};
 
 		const debugRedraw = process.env.PI_DEBUG_REDRAW === "1";
@@ -1376,18 +1349,7 @@ export class TUI extends Container {
 		// Height changes normally need a full re-render to keep the visible viewport aligned,
 		// but Termux changes height when the software keyboard shows or hides.
 		// In that environment, a full redraw causes the entire history to replay on every toggle.
-		// If the new Termux viewport would reveal rows skipped by the offscreen optimization,
-		// redraw once so stale scrollback does not become visible.
-		if (heightChanged && isTermuxSession()) {
-			const viewportBottom = prevViewportTop + height - 1;
-			if (this.skippedOffscreenChangesIntersect(prevViewportTop, viewportBottom)) {
-				logRedraw(
-					`terminal height changed revealing skipped offscreen changes (${this.previousHeight} -> ${height})`,
-				);
-				fullRender(true);
-				return;
-			}
-		} else if (heightChanged) {
+		if (heightChanged && !isTermuxSession()) {
 			logRedraw(`terminal height changed (${this.previousHeight} -> ${height})`);
 			fullRender(true);
 			return;
@@ -1436,24 +1398,6 @@ export class TUI extends Container {
 			this.positionHardwareCursor(cursorPos, newLines.length);
 			this.previousViewportTop = prevViewportTop;
 			this.previousHeight = height;
-			return;
-		}
-
-		// If all changed lines are above the visible viewport and the buffer length did not change,
-		// the on-screen content is already correct. Avoid clearing/replaying the viewport for
-		// offscreen animations such as tall dialogs with an updating header/status line.
-		if (
-			lastChanged < prevViewportTop &&
-			newLines.length === this.previousLines.length &&
-			!this.changedRangeContainsKittyImages(firstChanged, lastChanged, newLines)
-		) {
-			this.markSkippedOffscreenChange(firstChanged, lastChanged);
-			this.positionHardwareCursor(cursorPos, newLines.length);
-			this.previousLines = newLines;
-			this.previousKittyImageIds = this.collectKittyImageIds(newLines);
-			this.previousWidth = width;
-			this.previousHeight = height;
-			this.previousViewportTop = prevViewportTop;
 			return;
 		}
 
