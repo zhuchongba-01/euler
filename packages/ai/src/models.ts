@@ -236,10 +236,11 @@ class ModelsImpl implements MutableModels {
 
 		const requestModel = auth.baseUrl ? { ...model, baseUrl: auth.baseUrl } : model;
 
-		// Explicit request options win per-field; headers merge per header.
+		// Explicit request options win per-field; headers/env merge per key.
 		const apiKey = options?.apiKey ?? auth.apiKey;
 		const headers = auth.headers || options?.headers ? { ...auth.headers, ...options?.headers } : undefined;
-		const requestOptions = { ...options, apiKey, headers } as TOptions;
+		const env = resolution.env || options?.env ? { ...(resolution.env ?? {}), ...(options?.env ?? {}) } : undefined;
+		const requestOptions = { ...options, apiKey, headers, env } as TOptions;
 
 		return { requestModel, requestOptions };
 	}

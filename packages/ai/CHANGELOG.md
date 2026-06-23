@@ -17,9 +17,11 @@
 - `fauxProvider()` returns a faux `Provider` for tests built on explicit `Models` collections.
 - Image generation mirrors the chat-side design: `createImagesModels()`/`ImagesProvider`/`createImagesProvider()` with sync model reads, explicit `refresh()`, provider-resolved auth, and never-rejecting `generateImages()`; `openrouterImagesProvider()` factory plus `builtinImagesProviders()`/`builtinImagesModels()` in `providers/all`. The `ImagesProvider` id type alias is renamed to `ImagesProviderId`; the old global image API stays on `/compat`.
 - When Amazon Bedrock rejects an unsupported data retention mode, the error now links the AWS data retention documentation ([#5561](https://github.com/earendil-works/pi/pull/5561) by [@unexge](https://github.com/unexge)).
+- Provider auth results can carry provider-scoped environment values that `Models` and `ImagesModels` merge into API implementation options.
 
 ### Fixed
 
+- Fixed Amazon Bedrock endpoint resolution to honor scoped `AWS_PROFILE` values.
 - Fixed OpenCode Go GLM-5.2 metadata to expose `xhigh` reasoning and send `reasoning_effort: "max"` ([#5967](https://github.com/earendil-works/pi/issues/5967)).
 - Fixed Claude Fable 5 thinking-off requests to omit Anthropic's unsupported `thinking.type: "disabled"` payload ([#5567](https://github.com/earendil-works/pi/pull/5567) by [@tmustier](https://github.com/tmustier)).
 

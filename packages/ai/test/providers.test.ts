@@ -168,6 +168,47 @@ describe("createProvider", () => {
 		expect(calls).toEqual(["a:model-a", "b:model-b"]);
 	});
 
+	it("merges provider-resolved env into stream options", async () => {
+		let capturedEnv: Record<string, string> | undefined;
+		let capturedApiKey: string | undefined;
+		const envModel = { ...testModel("api-a", "model-a"), provider: "env-provider" };
+		const provider = createProvider({
+			id: "env-provider",
+			auth: {
+				apiKey: {
+					name: "Test",
+					resolve: async () => ({
+						auth: { apiKey: "provider-key" },
+						env: { PROVIDER_ONLY: "provider", SHARED: "provider" },
+					}),
+				},
+			},
+			models: [envModel],
+			api: {
+				stream: (model, _context, options) => {
+					capturedEnv = options?.env;
+					capturedApiKey = options?.apiKey;
+					return recordingStreams("a", []).stream(model, _context, options);
+				},
+				streamSimple: (model, _context, options) => {
+					capturedEnv = options?.env;
+					capturedApiKey = options?.apiKey;
+					return recordingStreams("a", []).streamSimple(model, _context, options);
+				},
+			},
+		});
+		const models = createModels();
+		models.setProvider(provider);
+
+		await models.completeSimple(envModel, context, {
+			apiKey: "request-key",
+			env: { REQUEST_ONLY: "request", SHARED: "request" },
+		});
+
+		expect(capturedApiKey).toBe("request-key");
+		expect(capturedEnv).toEqual({ PROVIDER_ONLY: "provider", REQUEST_ONLY: "request", SHARED: "request" });
+	});
+
 	it("produces a stream error for a model whose api has no implementation", async () => {
 		const provider = createProvider({
 			id: "mixed",

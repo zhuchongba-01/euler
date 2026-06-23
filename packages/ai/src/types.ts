@@ -240,6 +240,11 @@ export interface ImagesOptions {
 	signal?: AbortSignal;
 	apiKey?: string;
 	/**
+	 * Provider-scoped environment values. These take precedence over process.env for
+	 * provider configuration such as endpoint placeholders and proxy variables.
+	 */
+	env?: ProviderEnv;
+	/**
 	 * Optional callback for inspecting or replacing provider payloads before sending.
 	 * Return undefined to keep the payload unchanged.
 	 */

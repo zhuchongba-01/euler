@@ -1,4 +1,4 @@
-import type { Api, ImagesApi, ImagesModel, Model } from "../types.ts";
+import type { Api, ImagesApi, ImagesModel, Model, ProviderEnv } from "../types.ts";
 import type { OAuthCredentials } from "../utils/oauth/types.ts";
 
 /**
@@ -78,6 +78,8 @@ export interface AuthContext {
 /** Result of resolving auth for a model. */
 export interface AuthResult {
 	auth: ModelAuth;
+	/** Provider-scoped environment/config values resolved from credentials and ambient context. */
+	env?: ProviderEnv;
 	/** Human-readable label for status UI: "ANTHROPIC_API_KEY", "OAuth", "~/.aws/credentials". */
 	source?: string;
 }
