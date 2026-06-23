@@ -6,6 +6,10 @@
 
 - Added `Ctrl+J` as a default newline keybinding alongside `Shift+Enter`.
 
+### Fixed
+
+- Fixed full redraw loops when offscreen lines change above a tall visible viewport, avoiding flicker for oversized dialogs ([#5990](https://github.com/earendil-works/pi/issues/5990)).
+
 ## [0.79.10] - 2026-06-22
 
 ## [0.79.9] - 2026-06-20
