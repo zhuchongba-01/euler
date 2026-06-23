@@ -67,6 +67,7 @@ Migration guide:
 
 ### Fixed
 
+- Fixed OpenAI Responses streams to fail when they end before a terminal response event and to treat `response.incomplete` as a length stop ([#5526](https://github.com/earendil-works/pi/pull/5526) by [@dmmulroy](https://github.com/dmmulroy)).
 - Fixed Amazon Bedrock endpoint resolution to honor scoped `AWS_PROFILE` values.
 - Fixed Cloudflare providers to require account/gateway configuration and route built-in `/compat` requests through provider auth.
 - Fixed OpenAI Codex Responses WebSocket sessions to reconnect once when OpenAI's connection limit is reached before output starts ([#5973](https://github.com/earendil-works/pi/issues/5973)).
