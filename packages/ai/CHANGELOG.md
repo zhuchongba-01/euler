@@ -10,6 +10,7 @@
 
 Migration guide:
 
+- Read `packages/ai/README.md` in full for the new `Models` API, provider factories, auth configuration, image generation, and custom provider examples.
 - To keep the old global API temporarily, change imports from `@earendil-works/pi-ai` to `@earendil-works/pi-ai/compat`. The compat entrypoint preserves `stream`/`complete`, generated catalog reads, API registry helpers, env API-key helpers, lazy API wrappers, and image globals, but it will be removed in a future release.
 - To migrate to the new runtime, create a `Models` collection and call methods on it:
 
