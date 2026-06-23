@@ -7,6 +7,7 @@
 - The root entrypoint (`@earendil-works/pi-ai`) is now core-only and side-effect free. The old global API moved to the temporary `@earendil-works/pi-ai/compat` entrypoint, a strict superset of the root: switching a file's import path is the only migration step. Moved symbols include `stream`/`complete`/`streamSimple`/`completeSimple`, `getModel`/`getModels`/`getProviders` (now deprecated aliases of `getBuiltinModel`/`getBuiltinModels`/`getBuiltinProviders` from `@earendil-works/pi-ai/providers/all`), `registerApiProvider`/`unregisterApiProviders`/`resetApiProviders`/`getApiProvider`, `getEnvApiKey`/`findEnvKeys`, `setBedrockProviderModule`, the per-API lazy stream wrappers (`anthropicMessagesApi`, ...), and the image-generation API.
 - Renamed the `Provider` type to `ProviderId`. `Provider` now names the runtime provider interface (id, name, auth, model listing, stream behavior).
 - API implementation modules moved from `src/providers/` to `@earendil-works/pi-ai/api/*`, renamed by API id (`anthropic` -> `api/anthropic-messages`, `google` -> `api/google-generative-ai`, `mistral` -> `api/mistral-conversations`, `amazon-bedrock` -> `api/bedrock-converse-stream`), each exporting exactly `stream` and `streamSimple`. The old per-impl export names (`streamAnthropic`, `streamSimpleAnthropic`, ...) and legacy raw API subpaths (`./anthropic`, `./google`, `./openai-completions`, ...) are gone; import raw API implementations through `@earendil-works/pi-ai/api/*`.
+- Removed the `@earendil-works/pi-ai/base` selective-provider entrypoint; use the root/core APIs with explicit `createModels()` collections and provider factories for isolated bundles.
 
 Migration guide:
 
@@ -62,7 +63,6 @@ Migration guide:
 - OAuth flows (Anthropic, OpenAI Codex, GitHub Copilot) gained `OAuthAuth` adapters (`login`/`refresh`/`toAuth`) on unified `prompt()`/`notify()` login callbacks; Copilot's per-credential base URL is derived in `toAuth()`.
 - `fauxProvider()` returns a faux `Provider` for tests built on explicit `Models` collections.
 - Image generation mirrors the chat-side design: `createImagesModels()`/`ImagesProvider`/`createImagesProvider()` with sync model reads, explicit `refresh()`, provider-resolved auth, and never-rejecting `generateImages()`; `openrouterImagesProvider()` factory plus `builtinImagesProviders()`/`builtinImagesModels()` in `providers/all`. The `ImagesProvider` id type alias is renamed to `ImagesProviderId`; the old global image API stays on `/compat`.
-- When Amazon Bedrock rejects an unsupported data retention mode, the error now links the AWS data retention documentation ([#5561](https://github.com/earendil-works/pi/pull/5561) by [@unexge](https://github.com/unexge)).
 - Provider auth results can carry provider-scoped environment values that `Models` and `ImagesModels` merge into API implementation options.
 
 ### Fixed
@@ -70,9 +70,9 @@ Migration guide:
 - Fixed OpenAI Responses streams to fail when they end before a terminal response event and to treat `response.incomplete` as a length stop ([#5526](https://github.com/earendil-works/pi/pull/5526) by [@dmmulroy](https://github.com/dmmulroy)).
 - Fixed Amazon Bedrock endpoint resolution to honor scoped `AWS_PROFILE` values.
 - Fixed Cloudflare providers to require account/gateway configuration and route built-in `/compat` requests through provider auth.
+- Fixed `/compat` API-key injection to honor request-scoped `env` values.
 - Fixed OpenAI Codex Responses WebSocket sessions to reconnect once when OpenAI's connection limit is reached before output starts ([#5973](https://github.com/earendil-works/pi/issues/5973)).
 - Fixed OpenCode Go GLM-5.2 metadata to expose `xhigh` reasoning and send `reasoning_effort: "max"` ([#5967](https://github.com/earendil-works/pi/issues/5967)).
-- Fixed Claude Fable 5 thinking-off requests to omit Anthropic's unsupported `thinking.type: "disabled"` payload ([#5567](https://github.com/earendil-works/pi/pull/5567) by [@tmustier](https://github.com/tmustier)).
 
 ## [0.79.10] - 2026-06-22
 
