@@ -61,6 +61,7 @@ const DEFAULT_SSE_HEADER_TIMEOUT_MS = 20_000;
 const DEFAULT_WEBSOCKET_CONNECT_TIMEOUT_MS = 15_000;
 const CODEX_TOOL_CALL_PROVIDERS = new Set(["openai", "openai-codex", "opencode"]);
 const WEBSOCKET_MESSAGE_TOO_BIG_CLOSE_CODE = 1009;
+const WEBSOCKET_CONNECTION_LIMIT_REACHED_CODE = "websocket_connection_limit_reached";
 
 const CODEX_RESPONSE_STATUSES = new Set<CodexResponseStatus>([
 	"completed",
@@ -253,52 +254,62 @@ export const stream: StreamFunction<"openai-codex-responses", OpenAICodexRespons
 
 			if (transport !== "sse" && !websocketDisabledForSession) {
 				let websocketStarted = false;
-				try {
-					await processWebSocketStream(
-						resolveCodexWebSocketUrl(model.baseUrl),
-						body,
-						websocketHeaders,
-						output,
-						stream,
-						model,
-						() => {
-							websocketStarted = true;
-						},
-						idleTimeoutMs,
-						websocketConnectTimeoutMs,
-						options,
-					);
+				let retriedWebSocketConnectionLimit = false;
+				while (true) {
+					websocketStarted = false;
+					try {
+						await processWebSocketStream(
+							resolveCodexWebSocketUrl(model.baseUrl),
+							body,
+							websocketHeaders,
+							output,
+							stream,
+							model,
+							() => {
+								websocketStarted = true;
+							},
+							idleTimeoutMs,
+							websocketConnectTimeoutMs,
+							options,
+						);
 
-					if (options?.signal?.aborted) {
-						throw new Error("Request was aborted");
+						if (options?.signal?.aborted) {
+							throw new Error("Request was aborted");
+						}
+						stream.push({
+							type: "done",
+							reason: output.stopReason as "stop" | "length" | "toolUse",
+							message: output,
+						});
+						stream.end();
+						return;
+					} catch (error) {
+						const aborted = options?.signal?.aborted;
+						const connectionLimitBeforeStart = !websocketStarted && isWebSocketConnectionLimitReachedError(error);
+						if (!aborted && connectionLimitBeforeStart && !retriedWebSocketConnectionLimit) {
+							retriedWebSocketConnectionLimit = true;
+							continue;
+						}
+						if (aborted || (isCodexNonTransportError(error) && !connectionLimitBeforeStart)) {
+							throw error;
+						}
+						appendAssistantMessageDiagnostic(
+							output,
+							createAssistantMessageDiagnostic("provider_transport_failure", error, {
+								configuredTransport: transport,
+								fallbackTransport: websocketStarted ? undefined : "sse",
+								eventsEmitted: websocketStarted,
+								phase: websocketStarted ? "after_message_stream_start" : "before_message_stream_start",
+								requestBytes: new TextEncoder().encode(bodyJson).byteLength,
+							}),
+						);
+						recordWebSocketFailure(options?.sessionId, error);
+						if (websocketStarted) {
+							throw error;
+						}
+						recordWebSocketSseFallback(options?.sessionId);
+						break;
 					}
-					stream.push({
-						type: "done",
-						reason: output.stopReason as "stop" | "length" | "toolUse",
-						message: output,
-					});
-					stream.end();
-					return;
-				} catch (error) {
-					const aborted = options?.signal?.aborted;
-					if (aborted || isCodexNonTransportError(error)) {
-						throw error;
-					}
-					appendAssistantMessageDiagnostic(
-						output,
-						createAssistantMessageDiagnostic("provider_transport_failure", error, {
-							configuredTransport: transport,
-							fallbackTransport: websocketStarted ? undefined : "sse",
-							eventsEmitted: websocketStarted,
-							phase: websocketStarted ? "after_message_stream_start" : "before_message_stream_start",
-							requestBytes: new TextEncoder().encode(bodyJson).byteLength,
-						}),
-					);
-					recordWebSocketFailure(options?.sessionId, error);
-					if (websocketStarted) {
-						throw error;
-					}
-					recordWebSocketSseFallback(options?.sessionId);
 				}
 			}
 
@@ -582,16 +593,32 @@ function isCodexNonTransportError(error: unknown): boolean {
 	return error instanceof CodexApiError || error instanceof CodexProtocolError;
 }
 
+function isWebSocketConnectionLimitReachedError(error: unknown): boolean {
+	return error instanceof CodexApiError && error.code === WEBSOCKET_CONNECTION_LIMIT_REACHED_CODE;
+}
+
+function extractCodexEventError(event: Record<string, unknown>): { code?: string; message?: string } {
+	const nested = event.error && typeof event.error === "object" ? (event.error as Record<string, unknown>) : undefined;
+	return {
+		code: typeof event.code === "string" ? event.code : typeof nested?.code === "string" ? nested.code : undefined,
+		message:
+			typeof event.message === "string"
+				? event.message
+				: typeof nested?.message === "string"
+					? nested.message
+					: undefined,
+	};
+}
+
 async function* mapCodexEvents(events: AsyncIterable<Record<string, unknown>>): AsyncGenerator<ResponseStreamEvent> {
 	for await (const event of events) {
 		const type = typeof event.type === "string" ? event.type : undefined;
 		if (!type) continue;
 
 		if (type === "error") {
-			const code = (event as { code?: string }).code || "";
-			const message = (event as { message?: string }).message || "";
+			const { code, message } = extractCodexEventError(event);
 			throw new CodexApiError(`Codex error: ${message || code || JSON.stringify(event)}`, {
-				code: code || undefined,
+				code,
 				payload: event,
 			});
 		}

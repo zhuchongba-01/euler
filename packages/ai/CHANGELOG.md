@@ -22,6 +22,7 @@
 ### Fixed
 
 - Fixed Amazon Bedrock endpoint resolution to honor scoped `AWS_PROFILE` values.
+- Fixed OpenAI Codex Responses WebSocket sessions to reconnect once when OpenAI's connection limit is reached before output starts ([#5973](https://github.com/earendil-works/pi/issues/5973)).
 - Fixed OpenCode Go GLM-5.2 metadata to expose `xhigh` reasoning and send `reasoning_effort: "max"` ([#5967](https://github.com/earendil-works/pi/issues/5967)).
 - Fixed Claude Fable 5 thinking-off requests to omit Anthropic's unsupported `thinking.type: "disabled"` payload ([#5567](https://github.com/earendil-works/pi/pull/5567) by [@tmustier](https://github.com/tmustier)).
 

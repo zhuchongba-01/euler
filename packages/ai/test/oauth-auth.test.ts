@@ -69,7 +69,11 @@ describe.sequential("OAuthAuth adapters", () => {
 	it("github-copilot refresh preserves the enterprise domain", async () => {
 		const fetchedUrls: string[] = [];
 		const fetchMock = vi.fn(async (input: unknown) => {
-			fetchedUrls.push(typeof input === "string" ? input : String(input));
+			const url = typeof input === "string" ? input : String(input);
+			fetchedUrls.push(url);
+			if (url.endsWith("/models")) {
+				return jsonResponse({ data: [] });
+			}
 			return jsonResponse({ token: "new-token", expires_at: 9999999999 });
 		});
 		vi.stubGlobal("fetch", fetchMock);
