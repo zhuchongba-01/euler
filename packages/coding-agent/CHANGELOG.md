@@ -15,6 +15,7 @@
 ### Fixed
 
 - Fixed `pi --resume` to load user package themes and resolve automatic light/dark theme settings.
+- Fixed `models.json` custom providers so stored credentials can satisfy auth without a redundant provider-level `apiKey` ([#5953](https://github.com/earendil-works/pi/issues/5953)).
 
 ## [0.79.10] - 2026-06-22
 
