@@ -43,7 +43,7 @@ export async function resolveProviderAuth(
 		if (stored.type === "oauth" && provider.auth.oauth) {
 			return resolveStoredOAuth(credentials, provider.id, provider.auth.oauth, stored);
 		}
-		if (stored.type === "api-key" && provider.auth.apiKey) {
+		if (stored.type === "api_key" && provider.auth.apiKey) {
 			return resolveApiKey(authContext, provider.auth.apiKey, model, stored);
 		}
 		return undefined;

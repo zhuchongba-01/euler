@@ -225,7 +225,7 @@ describe("Models runtime", () => {
 		expect(resolution?.source).toBe("OAuth");
 
 		// stored api-key credential resolves through apiKey auth, beats env
-		await credentials.modify("p1", async () => ({ type: "api-key", key: "stored-key" }));
+		await credentials.modify("p1", async () => ({ type: "api_key", key: "stored-key" }));
 		const apiKeyResolution = await models.getAuth(model);
 		expect(apiKeyResolution?.auth.apiKey).toBe("stored-key");
 		expect(apiKeyResolution?.source).toBe("stored");
