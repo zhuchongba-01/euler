@@ -324,6 +324,7 @@ function detectOpenAICompletionsCompat(model: Model<"openai-completions">): Open
 	const isCloudflareAiGateway = provider === "cloudflare-ai-gateway" || baseUrl.includes("gateway.ai.cloudflare.com");
 	const isNvidia = provider === "nvidia" || baseUrl.includes("integrate.api.nvidia.com");
 	const isAntLing = provider === "ant-ling" || baseUrl.includes("api.ant-ling.com");
+	const isTogetherReasoningOnly = isTogether && TOGETHER_REASONING_ONLY_MODELS.has(model.id);
 
 	const isNonStandard =
 		isNvidia ||
@@ -366,7 +367,7 @@ function detectOpenAICompletionsCompat(model: Model<"openai-completions">): Open
 			? "deepseek"
 			: isZai
 				? "zai"
-				: isTogether
+				: isTogether && !isTogetherReasoningOnly
 					? "together"
 					: isAntLing
 						? "ant-ling"

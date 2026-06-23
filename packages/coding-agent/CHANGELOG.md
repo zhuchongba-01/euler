@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed inherited Amazon Bedrock scoped `AWS_PROFILE` endpoint resolution for built-in inference profile endpoints.
+- Fixed inherited Fireworks Anthropic-compatible requests to apply session-affinity and unsupported tool-field defaults for custom Fireworks models.
+- Fixed inherited Together MiniMax M2.7 metadata to avoid unsupported Together reasoning toggles.
+
 ## [0.80.0] - 2026-06-23
 
 ### Changed
