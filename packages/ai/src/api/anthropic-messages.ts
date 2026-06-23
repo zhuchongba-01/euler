@@ -170,16 +170,11 @@ const INTERLEAVED_THINKING_BETA = "interleaved-thinking-2025-05-14";
 function getAnthropicCompat(
 	model: Model<"anthropic-messages">,
 ): Required<Omit<AnthropicMessagesCompat, "forceAdaptiveThinking">> {
-	const isFireworks = model.provider === "fireworks";
-	const isCloudflareAiGatewayAnthropic =
-		model.provider === "cloudflare-ai-gateway" && model.baseUrl.includes("anthropic");
-
 	return {
-		supportsEagerToolInputStreaming: model.compat?.supportsEagerToolInputStreaming ?? !isFireworks,
-		supportsLongCacheRetention: model.compat?.supportsLongCacheRetention ?? !isFireworks,
-		sendSessionAffinityHeaders:
-			model.compat?.sendSessionAffinityHeaders ?? (isFireworks || isCloudflareAiGatewayAnthropic),
-		supportsCacheControlOnTools: model.compat?.supportsCacheControlOnTools ?? !isFireworks,
+		supportsEagerToolInputStreaming: model.compat?.supportsEagerToolInputStreaming ?? true,
+		supportsLongCacheRetention: model.compat?.supportsLongCacheRetention ?? true,
+		sendSessionAffinityHeaders: model.compat?.sendSessionAffinityHeaders ?? false,
+		supportsCacheControlOnTools: model.compat?.supportsCacheControlOnTools ?? true,
 		supportsTemperature: model.compat?.supportsTemperature ?? true,
 		allowEmptySignature: model.compat?.allowEmptySignature ?? false,
 	};
