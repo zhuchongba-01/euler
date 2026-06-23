@@ -1859,13 +1859,13 @@ export const OPENROUTER_MODELS = {
 		reasoning: true,
 		input: ["text", "image"],
 		cost: {
-			input: 0.68,
-			output: 3.41,
-			cacheRead: 0.144,
+			input: 0.74,
+			output: 3.5,
+			cacheRead: 0.15,
 			cacheWrite: 0,
 		},
 		contextWindow: 262144,
-		maxTokens: 262144,
+		maxTokens: 16384,
 	} satisfies Model<"openai-completions">,
 	"nvidia/llama-3.3-nemotron-super-49b-v1.5": {
 		id: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
