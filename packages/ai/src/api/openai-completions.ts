@@ -1163,55 +1163,123 @@ function mapStopReason(reason: ChatCompletionChunk.Choice["finish_reason"] | str
 	}
 }
 
-const DEFAULT_COMPAT: ResolvedOpenAICompletionsCompat = {
-	supportsStore: true,
-	supportsDeveloperRole: true,
-	supportsReasoningEffort: true,
-	supportsUsageInStreaming: true,
-	maxTokensField: "max_completion_tokens",
-	requiresToolResultName: false,
-	requiresAssistantAfterToolResult: false,
-	requiresThinkingAsText: false,
-	requiresReasoningContentOnAssistantMessages: false,
-	thinkingFormat: "openai",
-	openRouterRouting: {},
-	vercelGatewayRouting: {},
-	chatTemplateKwargs: {},
-	zaiToolStream: false,
-	supportsStrictMode: true,
-	cacheControlFormat: undefined,
-	sendSessionAffinityHeaders: false,
-	supportsLongCacheRetention: true,
-};
+/**
+ * Auto-detect compatibility settings from provider name and baseUrl.
+ * Used as the base when model.compat is not set; explicit model.compat
+ * entries override these detected values.
+ */
+function detectCompat(model: Model<"openai-completions">): ResolvedOpenAICompletionsCompat {
+	const provider = model.provider;
+	const baseUrl = model.baseUrl;
+
+	const isZai =
+		provider === "zai" ||
+		provider === "zai-coding-cn" ||
+		baseUrl.includes("api.z.ai") ||
+		baseUrl.includes("open.bigmodel.cn");
+	const isTogether =
+		provider === "together" || baseUrl.includes("api.together.ai") || baseUrl.includes("api.together.xyz");
+	const isMoonshot = provider === "moonshotai" || provider === "moonshotai-cn" || baseUrl.includes("api.moonshot.");
+	const isOpenRouter = provider === "openrouter" || baseUrl.includes("openrouter.ai");
+	const isCloudflareWorkersAI = provider === "cloudflare-workers-ai" || baseUrl.includes("api.cloudflare.com");
+	const isCloudflareAiGateway = provider === "cloudflare-ai-gateway" || baseUrl.includes("gateway.ai.cloudflare.com");
+	const isNvidia = provider === "nvidia" || baseUrl.includes("integrate.api.nvidia.com");
+	const isAntLing = provider === "ant-ling" || baseUrl.includes("api.ant-ling.com");
+
+	const isNonStandard =
+		isNvidia ||
+		provider === "cerebras" ||
+		baseUrl.includes("cerebras.ai") ||
+		provider === "xai" ||
+		baseUrl.includes("api.x.ai") ||
+		isTogether ||
+		baseUrl.includes("chutes.ai") ||
+		baseUrl.includes("deepseek.com") ||
+		isZai ||
+		isMoonshot ||
+		provider === "opencode" ||
+		baseUrl.includes("opencode.ai") ||
+		isCloudflareWorkersAI ||
+		isCloudflareAiGateway ||
+		isAntLing;
+
+	const useMaxTokens =
+		baseUrl.includes("chutes.ai") || isMoonshot || isCloudflareAiGateway || isTogether || isNvidia || isAntLing;
+
+	const isGrok = provider === "xai" || baseUrl.includes("api.x.ai");
+	const isDeepSeek = provider === "deepseek" || baseUrl.includes("deepseek.com");
+	const isOpenRouterDeveloperRoleModel =
+		isOpenRouter && (model.id.startsWith("anthropic/") || model.id.startsWith("openai/"));
+	const cacheControlFormat = provider === "openrouter" && model.id.startsWith("anthropic/") ? "anthropic" : undefined;
+
+	return {
+		supportsStore: !isNonStandard,
+		supportsDeveloperRole: isOpenRouterDeveloperRoleModel || (!isNonStandard && !isOpenRouter),
+		supportsReasoningEffort:
+			!isGrok && !isZai && !isMoonshot && !isTogether && !isCloudflareAiGateway && !isNvidia && !isAntLing,
+		supportsUsageInStreaming: true,
+		maxTokensField: useMaxTokens ? "max_tokens" : "max_completion_tokens",
+		requiresToolResultName: false,
+		requiresAssistantAfterToolResult: false,
+		requiresThinkingAsText: false,
+		requiresReasoningContentOnAssistantMessages: isDeepSeek,
+		thinkingFormat: isDeepSeek
+			? "deepseek"
+			: isZai
+				? "zai"
+				: isTogether
+					? "together"
+					: isAntLing
+						? "ant-ling"
+						: isOpenRouter
+							? "openrouter"
+							: "openai",
+		openRouterRouting: {},
+		vercelGatewayRouting: {},
+		chatTemplateKwargs: {},
+		zaiToolStream: false,
+		supportsStrictMode: !isMoonshot && !isTogether && !isCloudflareAiGateway && !isNvidia,
+		cacheControlFormat,
+		sendSessionAffinityHeaders: false,
+		supportsLongCacheRetention: !(
+			isTogether ||
+			isCloudflareWorkersAI ||
+			isCloudflareAiGateway ||
+			isNvidia ||
+			isAntLing
+		),
+	};
+}
 
 /**
  * Get resolved compatibility settings for a model.
- * Uses explicit generated/custom model.compat over OpenAI-standard defaults.
+ * Auto-detects from provider/URL then overrides with explicit model.compat.
  */
 function getCompat(model: Model<"openai-completions">): ResolvedOpenAICompletionsCompat {
-	if (!model.compat) return DEFAULT_COMPAT;
+	const detected = detectCompat(model);
+	if (!model.compat) return detected;
 
 	return {
-		supportsStore: model.compat.supportsStore ?? DEFAULT_COMPAT.supportsStore,
-		supportsDeveloperRole: model.compat.supportsDeveloperRole ?? DEFAULT_COMPAT.supportsDeveloperRole,
-		supportsReasoningEffort: model.compat.supportsReasoningEffort ?? DEFAULT_COMPAT.supportsReasoningEffort,
-		supportsUsageInStreaming: model.compat.supportsUsageInStreaming ?? DEFAULT_COMPAT.supportsUsageInStreaming,
-		maxTokensField: model.compat.maxTokensField ?? DEFAULT_COMPAT.maxTokensField,
-		requiresToolResultName: model.compat.requiresToolResultName ?? DEFAULT_COMPAT.requiresToolResultName,
+		supportsStore: model.compat.supportsStore ?? detected.supportsStore,
+		supportsDeveloperRole: model.compat.supportsDeveloperRole ?? detected.supportsDeveloperRole,
+		supportsReasoningEffort: model.compat.supportsReasoningEffort ?? detected.supportsReasoningEffort,
+		supportsUsageInStreaming: model.compat.supportsUsageInStreaming ?? detected.supportsUsageInStreaming,
+		maxTokensField: model.compat.maxTokensField ?? detected.maxTokensField,
+		requiresToolResultName: model.compat.requiresToolResultName ?? detected.requiresToolResultName,
 		requiresAssistantAfterToolResult:
-			model.compat.requiresAssistantAfterToolResult ?? DEFAULT_COMPAT.requiresAssistantAfterToolResult,
-		requiresThinkingAsText: model.compat.requiresThinkingAsText ?? DEFAULT_COMPAT.requiresThinkingAsText,
+			model.compat.requiresAssistantAfterToolResult ?? detected.requiresAssistantAfterToolResult,
+		requiresThinkingAsText: model.compat.requiresThinkingAsText ?? detected.requiresThinkingAsText,
 		requiresReasoningContentOnAssistantMessages:
 			model.compat.requiresReasoningContentOnAssistantMessages ??
-			DEFAULT_COMPAT.requiresReasoningContentOnAssistantMessages,
-		thinkingFormat: model.compat.thinkingFormat ?? DEFAULT_COMPAT.thinkingFormat,
-		openRouterRouting: model.compat.openRouterRouting ?? DEFAULT_COMPAT.openRouterRouting,
-		vercelGatewayRouting: model.compat.vercelGatewayRouting ?? DEFAULT_COMPAT.vercelGatewayRouting,
-		chatTemplateKwargs: model.compat.chatTemplateKwargs ?? DEFAULT_COMPAT.chatTemplateKwargs,
-		zaiToolStream: model.compat.zaiToolStream ?? DEFAULT_COMPAT.zaiToolStream,
-		supportsStrictMode: model.compat.supportsStrictMode ?? DEFAULT_COMPAT.supportsStrictMode,
-		cacheControlFormat: model.compat.cacheControlFormat ?? DEFAULT_COMPAT.cacheControlFormat,
-		sendSessionAffinityHeaders: model.compat.sendSessionAffinityHeaders ?? DEFAULT_COMPAT.sendSessionAffinityHeaders,
-		supportsLongCacheRetention: model.compat.supportsLongCacheRetention ?? DEFAULT_COMPAT.supportsLongCacheRetention,
+			detected.requiresReasoningContentOnAssistantMessages,
+		thinkingFormat: model.compat.thinkingFormat ?? detected.thinkingFormat,
+		openRouterRouting: model.compat.openRouterRouting ?? {},
+		vercelGatewayRouting: model.compat.vercelGatewayRouting ?? detected.vercelGatewayRouting,
+		chatTemplateKwargs: model.compat.chatTemplateKwargs ?? detected.chatTemplateKwargs,
+		zaiToolStream: model.compat.zaiToolStream ?? detected.zaiToolStream,
+		supportsStrictMode: model.compat.supportsStrictMode ?? detected.supportsStrictMode,
+		cacheControlFormat: model.compat.cacheControlFormat ?? detected.cacheControlFormat,
+		sendSessionAffinityHeaders: model.compat.sendSessionAffinityHeaders ?? detected.sendSessionAffinityHeaders,
+		supportsLongCacheRetention: model.compat.supportsLongCacheRetention ?? detected.supportsLongCacheRetention,
 	};
 }

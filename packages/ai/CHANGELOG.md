@@ -10,6 +10,7 @@
 
 - Fixed request-scoped `apiKey` and `env` values to participate in provider auth resolution, so providers such as Cloudflare can derive request-specific base URLs from explicit call options ([#6021](https://github.com/earendil-works/pi/issues/6021)).
 - Restored temporary legacy per-API stream aliases such as `streamSimpleOpenAICompletions` on the compat entrypoint ([#6016](https://github.com/earendil-works/pi/issues/6016), [#6017](https://github.com/earendil-works/pi/issues/6017)).
+- Restored runtime `detectCompat` fallback in `openai-completions` for models without explicit compat metadata ([#6020](https://github.com/earendil-works/pi/issues/6020)).
 
 ## [0.80.1] - 2026-06-23
 
