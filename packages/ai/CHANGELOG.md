@@ -35,6 +35,24 @@ Migration guide:
   models.setProvider(anthropicProvider());
   ```
 
+- To call a raw API implementation directly, import from `@earendil-works/pi-ai/api/*` and pass a compatible model plus auth/options yourself. Raw API modules export `stream` and `streamSimple`; use `.result()` on the returned stream for `complete`/`completeSimple` behavior:
+
+  ```ts
+  import { streamSimple } from "@earendil-works/pi-ai/api/anthropic-messages";
+  import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
+
+  const model = getBuiltinModel("anthropic", "claude-haiku-4-5");
+  const stream = streamSimple(
+    model,
+    { messages: [{ role: "user", content: "Hello", timestamp: Date.now() }] },
+    { apiKey: process.env.ANTHROPIC_API_KEY },
+  );
+
+  const message = await stream.result();
+  ```
+
+  Custom raw models must set the matching `api` value (for example `"anthropic-messages"` for `api/anthropic-messages`) and any required provider compatibility metadata in `model.compat`.
+
 ### Added
 
 - New `Models` runtime: `createModels()` builds an isolated provider collection with sync model reads (`getModels`/`getModel` return the last-known lists), an explicit async `refresh(provider?)` for dynamic providers, auth resolution (`getAuth`), and `stream`/`complete`/`streamSimple`/`completeSimple` that resolve auth through the owning provider. `createProvider()` builds providers from parts (single API implementation or a map dispatched on `model.api`; static `models` array plus an optional `refreshModels` fetcher with in-flight dedupe); `hasApi()` narrows dynamically listed models.
