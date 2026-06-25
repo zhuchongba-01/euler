@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed assistant messages stopped by output length to show a visible incomplete-response error ([#4290](https://github.com/earendil-works/pi/issues/4290)).
 - Fixed `--no-session --session-id` so ephemeral CLI runs can use deterministic session IDs for provider cache affinity ([#6070](https://github.com/earendil-works/pi/issues/6070)).
 - Fixed disk BMP image files to be detected, converted to PNG, and attached through `read` and CLI `@file` inputs ([#6047](https://github.com/earendil-works/pi/issues/6047)).
 - Fixed auto-retry for provider stream errors that explicitly tell callers to retry the request ([#6019](https://github.com/earendil-works/pi/issues/6019)).
