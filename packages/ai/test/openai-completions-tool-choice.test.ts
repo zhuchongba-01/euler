@@ -1,9 +1,8 @@
 import { Type } from "typebox";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getModel } from "../src/models.ts";
-import { convertMessages } from "../src/providers/openai-completions.ts";
-import { stream, streamSimple } from "../src/stream.ts";
-import type { AssistantMessage, Model, Tool, ToolResultMessage } from "../src/types.ts";
+import { convertMessages } from "../src/api/openai-completions.ts";
+import { getModel, stream, streamSimple } from "../src/compat.ts";
+import type { AssistantMessage, Model, SimpleStreamOptions, Tool, ToolResultMessage } from "../src/types.ts";
 
 const mockState = vi.hoisted(() => ({
 	lastParams: undefined as unknown,
@@ -63,6 +62,46 @@ vi.mock("openai", () => {
 
 	return { default: FakeOpenAI };
 });
+
+const localOpenAICompletionsModel = {
+	api: "openai-completions",
+	provider: "local-vllm",
+	baseUrl: "http://localhost:8000/v1",
+	reasoning: true,
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 128000,
+	maxTokens: 8192,
+} satisfies Omit<Model<"openai-completions">, "id" | "name" | "compat">;
+
+type CapturedParams = {
+	chat_template_kwargs?: Record<string, unknown>;
+	thinking?: unknown;
+	reasoning_effort?: string;
+};
+
+async function captureSimpleParams(
+	model: Model<"openai-completions">,
+	reasoning?: SimpleStreamOptions["reasoning"],
+): Promise<CapturedParams> {
+	let payload: unknown;
+
+	await streamSimple(
+		model,
+		{
+			messages: [{ role: "user", content: "Hi", timestamp: Date.now() }],
+		},
+		{
+			apiKey: "test",
+			reasoning,
+			onPayload: (params: unknown) => {
+				payload = params;
+			},
+		},
+	).result();
+
+	return (payload ?? mockState.lastParams) as CapturedParams;
+}
 
 describe("openai-completions tool_choice", () => {
 	beforeEach(() => {
@@ -970,6 +1009,8 @@ describe("openai-completions tool_choice", () => {
 	});
 
 	it("stores OpenRouter Kimi K2.6 reasoning replay compat in built-in metadata", () => {
+		// `:free` variant delisted from the OpenRouter API; the generator override
+		// matches any `moonshotai/kimi-k2.6*` variant that is listed.
 		const model = getModel("openrouter", "moonshotai/kimi-k2.6")!;
 		expect(model.compat?.supportsDeveloperRole).toBe(false);
 		expect(model.compat?.requiresReasoningContentOnAssistantMessages).toBe(true);
@@ -1142,6 +1183,7 @@ describe("openai-completions tool_choice", () => {
 				thinkingFormat: "openai",
 				openRouterRouting: {},
 				vercelGatewayRouting: {},
+				chatTemplateKwargs: {},
 				zaiToolStream: false,
 				supportsStrictMode: true,
 				sendSessionAffinityHeaders: false,
@@ -1446,6 +1488,77 @@ describe("openai-completions tool_choice", () => {
 			reasoning_effort?: string;
 		};
 		expect(params.reasoning).toEqual({ effort: "high" });
+		expect(params.reasoning_effort).toBeUndefined();
+	});
+
+	it("uses configurable chat template boolean thinking kwargs", async () => {
+		const model = {
+			...localOpenAICompletionsModel,
+			id: "deepseek-ai/DeepSeek-V3.1",
+			name: "DeepSeek V3.1 via vLLM",
+			compat: {
+				thinkingFormat: "chat-template",
+				supportsReasoningEffort: false,
+				chatTemplateKwargs: { thinking: { $var: "thinking.enabled" } },
+			},
+		} satisfies Model<"openai-completions">;
+
+		for (const testCase of [
+			{ reasoning: "high" as const, expected: true },
+			{ reasoning: undefined, expected: false },
+		]) {
+			const params = await captureSimpleParams(model, testCase.reasoning);
+
+			expect(params.chat_template_kwargs).toEqual({ thinking: testCase.expected });
+			expect(params.thinking).toBeUndefined();
+			expect(params.reasoning_effort).toBeUndefined();
+		}
+	});
+
+	it("uses qwen chat template thinking kwargs", async () => {
+		const model = {
+			...localOpenAICompletionsModel,
+			id: "Qwen/Qwen3-Coder",
+			name: "Qwen3 Coder via vLLM",
+			compat: {
+				thinkingFormat: "qwen-chat-template",
+				supportsReasoningEffort: false,
+			},
+		} satisfies Model<"openai-completions">;
+
+		for (const testCase of [
+			{ reasoning: "high" as const, expected: true },
+			{ reasoning: undefined, expected: false },
+		]) {
+			const params = await captureSimpleParams(model, testCase.reasoning);
+
+			expect(params.chat_template_kwargs).toEqual({
+				enable_thinking: testCase.expected,
+				preserve_thinking: true,
+			});
+			expect(params.reasoning_effort).toBeUndefined();
+		}
+	});
+
+	it("uses configurable chat template effort kwargs with static kwargs", async () => {
+		const model = {
+			...localOpenAICompletionsModel,
+			id: "unsloth/gpt-oss-120b-GGUF",
+			name: "GPT OSS via vLLM",
+			thinkingLevelMap: { xhigh: "max" },
+			compat: {
+				thinkingFormat: "chat-template",
+				supportsReasoningEffort: false,
+				chatTemplateKwargs: {
+					preserve_thinking: true,
+					reasoning_effort: { $var: "thinking.effort", omitWhenOff: true },
+				},
+			},
+		} satisfies Model<"openai-completions">;
+
+		const params = await captureSimpleParams(model, "xhigh");
+
+		expect(params.chat_template_kwargs).toEqual({ preserve_thinking: true, reasoning_effort: "max" });
 		expect(params.reasoning_effort).toBeUndefined();
 	});
 
