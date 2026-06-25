@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Fixed MiniMax (`minimax`, `minimax-cn`) sessions failing on long conversations with `unknown error, 999` or `context window exceeds limit (2013)` by clamping `max_tokens` for shared-budget MiniMax models ([#6061](https://github.com/earendil-works/pi/issues/6061)).
 - Fixed auto-retry for provider stream errors that explicitly tell callers to retry the request ([#6019](https://github.com/earendil-works/pi/issues/6019)).
 
 ## [0.80.2] - 2026-06-23

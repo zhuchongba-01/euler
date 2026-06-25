@@ -4,11 +4,14 @@
 
 ### Added
 
+- Added shared token estimation helpers for `Context` and `Message[]` in `pi-ai`.
+- Added `maxTokensSharesContextWindow` to `AnthropicMessagesCompat` for Anthropic-compatible providers that count `input + max_tokens` against a single shared context budget.
 - Added an optional `reasoning` field to `Usage` reporting reasoning/thinking token counts as a subset of `output`. Populated for Anthropic (`output_tokens_details.thinking_tokens`), OpenAI Responses/Codex/Azure (`output_tokens_details.reasoning_tokens`), OpenAI Completions (`completion_tokens_details.reasoning_tokens`), and Google Generative AI / Vertex (`thoughtsTokenCount`). Bedrock Converse and Mistral are not populated because those APIs do not return a reasoning token breakdown ([#6057](https://github.com/earendil-works/pi/issues/6057)).
 
 ### Fixed
 
 - Fixed OpenAI Responses streams to preserve reasoning replay state when output items finish out of order ([#6009](https://github.com/earendil-works/pi/issues/6009)).
+- Fixed MiniMax (`minimax`, `minimax-cn`) Anthropic-compatible requests failing on long conversations with `unknown error, 999` or `context window exceeds limit (2013)` by clamping `max_tokens` for shared-budget models ([#6061](https://github.com/earendil-works/pi/issues/6061)).
 - Fixed retry classification for provider errors that explicitly tell callers to retry the request ([#6019](https://github.com/earendil-works/pi/issues/6019)).
 
 ## [0.80.2] - 2026-06-23
