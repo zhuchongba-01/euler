@@ -628,6 +628,9 @@
 			"cpu": [
 				"arm64"
 			],
+			"libc": [
+				"glibc"
+			],
 			"optional": true
 		},
 		"node_modules/@mariozechner/clipboard-linux-arm64-musl": {
@@ -643,6 +646,9 @@
 			],
 			"cpu": [
 				"arm64"
+			],
+			"libc": [
+				"musl"
 			],
 			"optional": true
 		},
@@ -660,6 +666,9 @@
 			"cpu": [
 				"riscv64"
 			],
+			"libc": [
+				"glibc"
+			],
 			"optional": true
 		},
 		"node_modules/@mariozechner/clipboard-linux-x64-gnu": {
@@ -676,6 +685,9 @@
 			"cpu": [
 				"x64"
 			],
+			"libc": [
+				"glibc"
+			],
 			"optional": true
 		},
 		"node_modules/@mariozechner/clipboard-linux-x64-musl": {
@@ -691,6 +703,9 @@
 			],
 			"cpu": [
 				"x64"
+			],
+			"libc": [
+				"musl"
 			],
 			"optional": true
 		},
