@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Fixed a crash when undici emits an internal client error while terminating a mid-stream HTTP response ([#6133](https://github.com/earendil-works/pi/issues/6133)).
 - Fixed the compaction event regression test to cover status indicator cleanup and keep CI passing.
 - Fixed interactive status indicators so ending work, retry, compaction, or branch-summary indicators no longer shrink the TUI when clear-on-shrink is enabled ([#6026](https://github.com/earendil-works/pi/pull/6026)).
 - Fixed `--session` and `SessionManager.open()` to reject non-empty invalid session files without overwriting them ([#6002](https://github.com/earendil-works/pi/issues/6002)).
