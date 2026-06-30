@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Fixed oversized harness shell execution timeouts to fail with a clear validation error instead of being clamped to an immediate timeout ([#6181](https://github.com/earendil-works/pi/issues/6181)).
 - Fixed `Agent.prepareNextTurn` to keep receiving the run abort signal instead of the next-turn context.
 
 ## [0.80.2] - 2026-06-23
