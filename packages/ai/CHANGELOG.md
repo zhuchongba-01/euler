@@ -6,6 +6,10 @@
 
 - Fixed OpenAI Codex user-agent construction to synchronously load Node OS metadata, avoiding a startup race that could report `pi (browser)` in Node/Bun.
 
+### Added
+
+- Added zstd request-body compression for the OpenAI Codex Responses SSE transport. Requests are sent with `Content-Encoding: zstd` when Node/Bun zstd support is available; the WebSocket transport is unchanged.
+
 ## [0.80.3] - 2026-06-30
 
 ### Added
