@@ -15,6 +15,7 @@
 
 ### Added
 
+- Refreshed generated model catalogs from models.dev, adding newly listed models including Kimi K2.7 Code for GitHub Copilot and Fable 5 to several providers ([#6256](https://github.com/earendil-works/pi/issues/6256)).
 - Added Claude Sonnet 5 to the GitHub Copilot model catalog ([#6200](https://github.com/earendil-works/pi/issues/6200)).
 - Added zstd request-body compression for the OpenAI Codex Responses SSE transport. Requests are sent with `Content-Encoding: zstd` when Node/Bun zstd support is available; the WebSocket transport is unchanged.
 
