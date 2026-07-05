@@ -6,15 +6,15 @@
 #      (~/.pi/agent/auth.json).
 #   2. Create the `pi-analyze` label.
 #   3. Add a repository secret `EARENDIL_ORG_READ_TOKEN` with permission to
-#      read `earendil-works` org membership. The authorization job uses it to
-#      verify that the label actor is an active member of `earendil-works/staff`.
-#   4. Optionally set a `PI_ISSUE_ANALYSIS_MODEL` repository variable to pin
-#      the model (e.g. "anthropic/claude-sonnet-4-5").
+#      read `earendil-works` org membership and create secret gists. The
+#      authorization job uses it to verify that the label actor is an active
+#      member of `earendil-works/staff`; the analysis job uses it to upload
+#      the exported session gist.
 #
 # The session runs in a high-entropy checkout directory so the recorded cwd is
 # a unique string. Import the session into a local checkout with the
 # import-repro extension (.pi/extensions/import-repro.ts):
-#   pi "/import-repro <issue number | issue URL | run URL>"
+#   pi "/import-repro <gist-id | gist-url | pi.dev/session URL>"
 
 name: Issue Analysis
 
@@ -124,6 +124,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: pi-analyze
     timeout-minutes: 45
+    env:
+      ISSUE_ANALYSIS_MODEL: openai-codex/gpt-5.5
     steps:
       - name: Create high-entropy working directory name
         id: workdir
@@ -170,57 +172,77 @@ jobs:
           PI_CODING_AGENT_DIR: ${{ runner.temp }}/pi-agent
           GH_TOKEN: ${{ github.token }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
-          PI_MODEL: ${{ vars.PI_ISSUE_ANALYSIS_MODEL }}
         run: |
           mkdir -p "$RUNNER_TEMP/pi-out/session"
-          args=(-p --approve --session-dir "$RUNNER_TEMP/pi-out/session")
-          if [ -n "$PI_MODEL" ]; then
-            args+=(--model "$PI_MODEL")
-          fi
-          ./pi-test.sh "${args[@]}" "/is $ISSUE_URL" | tee "$RUNNER_TEMP/pi-out/output.md"
+          ./pi-test.sh \
+            -p \
+            --approve \
+            --session-dir "$RUNNER_TEMP/pi-out/session" \
+            --model "$ISSUE_ANALYSIS_MODEL" \
+            "/is $ISSUE_URL" | tee "$RUNNER_TEMP/pi-out/output.md"
 
-      - name: Upload session artifact
-        id: upload
+      - name: Export session files
+        id: export_session_files
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pi-is-issue-${{ github.event.issue.number }}-run-${{ github.run_id }}
-          path: ${{ runner.temp }}/pi-out/
-          if-no-files-found: error
+        shell: bash
+        working-directory: ${{ steps.workdir.outputs.name }}
+        env:
+          PI_CODING_AGENT_DIR: ${{ runner.temp }}/pi-agent
+        run: |
+          session_file="$(find "$RUNNER_TEMP/pi-out/session" -type f -name '*.jsonl' | head -n 1)"
+          if [ -z "$session_file" ]; then
+            echo "No session jsonl file found" >&2
+            exit 1
+          fi
+          cp "$session_file" "$RUNNER_TEMP/pi-out/session.jsonl"
+          ./pi-test.sh --no-extensions --export "$RUNNER_TEMP/pi-out/session.jsonl" "$RUNNER_TEMP/pi-out/session.html"
+
+      - name: Upload session gist
+        id: gist
+        if: always() && steps.export_session_files.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.EARENDIL_ORG_READ_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "EARENDIL_ORG_READ_TOKEN is not configured" >&2
+            exit 1
+          fi
+          gist_url="$(gh gist create --public=false "$RUNNER_TEMP/pi-out/session.html" "$RUNNER_TEMP/pi-out/session.jsonl")"
+          gist_id="${gist_url##*/}"
+          echo "url=$gist_url" >> "$GITHUB_OUTPUT"
+          echo "id=$gist_id" >> "$GITHUB_OUTPUT"
+          echo "share_url=https://pi.dev/session/#$gist_id" >> "$GITHUB_OUTPUT"
 
       - name: Comment with session import instructions
-        if: always() && steps.upload.outcome == 'success'
+        if: always() && steps.gist.outcome == 'success'
         uses: actions/github-script@v7
         env:
-          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GIST_URL: ${{ steps.gist.outputs.url }}
+          GIST_ID: ${{ steps.gist.outputs.id }}
+          SHARE_URL: ${{ steps.gist.outputs.share_url }}
         with:
           script: |
-            const artifactUrl = process.env.ARTIFACT_URL;
-            const runUrl = process.env.RUN_URL;
-            const issueNumber = context.issue.number;
+            const gistUrl = process.env.GIST_URL;
+            const gistId = process.env.GIST_ID;
+            const shareUrl = process.env.SHARE_URL;
             const body = [
               'Pi issue analysis finished.',
               '',
-              `Session artifact: ${artifactUrl}`,
+              `Share URL: ${shareUrl}`,
+              `Gist: ${gistUrl}`,
               '',
               'Continue locally from a checkout with:',
               '',
               '```sh',
-              `pi "/import-repro ${runUrl}"`,
-              '```',
-              '',
-              'Or import the latest analysis artifact for this issue with:',
-              '',
-              '```sh',
-              `pi "/import-repro #${issueNumber}"`,
+              `pi "/import-repro ${gistId}"`,
               '```',
             ].join('\n');
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: issueNumber,
+              issue_number: context.issue.number,
               body,
             });
 
