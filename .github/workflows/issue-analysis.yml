@@ -1,5 +1,5 @@
 # Runs the repo's /is prompt against an issue when the `pi-analyze` label is added
-# or when a staff member comments `@issueron analyze` on an issue.
+# or when a staff member comments `@issuron analyze` on an issue.
 #
 # Setup required before this works:
 #   1. Create a `pi-analyze` GitHub environment on the repo and add a
@@ -66,9 +66,9 @@ jobs:
                 return;
               }
               const body = context.payload.comment.body || '';
-              const match = body.match(/^\s*@issueron\s+analyze\b([\s\S]*)$/i);
+              const match = body.match(/^\s*@issuron\s+analyze\b([\s\S]*)$/i);
               if (!match) {
-                console.log('Comment is not an @issueron analyze trigger');
+                console.log('Comment is not an @issuron analyze trigger');
                 return;
               }
               extraInstructions = match[1].trim();
@@ -225,7 +225,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pi-out/session"
           prompt="/is $ISSUE_URL"
           if [ -n "$EXTRA_INSTRUCTIONS" ]; then
-            prompt+=$'\n\nAdditional instructions from @issueron analyze comment:\n'
+            prompt+=$'\n\nAdditional instructions from @issuron analyze comment:\n'
             prompt+="$EXTRA_INSTRUCTIONS"
           fi
           ./pi-test.sh \
