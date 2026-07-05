@@ -275,11 +275,51 @@ jobs:
           GIST_URL: ${{ steps.gist.outputs.url }}
           GIST_ID: ${{ steps.gist.outputs.id }}
           SHARE_URL: ${{ steps.gist.outputs.share_url }}
+          SESSION_JSONL: ${{ runner.temp }}/pi-out/session.jsonl
         with:
           script: |
+            const fs = require('fs');
+
+            function extractLastAgentMessage(sessionPath) {
+              const lines = fs.readFileSync(sessionPath, 'utf8').split(/\r?\n/).filter(Boolean);
+              let lastText = '';
+
+              for (const line of lines) {
+                let entry;
+                try {
+                  entry = JSON.parse(line);
+                } catch {
+                  continue;
+                }
+
+                if (entry.type !== 'message' || entry.message?.role !== 'assistant') continue;
+
+                const content = entry.message.content;
+                const parts = [];
+                if (typeof content === 'string') {
+                  parts.push(content);
+                } else if (Array.isArray(content)) {
+                  for (const block of content) {
+                    if (block?.type === 'text' && typeof block.text === 'string') {
+                      parts.push(block.text);
+                    }
+                  }
+                }
+
+                const text = parts.join('\n\n').trim();
+                if (text) lastText = text;
+              }
+
+              if (!lastText) return '_No assistant output found._';
+              const maxLength = 55000;
+              if (lastText.length <= maxLength) return lastText;
+              return `${lastText.slice(0, maxLength)}\n\n_[truncated]_`;
+            }
+
             const gistUrl = process.env.GIST_URL;
             const gistId = process.env.GIST_ID;
             const shareUrl = process.env.SHARE_URL;
+            const lastAgentMessage = extractLastAgentMessage(process.env.SESSION_JSONL);
             const body = [
               'Pi issue analysis finished.',
               '',
@@ -291,6 +331,13 @@ jobs:
               '```sh',
               `pi "/ir ${gistId}"`,
               '```',
+              '',
+              '<details>',
+              '<summary>Agent analysis summary</summary>',
+              '',
+              lastAgentMessage,
+              '',
+              '</details>',
             ].join('\n');
 
             await github.rest.issues.createComment({
