@@ -1,4 +1,5 @@
-# Runs the repo's /is prompt against an issue when the `pi-analyze` label is added.
+# Runs the repo's /is prompt against an issue when the `pi-analyze` label is added
+# or when a staff member comments `@issueron analyze` on an issue.
 #
 # Setup required before this works:
 #   1. Create a `pi-analyze` GitHub environment on the repo and add a
@@ -14,14 +15,16 @@
 #
 # The session runs in a high-entropy checkout directory so the recorded cwd is
 # a unique string. Import the session into a local checkout with the
-# import-repro extension (.pi/extensions/import-repro.ts):
-#   pi "/import-repro <gist-id | gist-url | pi.dev/session URL>"
+# /ir extension command (.pi/extensions/import-repro.ts):
+#   pi "/ir <gist-id | gist-url | pi.dev/session URL>"
 
 name: Issue Analysis
 
 on:
   issues:
     types: [labeled]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -33,24 +36,55 @@ concurrency:
 
 jobs:
   authorize:
-    if: github.event.label.name == 'pi-analyze'
     runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.verify.outputs.should_run }}
+      extra_instructions: ${{ steps.verify.outputs.extra_instructions }}
     steps:
       - name: Verify sender permission
+        id: verify
         uses: actions/github-script@v7
         env:
           ORG_READ_TOKEN: ${{ secrets.EARENDIL_ORG_READ_TOKEN }}
         with:
           script: |
+            const ANALYZE_LABEL = 'pi-analyze';
             const username = context.payload.sender.login;
+            let extraInstructions = '';
+
+            core.setOutput('should_run', 'false');
+            core.setOutput('extra_instructions', '');
+
+            if (context.eventName === 'issues') {
+              if (context.payload.action !== 'labeled' || context.payload.label?.name !== ANALYZE_LABEL) {
+                console.log('Not a pi-analyze label event');
+                return;
+              }
+            } else if (context.eventName === 'issue_comment') {
+              if (context.payload.issue.pull_request) {
+                console.log('Ignoring pull request comment');
+                return;
+              }
+              const body = context.payload.comment.body || '';
+              const match = body.match(/^\s*@issueron\s+analyze\b([\s\S]*)$/i);
+              if (!match) {
+                console.log('Comment is not an @issueron analyze trigger');
+                return;
+              }
+              extraInstructions = match[1].trim();
+            } else {
+              console.log(`Unsupported event: ${context.eventName}`);
+              return;
+            }
 
             async function removeTriggerLabel() {
+              if (context.eventName !== 'issues') return;
               try {
                 await github.rest.issues.removeLabel({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.issue.number,
-                  name: 'pi-analyze',
+                  name: ANALYZE_LABEL,
                 });
               } catch (error) {
                 if (error.status !== 404) throw error;
@@ -117,11 +151,24 @@ jobs:
               core.setFailed(
                 `@${username} has '${data.permission}' permission; write or admin is required to trigger issue analysis.`,
               );
+              return;
             }
+
+            if (context.eventName === 'issue_comment') {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [ANALYZE_LABEL],
+              });
+            }
+
+            core.setOutput('should_run', 'true');
+            core.setOutput('extra_instructions', extraInstructions);
 
   analyze:
     needs: authorize
-    if: needs.authorize.result == 'success'
+    if: needs.authorize.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     environment: pi-analyze
     timeout-minutes: 45
@@ -173,14 +220,20 @@ jobs:
           PI_CODING_AGENT_DIR: ${{ runner.temp }}/pi-agent
           GH_TOKEN: ${{ github.token }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
+          EXTRA_INSTRUCTIONS: ${{ needs.authorize.outputs.extra_instructions }}
         run: |
           mkdir -p "$RUNNER_TEMP/pi-out/session"
+          prompt="/is $ISSUE_URL"
+          if [ -n "$EXTRA_INSTRUCTIONS" ]; then
+            prompt+=$'\n\nAdditional instructions from @issueron analyze comment:\n'
+            prompt+="$EXTRA_INSTRUCTIONS"
+          fi
           ./pi-test.sh \
             -p \
             --approve \
             --session-dir "$RUNNER_TEMP/pi-out/session" \
             --model "$ISSUE_ANALYSIS_MODEL" \
-            "/is $ISSUE_URL" | tee "$RUNNER_TEMP/pi-out/output.md"
+            "$prompt" | tee "$RUNNER_TEMP/pi-out/output.md"
 
       - name: Export session files
         id: export_session_files
@@ -236,7 +289,7 @@ jobs:
               'Continue locally from a checkout with:',
               '',
               '```sh',
-              `pi "/import-repro ${gistId}"`,
+              `pi "/ir ${gistId}"`,
               '```',
             ].join('\n');
 

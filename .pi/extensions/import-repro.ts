@@ -7,11 +7,12 @@
  * current session directory, and switches to it.
  *
  * Usage:
- *   /import-repro b4d100022aefb12f25dd2d8485e0a82a
- *   /import-repro https://gist.github.com/mitsuhiko/b4d100022aefb12f25dd2d8485e0a82a
- *   /import-repro https://pi.dev/session/#b4d100022aefb12f25dd2d8485e0a82a
+ *   /ir b4d100022aefb12f25dd2d8485e0a82a
+ *   /ir https://gist.github.com/mitsuhiko/b4d100022aefb12f25dd2d8485e0a82a
+ *   /ir https://pi.dev/session/#b4d100022aefb12f25dd2d8485e0a82a
+ *   /ir https://github.com/earendil-works/pi/issues/123
  *
- *   pi "/import-repro <gist-id>"
+ *   pi "/ir <gist-id>"
  */
 
 import { Buffer } from "node:buffer";
@@ -22,6 +23,8 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-c
 const GIST_ID_RE = /^[0-9a-fA-F]{20,}$/;
 const GIST_URL_RE = /^https:\/\/gist\.github\.com\/(?:[^/]+\/)?([0-9a-fA-F]{20,})(?:[/#?].*)?$/;
 const SHARE_URL_RE = /^https:\/\/pi\.dev\/session\/#([0-9a-fA-F]{20,})(?:[/#?].*)?$/;
+const ISSUE_URL_RE = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)(?:[/#?].*)?$/;
+const GIST_URL_IN_TEXT_RE = /https:\/\/gist\.github\.com\/(?:[^/\s]+\/)?([0-9a-fA-F]{20,})\b/g;
 const SESSION_DATA_RE = /<script id="session-data" type="application\/json">([^<]+)<\/script>/;
 
 interface SessionHeader {
@@ -47,7 +50,15 @@ interface GistResponse {
 	files?: Record<string, GistFile>;
 }
 
-function parseRef(ref: string, cwd: string): { type: "gist"; id: string } | { type: "file"; path: string } {
+interface IssueComment {
+	body?: string | null;
+	user?: { login?: string } | null;
+}
+
+function parseRef(
+	ref: string,
+	cwd: string,
+): { type: "gist"; id: string } | { type: "file"; path: string } | { type: "issue"; owner: string; repo: string; issue: string } {
 	if (ref.endsWith(".html") || ref.endsWith(".jsonl")) {
 		return { type: "file", path: isAbsolute(ref) ? ref : resolve(cwd, ref) };
 	}
@@ -58,9 +69,12 @@ function parseRef(ref: string, cwd: string): { type: "gist"; id: string } | { ty
 	const gistMatch = ref.match(GIST_URL_RE);
 	if (gistMatch) return { type: "gist", id: gistMatch[1] };
 
+	const issueMatch = ref.match(ISSUE_URL_RE);
+	if (issueMatch) return { type: "issue", owner: issueMatch[1], repo: issueMatch[2], issue: issueMatch[3] };
+
 	if (GIST_ID_RE.test(ref)) return { type: "gist", id: ref };
 
-	throw new Error(`expected a gist ID, gist URL, pi.dev share URL, .html file, or .jsonl file: ${ref}`);
+	throw new Error(`expected a gist ID, gist URL, pi.dev share URL, issue URL, .html file, or .jsonl file: ${ref}`);
 }
 
 function parseSessionJsonl(raw: string): { header: SessionHeader; jsonl: string } {
@@ -124,6 +138,33 @@ async function readGistFile(file: GistFile): Promise<string> {
 	return await fetchText(file.raw_url);
 }
 
+async function findIssueGistId(owner: string, repo: string, issue: string): Promise<string> {
+	const gistIds: string[] = [];
+	let page = 1;
+	while (true) {
+		const response = await fetch(
+			`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${encodeURIComponent(issue)}/comments?per_page=100&page=${page}`,
+			{ headers: { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" } },
+		);
+		if (!response.ok) throw new Error(`failed to fetch issue comments: HTTP ${response.status}`);
+
+		const comments = (await response.json()) as IssueComment[];
+		for (const comment of comments) {
+			if (comment.user?.login !== "github-actions[bot]") continue;
+			for (const match of (comment.body ?? "").matchAll(GIST_URL_IN_TEXT_RE)) {
+				gistIds.push(match[1]);
+			}
+		}
+
+		if (comments.length < 100) break;
+		page++;
+	}
+
+	const gistId = gistIds.at(-1);
+	if (!gistId) throw new Error(`no github-actions gist link found in comments on ${owner}/${repo}#${issue}`);
+	return gistId;
+}
+
 async function fetchGistSession(gistId: string): Promise<{ header: SessionHeader; jsonl: string }> {
 	const response = await fetch(`https://api.github.com/gists/${gistId}`, {
 		headers: {
@@ -145,12 +186,12 @@ async function fetchGistSession(gistId: string): Promise<{ header: SessionHeader
 }
 
 export default function (pi: ExtensionAPI) {
-	pi.registerCommand("import-repro", {
-		description: "Import a CI issue-analysis session from a gist ID or pi.dev session URL and switch to it",
+	pi.registerCommand("ir", {
+		description: "Import a CI issue-analysis session from a gist ID, share URL, or issue URL and switch to it",
 		handler: async (args: string, ctx: ExtensionCommandContext) => {
 			const ref = args.trim();
 			if (!ref) {
-				ctx.ui.notify("Usage: /import-repro <gist-id | gist-url | pi.dev/session URL>", "error");
+				ctx.ui.notify("Usage: /ir <gist-id | gist-url | pi.dev/session URL | issue URL>", "error");
 				return;
 			}
 
@@ -166,6 +207,10 @@ export default function (pi: ExtensionAPI) {
 				if (parsedRef.type === "gist") {
 					decoded = await fetchGistSession(parsedRef.id);
 					sourceName = `${parsedRef.id}.jsonl`;
+				} else if (parsedRef.type === "issue") {
+					const gistId = await findIssueGistId(parsedRef.owner, parsedRef.repo, parsedRef.issue);
+					decoded = await fetchGistSession(gistId);
+					sourceName = `${gistId}.jsonl`;
 				} else {
 					if (!existsSync(parsedRef.path)) throw new Error(`session file not found: ${parsedRef.path}`);
 					const raw = readFileSync(parsedRef.path, "utf8");
@@ -190,7 +235,7 @@ export default function (pi: ExtensionAPI) {
 				ctx.ui.notify(`Imported session ${decoded.header.id} (cwd ${decoded.header.cwd} -> ${targetCwd})`, "info");
 				await ctx.switchSession(destination);
 			} catch (error) {
-				ctx.ui.notify(`import-repro: ${error instanceof Error ? error.message : String(error)}`, "error");
+				ctx.ui.notify(`ir: ${error instanceof Error ? error.message : String(error)}`, "error");
 			}
 		},
 	});
