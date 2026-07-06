@@ -15,7 +15,7 @@ import {
 	type SelfUpdatePackageTarget,
 	VERSION,
 } from "./config.ts";
-import type { ExtensionFactory } from "./core/extensions/types.ts";
+import type { InlineExtension } from "./core/extensions/types.ts";
 import { DefaultPackageManager } from "./core/package-manager.ts";
 import { type AppMode, resolveProjectTrusted } from "./core/project-trust.ts";
 import { DefaultResourceLoader } from "./core/resource-loader.ts";
@@ -484,7 +484,7 @@ function prepareWindowsNpmSelfUpdate(): void {
 }
 
 export interface PackageCommandRuntimeOptions {
-	extensionFactories?: ExtensionFactory[];
+	extensionFactories?: InlineExtension[];
 }
 
 interface CommandSettingsResult {
@@ -507,7 +507,7 @@ async function createCommandSettingsManager(options: {
 	agentDir: string;
 	projectTrustOverride?: boolean;
 	useSavedProjectTrustOnly?: boolean;
-	extensionFactories?: ExtensionFactory[];
+	extensionFactories?: InlineExtension[];
 }): Promise<CommandSettingsResult> {
 	const settingsManager = SettingsManager.create(options.cwd, options.agentDir, { projectTrusted: false });
 	const projectTrustWarnings: string[] = [];
