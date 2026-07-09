@@ -608,7 +608,7 @@ export const OPENAI_MODELS = {
 	} satisfies Model<"openai-responses">,
 	"gpt-5.6": {
 		id: "gpt-5.6",
-		name: "GPT-5.6 Sol",
+		name: "GPT-5.6",
 		api: "openai-responses",
 		provider: "openai",
 		baseUrl: "https://api.openai.com/v1",

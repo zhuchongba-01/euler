@@ -1391,6 +1391,23 @@ export const VERCEL_AI_GATEWAY_MODELS = {
 		contextWindow: 128000,
 		maxTokens: 8192,
 	} satisfies Model<"anthropic-messages">,
+	"meta/muse-spark-1.1": {
+		id: "meta/muse-spark-1.1",
+		name: "Muse Spark 1.1",
+		api: "anthropic-messages",
+		provider: "vercel-ai-gateway",
+		baseUrl: "https://ai-gateway.vercel.sh",
+		reasoning: true,
+		input: ["text"],
+		cost: {
+			input: 1.25,
+			output: 4.25,
+			cacheRead: 0.15,
+			cacheWrite: 0,
+		},
+		contextWindow: 1048576,
+		maxTokens: 1048576,
+	} satisfies Model<"anthropic-messages">,
 	"minimax/minimax-m2": {
 		id: "minimax/minimax-m2",
 		name: "MiniMax M2",
