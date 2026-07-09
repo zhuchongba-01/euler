@@ -5,6 +5,7 @@
 ### Added
 
 - Added configurable harness session context entry transforms and custom-entry message projectors.
+- Exported `InMemorySessionStorage` and `JsonlSessionStorage` ([#6435](https://github.com/earendil-works/pi/issues/6435)).
 
 ### Fixed
 
