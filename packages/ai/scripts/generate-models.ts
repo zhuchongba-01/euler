@@ -195,7 +195,22 @@ const ANT_LING_RING_THINKING_LEVEL_MAP = {
 
 const MODELS_DEV_OPENAI_UNSUPPORTED_MODEL_IDS = new Set(["gpt-5.6"]);
 const OPENAI_LONG_CONTEXT_INPUT_THRESHOLD = 272000;
-const OPENAI_GPT_56_MODEL_IDS = new Set(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]);
+const OPENAI_SHORT_CONTEXT_CAPPED_MODEL_IDS = new Set([
+	"gpt-5.4",
+	"gpt-5.5",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna",
+]);
+const OPENAI_LONG_CONTEXT_PRICING_MODEL_IDS = new Set([
+	"gpt-5.4",
+	"gpt-5.4-pro",
+	"gpt-5.5",
+	"gpt-5.5-pro",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna",
+]);
 
 function withOpenAiLongContextPricing(cost: Model<Api>["cost"]): Model<Api>["cost"] {
 	return {
@@ -1695,16 +1710,14 @@ async function generateModels() {
 			candidate.contextWindow = 272000;
 			candidate.maxTokens = 128000;
 		}
-		// Keep direct OpenAI requests in the short-context pricing tier.
-		if (
-			candidate.provider === "openai" &&
-			(candidate.id === "gpt-5.4" || candidate.id === "gpt-5.5" || OPENAI_GPT_56_MODEL_IDS.has(candidate.id))
-		) {
+		// Keep direct OpenAI requests in the short-context pricing tier by default. Users can opt into the
+		// larger context through model overrides, so retain long-context cost metadata on the capped models.
+		if (candidate.provider === "openai" && OPENAI_SHORT_CONTEXT_CAPPED_MODEL_IDS.has(candidate.id)) {
 			candidate.contextWindow = OPENAI_LONG_CONTEXT_INPUT_THRESHOLD;
 			candidate.maxTokens = 128000;
-			if (OPENAI_GPT_56_MODEL_IDS.has(candidate.id)) {
-				candidate.cost = withOpenAiLongContextPricing(candidate.cost);
-			}
+		}
+		if (candidate.provider === "openai" && OPENAI_LONG_CONTEXT_PRICING_MODEL_IDS.has(candidate.id)) {
+			candidate.cost = withOpenAiLongContextPricing(candidate.cost);
 		}
 		// models.dev reports gpt-5-pro output as 272000 (a duplicate of the input sub-limit);
 		// the actual max output is 128000. Also propagates to the derived Azure clone.
@@ -1950,7 +1963,7 @@ async function generateModels() {
 			baseUrl: CODEX_BASE_URL,
 			reasoning: true,
 			input: ["text", "image"],
-			cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 },
+			cost: withOpenAiLongContextPricing({ input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 }),
 			contextWindow: CODEX_CONTEXT,
 			maxTokens: CODEX_MAX_TOKENS,
 		},
@@ -1974,7 +1987,7 @@ async function generateModels() {
 			baseUrl: CODEX_BASE_URL,
 			reasoning: true,
 			input: ["text", "image"],
-			cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 0 },
+			cost: withOpenAiLongContextPricing({ input: 5, output: 30, cacheRead: 0.5, cacheWrite: 0 }),
 			contextWindow: CODEX_CONTEXT,
 			maxTokens: CODEX_MAX_TOKENS,
 		},
