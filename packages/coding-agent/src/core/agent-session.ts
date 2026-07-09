@@ -3016,14 +3016,15 @@ export class AgentSession {
 	}
 
 	/**
-	 * Get session statistics.
+	 * Get session statistics. Aggregates over ALL session entries (including
+	 * history that was compacted away), so token/cost totals reflect what was
+	 * actually billed across the session.
 	 */
 	getSessionStats(): SessionStats {
-		const state = this.state;
-		const userMessages = state.messages.filter((m) => m.role === "user").length;
-		const assistantMessages = state.messages.filter((m) => m.role === "assistant").length;
-		const toolResults = state.messages.filter((m) => m.role === "toolResult").length;
-
+		let userMessages = 0;
+		let assistantMessages = 0;
+		let toolResults = 0;
+		let totalMessages = 0;
 		let toolCalls = 0;
 		let totalInput = 0;
 		let totalOutput = 0;
@@ -3031,15 +3032,26 @@ export class AgentSession {
 		let totalCacheWrite = 0;
 		let totalCost = 0;
 
-		for (const message of state.messages) {
-			if (message.role === "assistant") {
+		for (const entry of this.sessionManager.getEntries()) {
+			if (entry.type !== "message") continue;
+			totalMessages++;
+			const message = entry.message;
+			if (message.role === "user") {
+				userMessages++;
+			} else if (message.role === "toolResult") {
+				toolResults++;
+			} else if (message.role === "assistant") {
+				assistantMessages++;
 				const assistantMsg = message as AssistantMessage;
-				toolCalls += assistantMsg.content.filter((c) => c.type === "toolCall").length;
-				totalInput += assistantMsg.usage.input;
-				totalOutput += assistantMsg.usage.output;
-				totalCacheRead += assistantMsg.usage.cacheRead;
-				totalCacheWrite += assistantMsg.usage.cacheWrite;
-				totalCost += assistantMsg.usage.cost.total;
+				if (Array.isArray(assistantMsg.content)) {
+					toolCalls += assistantMsg.content.filter((c) => c.type === "toolCall").length;
+				}
+				const usage = assistantMsg.usage;
+				totalInput += usage.input;
+				totalOutput += usage.output;
+				totalCacheRead += usage.cacheRead;
+				totalCacheWrite += usage.cacheWrite;
+				totalCost += usage.cost.total;
 			}
 		}
 
@@ -3050,7 +3062,7 @@ export class AgentSession {
 			assistantMessages,
 			toolCalls,
 			toolResults,
-			totalMessages: state.messages.length,
+			totalMessages,
 			tokens: {
 				input: totalInput,
 				output: totalOutput,
