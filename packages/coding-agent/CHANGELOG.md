@@ -5,6 +5,7 @@
 ### Added
 
 - Added the opt-in `max` thinking level across CLI, SDK, RPC, model selection, and themes. Custom themes can define `thinkingMax`; existing themes fall back to `thinkingXhigh`.
+- Added request-wide input-token pricing tiers to custom model costs in `models.json`, `modelOverrides`, and extension-registered providers.
 
 ## [0.80.5] - 2026-07-09
 
