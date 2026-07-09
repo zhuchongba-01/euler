@@ -5247,7 +5247,11 @@ export class InteractiveMode {
 		reloadBox.addChild(new DynamicBorder(borderColor));
 		reloadBox.addChild(new Spacer(1));
 		reloadBox.addChild(
-			new Text(theme.fg("muted", "Reloading keybindings, extensions, skills, prompts, themes..."), 1, 0),
+			new Text(
+				theme.fg("muted", "Reloading keybindings, extensions, skills, prompts, themes, and context files..."),
+				1,
+				0,
+			),
 		);
 		reloadBox.addChild(new Spacer(1));
 		reloadBox.addChild(new DynamicBorder(borderColor));
@@ -5317,8 +5321,8 @@ export class InteractiveMode {
 			}
 			this.showStatus(
 				savedImplicitProjectTrust
-					? "Reloaded keybindings, extensions, skills, prompts, themes; saved project trust"
-					: "Reloaded keybindings, extensions, skills, prompts, themes",
+					? "Reloaded keybindings, extensions, skills, prompts, themes, and context files; saved project trust"
+					: "Reloaded keybindings, extensions, skills, prompts, themes, and context files",
 			);
 			dismissReloadBox(this.editor as Component);
 			reloadBoxDismissed = true;

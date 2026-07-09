@@ -370,7 +370,7 @@ export interface ExtensionCommandContext extends ExtensionContext {
 		options?: { withSession?: (ctx: ReplacedSessionContext) => Promise<void> },
 	): Promise<{ cancelled: boolean }>;
 
-	/** Reload extensions, skills, prompts, and themes. */
+	/** Reload extensions, skills, prompts, themes, and context files. */
 	reload(): Promise<void>;
 }
 
