@@ -742,7 +742,8 @@ export const stream: StreamFunction<"anthropic-messages", AnthropicOptions> = (
 
 /**
  * Map ThinkingLevel to Anthropic effort levels for adaptive thinking.
- * Note: effort "max" is only valid on Opus 4.6, while Opus 4.7+ and Fable 5 support "xhigh".
+ * Note: effort "max" is available on all adaptive-thinking Claude models, while native
+ * "xhigh" is only available on Opus 4.7/4.8, Sonnet 5, and Fable 5.
  */
 function mapThinkingLevelToEffort(
 	model: Model<"anthropic-messages">,

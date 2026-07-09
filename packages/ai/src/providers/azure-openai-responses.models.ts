@@ -613,7 +613,7 @@ export const AZURE_OPENAI_RESPONSES_MODELS = {
 		provider: "azure-openai-responses",
 		baseUrl: "",
 		reasoning: true,
-		thinkingLevelMap: {"off":null,"xhigh":"xhigh"},
+		thinkingLevelMap: {"off":null,"xhigh":"xhigh","max":"max"},
 		input: ["text", "image"],
 		cost: {
 			input: 5,
@@ -631,7 +631,7 @@ export const AZURE_OPENAI_RESPONSES_MODELS = {
 		provider: "azure-openai-responses",
 		baseUrl: "",
 		reasoning: true,
-		thinkingLevelMap: {"off":null,"xhigh":"xhigh"},
+		thinkingLevelMap: {"off":null,"xhigh":"xhigh","max":"max"},
 		input: ["text", "image"],
 		cost: {
 			input: 1,
@@ -649,7 +649,7 @@ export const AZURE_OPENAI_RESPONSES_MODELS = {
 		provider: "azure-openai-responses",
 		baseUrl: "",
 		reasoning: true,
-		thinkingLevelMap: {"off":null,"xhigh":"xhigh"},
+		thinkingLevelMap: {"off":null,"xhigh":"xhigh","max":"max"},
 		input: ["text", "image"],
 		cost: {
 			input: 5,
@@ -667,7 +667,7 @@ export const AZURE_OPENAI_RESPONSES_MODELS = {
 		provider: "azure-openai-responses",
 		baseUrl: "",
 		reasoning: true,
-		thinkingLevelMap: {"off":null,"xhigh":"xhigh"},
+		thinkingLevelMap: {"off":null,"xhigh":"xhigh","max":"max"},
 		input: ["text", "image"],
 		cost: {
 			input: 2.5,

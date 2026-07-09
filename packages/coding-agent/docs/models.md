@@ -214,13 +214,13 @@ Current behavior:
 
 ### Thinking Level Map
 
-Use `thinkingLevelMap` on a model to describe model-specific thinking controls. Keys are pi thinking levels: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`.
+Use `thinkingLevelMap` on a model to describe model-specific thinking controls. Keys are pi thinking levels: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. Maps may contain holes; for example, a model can expose `high` and `max` without exposing `xhigh`.
 
 Values are tristate:
 
 | Value | Meaning |
 |-------|---------|
-| omitted | Level is supported and uses the provider's default mapping |
+| omitted | Standard levels through `high` use the provider's default mapping; extended `xhigh` and `max` levels are unsupported |
 | string | Level is supported and this value is sent to the provider |
 | `null` | Level is unsupported and hidden/skipped/clamped away |
 
@@ -235,7 +235,8 @@ Example for a model that only supports off, high, and max reasoning:
     "low": null,
     "medium": null,
     "high": "high",
-    "xhigh": "max"
+    "xhigh": null,
+    "max": "max"
   }
 }
 ```

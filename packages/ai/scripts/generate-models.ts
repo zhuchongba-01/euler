@@ -160,7 +160,7 @@ const ZAI_GLM52_THINKING_LEVEL_MAP = {
 	low: "high",
 	medium: "high",
 	high: "high",
-	xhigh: "max",
+	max: "max",
 } as const;
 const OPENCODE_GO_GLM52_THINKING_LEVEL_MAP = {
 	off: null,
@@ -168,7 +168,7 @@ const OPENCODE_GO_GLM52_THINKING_LEVEL_MAP = {
 	low: null,
 	medium: null,
 	high: "high",
-	xhigh: "max",
+	max: "max",
 } as const;
 const EAGER_TOOL_INPUT_STREAMING_UNSUPPORTED_ANTHROPIC_MODELS = new Set([
 	"github-copilot:claude-haiku-4.5",
@@ -181,7 +181,7 @@ const DEEPSEEK_V4_THINKING_LEVEL_MAP = {
 	low: null,
 	medium: null,
 	high: "high",
-	xhigh: "max",
+	max: "max",
 } as const;
 
 const ANT_LING_RING_THINKING_LEVEL_MAP = {
@@ -235,7 +235,7 @@ const GITHUB_COPILOT_EXTENDED_CONTEXT_MODELS = new Set([
 const GITHUB_COPILOT_THINKING_LEVEL_OVERRIDES = {
 	"claude-opus-4.7": { minimal: "low" },
 	"claude-opus-4.8": { minimal: "low" },
-	"claude-sonnet-4.6": { minimal: "low", xhigh: "max" },
+	"claude-sonnet-4.6": { minimal: "low", max: "max" },
 } satisfies Record<string, NonNullable<Model<Api>["thinkingLevelMap"]>>;
 
 function mergeThinkingLevelMap(model: Model<any>, map: NonNullable<Model<any>["thinkingLevelMap"]>): void {
@@ -268,6 +268,16 @@ function supportsOpenAiXhigh(modelId: string): boolean {
 		modelId.includes("gpt-5.4") ||
 		modelId.includes("gpt-5.5") ||
 		modelId.includes("gpt-5.6")
+	);
+}
+
+function supportsOpenAiMax(model: Model<Api>): boolean {
+	return (
+		model.id.includes("gpt-5.6") &&
+		(model.api === "openai-responses" ||
+			model.api === "azure-openai-responses" ||
+			model.api === "openai-codex-responses" ||
+			model.api === "openai-completions")
 	);
 }
 
@@ -472,28 +482,41 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 	if (supportsOpenAiXhigh(model.id)) {
 		mergeThinkingLevelMap(model, { xhigh: "xhigh" });
 	}
+	if (supportsOpenAiMax(model)) {
+		mergeThinkingLevelMap(model, { max: "max" });
+	}
 	if (model.provider === "openai" && model.id === "gpt-5.5") {
 		mergeThinkingLevelMap(model, { minimal: null });
 	}
 	if (model.id.endsWith("gpt-5.5-pro")) {
 		mergeThinkingLevelMap(model, { off: null, minimal: null, low: null });
 	}
-	if (model.id.includes("opus-4-6") || model.id.includes("opus-4.6")) {
-		mergeThinkingLevelMap(model, { xhigh: "max" });
+	// Anthropic adaptive-thinking effort support (per Anthropic adaptive thinking docs):
+	// - "max" is available on all adaptive-thinking Claude models.
+	// - "xhigh" is only available on Opus 4.7/4.8, Sonnet 5, and Fable 5.
+	if (
+		model.id.includes("opus-4-6") ||
+		model.id.includes("opus-4.6") ||
+		model.id.includes("sonnet-4-6") ||
+		model.id.includes("sonnet-4.6")
+	) {
+		mergeThinkingLevelMap(model, { max: "max" });
 	}
 	if (
 		model.id.includes("opus-4-7") ||
 		model.id.includes("opus-4.7") ||
 		model.id.includes("opus-4-8") ||
-		model.id.includes("opus-4.8")
+		model.id.includes("opus-4.8") ||
+		model.id.includes("sonnet-5") ||
+		model.id.includes("sonnet.5")
 	) {
-		mergeThinkingLevelMap(model, { xhigh: "xhigh" });
+		mergeThinkingLevelMap(model, { xhigh: "xhigh", max: "max" });
 	}
 	if (
 		(model.api === "anthropic-messages" || model.api === "bedrock-converse-stream") &&
 		model.id.includes("fable-5")
 	) {
-		mergeThinkingLevelMap(model, { off: null, xhigh: "xhigh" });
+		mergeThinkingLevelMap(model, { off: null, xhigh: "xhigh", max: "max" });
 	}
 	if (model.api === "anthropic-messages" && isAnthropicAdaptiveThinkingModel(model.id)) {
 		mergeAnthropicMessagesCompat(model, { forceAdaptiveThinking: true });
@@ -505,7 +528,7 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 		mergeThinkingLevelMap(
 			model,
 			model.provider === "openrouter"
-				? { ...DEEPSEEK_V4_THINKING_LEVEL_MAP, xhigh: "xhigh" }
+				? { ...DEEPSEEK_V4_THINKING_LEVEL_MAP, xhigh: "xhigh", max: null }
 				: DEEPSEEK_V4_THINKING_LEVEL_MAP,
 		);
 	}
@@ -544,7 +567,7 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 		mergeThinkingLevelMap(model, { xhigh: "xhigh" });
 	}
 	if (model.provider === "fireworks" && model.id.includes("glm-5p2")) {
-		mergeThinkingLevelMap(model, { off: "none", minimal: null, low: "high", medium: "high", xhigh: "max" });
+		mergeThinkingLevelMap(model, { off: "none", minimal: null, low: "high", medium: "high", max: "max" });
 	}
 	if (model.provider === "opencode-go" && model.id === "glm-5.2") {
 		mergeThinkingLevelMap(model, OPENCODE_GO_GLM52_THINKING_LEVEL_MAP);
