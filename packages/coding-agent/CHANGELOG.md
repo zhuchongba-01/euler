@@ -22,6 +22,7 @@
 - Fixed auto-retry for Bun fetch socket-drop errors reported as `socket connection was closed`, so transient provider disconnects do not end headless runs without retrying ([#6431](https://github.com/earendil-works/pi/issues/6431)).
 - Fixed `models.json` `modelOverrides` to apply to extension-registered provider models ([#6367](https://github.com/earendil-works/pi/issues/6367)).
 - Fixed project context file discovery to use stable parent traversal on Windows so startup no longer hangs while loading AGENTS.md or CLAUDE.md ([#6369](https://github.com/earendil-works/pi/issues/6369)).
+- Fixed `--session-id` startup to warn when no existing project session has that id and pi creates a new session ([#6407](https://github.com/earendil-works/pi/issues/6407)).
 
 ### Removed
 
