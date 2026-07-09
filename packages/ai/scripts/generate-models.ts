@@ -201,6 +201,10 @@ const OPENAI_RESPONSES_NONE_REASONING_MODELS = new Set([
 	"gpt-5.4-mini",
 	"gpt-5.4-nano",
 	"gpt-5.5",
+	"gpt-5.6",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna",
 ]);
 
 const OPENCODE_OPENAI_COMPLETIONS_LONG_CACHE_RETENTION_UNSUPPORTED_MODELS = new Set([
@@ -262,7 +266,8 @@ function supportsOpenAiXhigh(modelId: string): boolean {
 		modelId.includes("gpt-5.2") ||
 		modelId.includes("gpt-5.3") ||
 		modelId.includes("gpt-5.4") ||
-		modelId.includes("gpt-5.5")
+		modelId.includes("gpt-5.5") ||
+		modelId.includes("gpt-5.6")
 	);
 }
 
@@ -1684,8 +1689,56 @@ async function generateModels() {
 
 
 	// Add missing gpt models
-	if (!allModels.some(m => m.provider === "openai" && m.id === "gpt-5-chat-latest")) {
-		allModels.push({
+	const missingOpenAiModels: Model<"openai-responses">[] = [
+		{
+			id: "gpt-5.6",
+			name: "GPT-5.6",
+			api: "openai-responses",
+			baseUrl: "https://api.openai.com/v1",
+			provider: "openai",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 0 },
+			contextWindow: 1050000,
+			maxTokens: 128000,
+		},
+		{
+			id: "gpt-5.6-sol",
+			name: "GPT-5.6 Sol",
+			api: "openai-responses",
+			baseUrl: "https://api.openai.com/v1",
+			provider: "openai",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 0 },
+			contextWindow: 1050000,
+			maxTokens: 128000,
+		},
+		{
+			id: "gpt-5.6-terra",
+			name: "GPT-5.6 Terra",
+			api: "openai-responses",
+			baseUrl: "https://api.openai.com/v1",
+			provider: "openai",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 },
+			contextWindow: 1050000,
+			maxTokens: 128000,
+		},
+		{
+			id: "gpt-5.6-luna",
+			name: "GPT-5.6 Luna",
+			api: "openai-responses",
+			baseUrl: "https://api.openai.com/v1",
+			provider: "openai",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 1, output: 6, cacheRead: 0.1, cacheWrite: 0 },
+			contextWindow: 1050000,
+			maxTokens: 128000,
+		},
+		{
 			id: "gpt-5-chat-latest",
 			name: "GPT-5 Chat Latest",
 			api: "openai-responses",
@@ -1701,7 +1754,12 @@ async function generateModels() {
 			},
 			contextWindow: 128000,
 			maxTokens: 16384,
-		});
+		},
+	];
+	for (const model of missingOpenAiModels) {
+		if (!allModels.some((m) => m.provider === model.provider && m.id === model.id)) {
+			allModels.push(model);
+		}
 	}
 
 	const deepseekCompat: OpenAICompletionsCompat = {
@@ -1878,6 +1936,42 @@ async function generateModels() {
 			reasoning: true,
 			input: ["text", "image"],
 			cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 0 },
+			contextWindow: CODEX_CONTEXT,
+			maxTokens: CODEX_MAX_TOKENS,
+		},
+		{
+			id: "gpt-5.6-luna",
+			name: "GPT-5.6 Luna",
+			api: "openai-codex-responses",
+			provider: "openai-codex",
+			baseUrl: CODEX_BASE_URL,
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 1, output: 6, cacheRead: 0.1, cacheWrite: 0 },
+			contextWindow: CODEX_CONTEXT,
+			maxTokens: CODEX_MAX_TOKENS,
+		},
+		{
+			id: "gpt-5.6-sol",
+			name: "GPT-5.6 Sol",
+			api: "openai-codex-responses",
+			provider: "openai-codex",
+			baseUrl: CODEX_BASE_URL,
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 0 },
+			contextWindow: CODEX_CONTEXT,
+			maxTokens: CODEX_MAX_TOKENS,
+		},
+		{
+			id: "gpt-5.6-terra",
+			name: "GPT-5.6 Terra",
+			api: "openai-codex-responses",
+			provider: "openai-codex",
+			baseUrl: CODEX_BASE_URL,
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 },
 			contextWindow: CODEX_CONTEXT,
 			maxTokens: CODEX_MAX_TOKENS,
 		},

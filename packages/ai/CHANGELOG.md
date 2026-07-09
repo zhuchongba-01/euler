@@ -20,6 +20,7 @@
 
 ### Added
 
+- Added OpenAI GPT-5.6 model metadata for `gpt-5.6`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`, plus verified `openai-codex` support for `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`.
 - Refreshed generated model catalogs from models.dev, adding newly listed models including Kimi K2.7 Code for GitHub Copilot and Fable 5 to several providers ([#6256](https://github.com/earendil-works/pi/issues/6256)).
 - Added Claude Sonnet 5 to the GitHub Copilot model catalog ([#6200](https://github.com/earendil-works/pi/issues/6200)).
 - Added zstd request-body compression for the OpenAI Codex Responses SSE transport. Requests are sent with `Content-Encoding: zstd` when Node/Bun zstd support is available; the WebSocket transport is unchanged.

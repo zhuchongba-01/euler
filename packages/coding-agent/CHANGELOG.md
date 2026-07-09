@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added inherited OpenAI GPT-5.6 model metadata for `gpt-5.6`, `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`, plus verified `openai-codex` support for `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`.
 - Added `/login <provider>` support with provider autocomplete.
 - Added public SDK exports for CLI-equivalent model and scoped-model resolution ([#6201](https://github.com/earendil-works/pi/issues/6201)).
 - Added extension and RPC `agent_settled` events plus session-level idle waiting for fully settled agent runs ([#6363](https://github.com/earendil-works/pi/issues/6363)).
