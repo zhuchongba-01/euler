@@ -15,6 +15,7 @@
 - Fixed OpenAI Completions and Responses providers to send `(no tool output)` instead of `(see attached image)` when a tool result has empty text and no image content, preventing the model from hallucinating image attachments.
 - Fixed OpenAI Responses and Azure OpenAI Responses requests to avoid sending `max_output_tokens` values below the provider minimum ([#6265](https://github.com/earendil-works/pi/issues/6265)).
 - Fixed retry classification for Cloudflare 524 timeout responses ([#6239](https://github.com/earendil-works/pi/issues/6239)).
+- Fixed GitHub Copilot extended context window models (Claude Opus 4.7/4.8, Claude Opus 4.6, Claude Sonnet 4.6/5, Claude Fable 5, GPT-5.3 Codex, GPT-5.4, GPT-5.5) to use `contextWindow: 1000000`, preventing premature compaction and under-budgeting ([#6439](https://github.com/earendil-works/pi/issues/6439)).
 
 ### Added
 
