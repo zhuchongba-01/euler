@@ -10,6 +10,7 @@
 
 ### Added
 
+- Added cache-friendly dynamic tool loading. `ToolResultMessage.addedToolNames` marks where tools from `Context.tools` became available; Anthropic and OpenAI Responses use native deferred loading so late tools stay out of the cached prefix, while other providers continue using `Context.tools` normally.
 - Added a separate opt-in `max` thinking level, including native `xhigh` and `max` support for GPT-5.6 and Anthropic adaptive-thinking effort metadata matching Anthropic's documentation: `max` on all adaptive Claude models, native `xhigh` on Opus 4.7/4.8, Sonnet 5, and Fable 5 only.
 - Added request-wide input-token pricing tiers to model cost metadata and usage cost calculation.
 

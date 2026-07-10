@@ -624,6 +624,11 @@ export class ExtensionRunner {
 		this.shutdownHandler();
 	}
 
+	getActiveTools(): string[] {
+		this.assertActive();
+		return this.runtime.getActiveTools();
+	}
+
 	/**
 	 * Create an ExtensionContext for use in event handlers and tool execution.
 	 * Context values are resolved at call time, so changes via bindCore/bindUI are reflected.
