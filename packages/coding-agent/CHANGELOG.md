@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Fixed `Ctrl+V` to paste clipboard text when the pasteboard does not contain an image.
 - Fixed `/login amazon-bedrock` to prompt for and save a Bedrock API key instead of only displaying ambient AWS credential setup instructions.
 
 ## [0.80.6] - 2026-07-09
