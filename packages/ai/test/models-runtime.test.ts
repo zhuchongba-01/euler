@@ -106,6 +106,22 @@ function testOAuth(overrides?: Partial<OAuthAuth>): OAuthAuth {
 }
 
 describe("Models runtime", () => {
+	it("enumerates credential metadata without exposing secrets", async () => {
+		const credentials = new InMemoryCredentialStore();
+		await credentials.modify("api-provider", async () => ({ type: "api_key", key: "secret" }));
+		await credentials.modify("oauth-provider", async () => ({
+			type: "oauth",
+			access: "access",
+			refresh: "refresh",
+			expires: Date.now() + 60_000,
+		}));
+
+		expect(await credentials.list()).toEqual([
+			{ providerId: "api-provider", type: "api_key" },
+			{ providerId: "oauth-provider", type: "oauth" },
+		]);
+	});
+
 	it("applies request-wide pricing tiers above the configured input threshold", () => {
 		const model = testModel("openai", "gpt-5.6-sol");
 		model.cost = {
@@ -246,8 +262,10 @@ describe("Models runtime", () => {
 		models.setProvider(testProvider({ id: "p1", auth: { apiKey: envKeyAuth("env-key"), oauth: testOAuth() } }));
 		const model = testModel("p1", "model-a");
 
-		// nothing stored: ambient env resolves
+		// model and provider-id overloads resolve the same provider-scoped auth
 		expect((await models.getAuth(model))?.auth.apiKey).toBe("env-key");
+		expect((await models.getAuth(model.provider))?.auth.apiKey).toBe("env-key");
+		expect((await models.getAuth(model, { apiKey: "explicit-key" }))?.auth.apiKey).toBe("explicit-key");
 
 		// stored oauth credential (persisted via the single write path): beats ambient env
 		await credentials.modify("p1", async () => ({
@@ -256,15 +274,67 @@ describe("Models runtime", () => {
 			refresh: "r",
 			expires: Date.now() + 100000,
 		}));
-		const resolution = await models.getAuth(model);
+		const resolution = await models.getAuth(model.provider);
 		expect(resolution?.auth.apiKey).toBe("oauth-token");
 		expect(resolution?.source).toBe("OAuth");
 
 		// stored api-key credential resolves through apiKey auth, beats env
 		await credentials.modify("p1", async () => ({ type: "api_key", key: "stored-key" }));
-		const apiKeyResolution = await models.getAuth(model);
+		const apiKeyResolution = await models.getAuth(model.provider);
 		expect(apiKeyResolution?.auth.apiKey).toBe("stored-key");
 		expect(apiKeyResolution?.source).toBe("stored");
+	});
+
+	it("checks provider auth without refreshing OAuth and filters available models", async () => {
+		const credentials = new InMemoryCredentialStore();
+		let refreshes = 0;
+		const models = createModels({ credentials });
+		models.setProvider(testProvider({ id: "ambient", auth: { apiKey: envKeyAuth("env-key") } }));
+		models.setProvider(testProvider({ id: "missing", auth: { apiKey: envKeyAuth(undefined) } }));
+		models.setProvider(
+			testProvider({
+				id: "oauth",
+				auth: {
+					oauth: testOAuth({
+						refresh: async (credential) => {
+							refreshes++;
+							return credential;
+						},
+					}),
+				},
+			}),
+		);
+		await credentials.modify("oauth", async () => ({
+			type: "oauth",
+			access: "expired",
+			refresh: "refresh",
+			expires: 0,
+		}));
+
+		expect(await models.checkAuth("ambient")).toEqual({ source: "env", type: "api_key" });
+		expect(await models.checkAuth("missing")).toBeUndefined();
+		expect(await models.checkAuth("oauth")).toEqual({ source: "OAuth", type: "oauth" });
+		expect(refreshes).toBe(0);
+		expect((await models.getAvailable()).map((model) => model.provider)).toEqual(["ambient", "oauth"]);
+		expect((await models.getAvailable("ambient")).map((model) => model.provider)).toEqual(["ambient"]);
+	});
+
+	it("runs provider login and logout through the credential store", async () => {
+		const credentials = new InMemoryCredentialStore();
+		const apiKey = envKeyAuth(undefined);
+		apiKey.login = async () => ({ type: "api_key", key: "logged-in" });
+		const models = createModels({ credentials });
+		models.setProvider(testProvider({ id: "p1", auth: { apiKey } }));
+
+		const credential = await models.login("p1", "api_key", {
+			prompt: async () => "unused",
+			notify: () => {},
+		});
+		expect(credential).toEqual({ type: "api_key", key: "logged-in" });
+		expect(await credentials.read("p1")).toEqual(credential);
+
+		await models.logout("p1");
+		expect(await credentials.read("p1")).toBeUndefined();
 	});
 
 	it("a stored credential without a matching handler blocks ambient fallback", async () => {
@@ -274,7 +344,7 @@ describe("Models runtime", () => {
 		models.setProvider(testProvider({ id: "p1", auth: { apiKey: envKeyAuth("env-key") } }));
 		await credentials.modify("p1", async () => ({ type: "oauth", access: "a", refresh: "r", expires: 0 }));
 
-		expect(await models.getAuth(testModel("p1", "model-a"))).toBeUndefined();
+		expect(await models.getAuth("p1")).toBeUndefined();
 	});
 
 	it("refreshes expired oauth credentials and persists the rotated credential", async () => {
@@ -291,7 +361,7 @@ describe("Models runtime", () => {
 			expires: 0,
 		}));
 
-		const resolution = await models.getAuth(testModel("p1", "model-a"));
+		const resolution = await models.getAuth("p1");
 		expect(resolution?.auth.apiKey).toBe("new-token");
 		expect(((await credentials.read("p1")) as { access: string }).access).toBe("new-token");
 	});
@@ -307,7 +377,7 @@ describe("Models runtime", () => {
 		models.setProvider(testProvider({ id: "p1", auth: { oauth } }));
 		await credentials.modify("p1", async () => ({ type: "oauth", access: "old", refresh: "r", expires: 0 }));
 
-		await expect(models.getAuth(testModel("p1", "model-a"))).rejects.toMatchObject({ code: "oauth" });
+		await expect(models.getAuth("p1")).rejects.toMatchObject({ code: "oauth" });
 		// credential preserved for retry / re-login
 		expect(((await credentials.read("p1")) as { access: string }).access).toBe("old");
 	});
@@ -328,7 +398,7 @@ describe("Models runtime", () => {
 		models.setProvider(testProvider({ id: "p1", auth: { oauth } }));
 		const model = testModel("p1", "model-a");
 
-		const [a, b] = await Promise.all([models.getAuth(model), models.getAuth(model)]);
+		const [a, b] = await Promise.all([models.getAuth(model.provider), models.getAuth(model.provider)]);
 		expect(refreshes).toBe(1);
 		expect(a?.auth.apiKey).toBe("new-1");
 		expect(b?.auth.apiKey).toBe("new-1");
@@ -339,6 +409,7 @@ describe("Models runtime", () => {
 		const base = new InMemoryCredentialStore();
 		const credentials: CredentialStore = {
 			read: (pid) => base.read(pid),
+			list: () => base.list(),
 			modify: (pid, fn) => {
 				modifies++;
 				return base.modify(pid, fn);
@@ -354,7 +425,7 @@ describe("Models runtime", () => {
 		const models = createModels({ credentials });
 		models.setProvider(testProvider({ id: "p1", auth: { oauth: testOAuth() } }));
 
-		expect((await models.getAuth(testModel("p1", "model-a")))?.auth.apiKey).toBe("valid");
+		expect((await models.getAuth("p1"))?.auth.apiKey).toBe("valid");
 		expect(modifies).toBe(0);
 	});
 
@@ -364,16 +435,18 @@ describe("Models runtime", () => {
 			read: async () => {
 				throw new Error("disk on fire");
 			},
+			list: async () => [],
 			modify: async () => undefined,
 			delete: async () => {},
 		};
 		const models = createModels({ credentials: readFailing });
 		models.setProvider(testProvider({ id: "p1", auth: { apiKey: envKeyAuth("env-key") } }));
-		await expect(models.getAuth(testModel("p1", "model-a"))).rejects.toMatchObject({ code: "auth" });
+		await expect(models.getAuth("p1")).rejects.toMatchObject({ code: "auth" });
 
 		// modify failure during refresh
 		const modifyFailing: CredentialStore = {
 			read: async () => ({ type: "oauth", access: "old", refresh: "r", expires: 0 }),
+			list: async () => [{ providerId: "p1", type: "oauth" }],
 			modify: async () => {
 				throw new Error("disk on fire");
 			},
@@ -381,7 +454,7 @@ describe("Models runtime", () => {
 		};
 		const oauthModels = createModels({ credentials: modifyFailing });
 		oauthModels.setProvider(testProvider({ id: "p1", auth: { oauth: testOAuth() } }));
-		await expect(oauthModels.getAuth(testModel("p1", "model-a"))).rejects.toMatchObject({ code: "auth" });
+		await expect(oauthModels.getAuth("p1")).rejects.toMatchObject({ code: "auth" });
 	});
 
 	it("wraps api-key auth failures in ModelsError", async () => {
@@ -393,7 +466,7 @@ describe("Models runtime", () => {
 		};
 		const models = createModels();
 		models.setProvider(testProvider({ id: "p1", auth: { apiKey: failing } }));
-		await expect(models.getAuth(testModel("p1", "model-a"))).rejects.toMatchObject({ code: "auth" });
+		await expect(models.getAuth("p1")).rejects.toMatchObject({ code: "auth" });
 	});
 
 	it("uses explicit request api key and env during provider auth resolution", async () => {
@@ -427,7 +500,7 @@ describe("Models runtime", () => {
 			resolve: async () => ({
 				auth: {
 					apiKey: "resolved-key",
-					headers: { "x-a": "auth", "x-b": "auth" },
+					headers: { Authorization: "Bearer resolved-key", "x-a": "auth", "x-b": "auth" },
 					baseUrl: "https://auth.test/v1",
 				},
 			}),
@@ -438,18 +511,48 @@ describe("Models runtime", () => {
 
 		const result = await models.completeSimple(model, context, {
 			apiKey: "explicit-key",
-			headers: { "x-b": "explicit" },
+			headers: { authorization: "Explicit token", "x-b": "explicit" },
 		});
 		expect(result.stopReason).toBe("stop");
 		expect(calls).toHaveLength(1);
 		expect(calls[0].options?.apiKey).toBe("explicit-key");
-		expect(calls[0].options?.headers).toEqual({ "x-a": "auth", "x-b": "explicit" });
+		expect(calls[0].options?.headers).toEqual({ authorization: "Explicit token", "x-a": "auth", "x-b": "explicit" });
 		expect(calls[0].model.baseUrl).toBe("https://auth.test/v1");
 
 		// without explicit options, resolved auth applies
 		const result2 = await models.completeSimple(model, context);
 		expect(result2.stopReason).toBe("stop");
 		expect(calls[1].options?.apiKey).toBe("resolved-key");
+	});
+
+	it("adds model headers only for model auth and transforms assembled headers once", async () => {
+		const calls: ProviderCall[] = [];
+		const models = createModels();
+		models.setProvider(testProvider({ id: "p1", auth: { apiKey: envKeyAuth("key") }, calls }));
+		const model = testModel("p1", "model-a");
+		model.headers = { "x-model": "model", "x-shared": "model" };
+
+		expect((await models.getAuth("p1"))?.auth.headers).toBeUndefined();
+		expect((await models.getAuth(model))?.auth.headers).toEqual({ "x-model": "model", "x-shared": "model" });
+
+		let transforms = 0;
+		await models.completeSimple(model, context, {
+			headers: { "x-explicit": "explicit", "X-Shared": "explicit" },
+			transformHeaders: async (headers) => {
+				transforms++;
+				expect(headers).toEqual({ "x-model": "model", "x-explicit": "explicit", "X-Shared": "explicit" });
+				return { ...headers, "x-transformed": "yes" };
+			},
+		});
+
+		expect(transforms).toBe(1);
+		expect(calls[0].options?.headers).toEqual({
+			"x-model": "model",
+			"x-explicit": "explicit",
+			"X-Shared": "explicit",
+			"x-transformed": "yes",
+		});
+		expect(calls[0].options).not.toHaveProperty("transformHeaders");
 	});
 
 	it("produces an error stream for unknown providers instead of throwing", async () => {

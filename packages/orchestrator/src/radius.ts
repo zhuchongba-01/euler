@@ -1,5 +1,6 @@
 import { hostname, platform } from "node:os";
-import { AuthStorage, type OAuthCredential } from "@earendil-works/pi-coding-agent";
+import type { OAuthCredential } from "@earendil-works/pi-ai";
+import { readStoredCredential } from "@earendil-works/pi-coding-agent";
 import { getOrchestratorDir, getSocketPath, VERSION } from "./config.ts";
 import { loadMachine, saveMachine } from "./storage.ts";
 import type { InstanceRecord, MachineRecord, RadiusRegistration } from "./types.ts";
@@ -116,15 +117,9 @@ export function getRadiusOrchestratorBaseUrl(): string {
 	return new URL(DEFAULT_ORCHESTRATOR_BASE_PATH, getRadiusUrl()).toString();
 }
 
-const radiusAuthStorage = AuthStorage.create();
-
 function getStoredRadiusCredential(): OAuthCredential | undefined {
-	radiusAuthStorage.reload();
-	const credential = radiusAuthStorage.get(RADIUS_PROVIDER);
-	if (!credential || credential.type !== "oauth") {
-		return undefined;
-	}
-	return credential;
+	const credential = readStoredCredential(RADIUS_PROVIDER);
+	return credential?.type === "oauth" ? credential : undefined;
 }
 
 export function getRadiusAccessToken(): string {

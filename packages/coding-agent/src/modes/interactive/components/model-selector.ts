@@ -9,7 +9,7 @@ import {
 	Text,
 	type TUI,
 } from "@earendil-works/pi-tui";
-import type { ModelRegistry } from "../../../core/model-registry.ts";
+import type { ModelRuntime } from "../../../core/model-runtime.ts";
 import type { SettingsManager } from "../../../core/settings-manager.ts";
 import { getModelSelectorSearchText } from "../model-search.ts";
 import { theme } from "../theme/theme.ts";
@@ -52,7 +52,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	private selectedIndex: number = 0;
 	private currentModel?: Model<any>;
 	private settingsManager: SettingsManager;
-	private modelRegistry: ModelRegistry;
+	private modelRuntime: ModelRuntime;
 	private onSelectCallback: (model: Model<any>) => void;
 	private onCancelCallback: () => void;
 	private errorMessage?: string;
@@ -66,7 +66,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		tui: TUI,
 		currentModel: Model<any> | undefined,
 		settingsManager: SettingsManager,
-		modelRegistry: ModelRegistry,
+		modelRuntime: ModelRuntime,
 		scopedModels: ReadonlyArray<ScopedModelItem>,
 		onSelect: (model: Model<any>) => void,
 		onCancel: () => void,
@@ -77,7 +77,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		this.tui = tui;
 		this.currentModel = currentModel;
 		this.settingsManager = settingsManager;
-		this.modelRegistry = modelRegistry;
+		this.modelRuntime = modelRuntime;
 		this.scopedModels = scopedModels;
 		this.scope = scopedModels.length > 0 ? "scoped" : "all";
 		this.onSelectCallback = onSelect;
@@ -139,17 +139,17 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		let models: ModelItem[];
 
 		// Refresh to pick up any changes to models.json
-		this.modelRegistry.refresh();
+		await this.modelRuntime.refresh();
 
 		// Check for models.json errors
-		const loadError = this.modelRegistry.getError();
+		const loadError = this.modelRuntime.getError();
 		if (loadError) {
 			this.errorMessage = loadError;
 		}
 
 		// Load available models (built-in models still work even if models.json failed)
 		try {
-			const availableModels = await this.modelRegistry.getAvailable();
+			const availableModels = await this.modelRuntime.getAvailable();
 			models = availableModels.map((model: Model<any>) => ({
 				provider: model.provider,
 				id: model.id,
@@ -166,7 +166,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 
 		this.allModels = this.sortModels(models);
 		this.scopedModels = this.scopedModels.map((scoped) => {
-			const refreshed = this.modelRegistry.find(scoped.model.provider, scoped.model.id);
+			const refreshed = this.modelRuntime.getModel(scoped.model.provider, scoped.model.id);
 			return refreshed ? { ...scoped, model: refreshed } : scoped;
 		});
 		this.scopedModelItems = this.scopedModels.map((scoped) => ({

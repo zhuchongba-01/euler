@@ -252,11 +252,12 @@ describe("openai-responses provider defaults", () => {
 		expect(captured).toEqual({ sessionId: null, clientRequestId: null });
 	});
 
-	it.each([
-		["gpt-5.4", "priority", 2],
-		["gpt-5.5", "priority", 2.5],
-		["gpt-5.5", "flex", 0.5],
-	] as const)("applies %s %s service-tier cost multiplier", async (modelId, serviceTier, multiplier) => {
+	async function streamServiceTierUsage(
+		modelId: "gpt-5.4" | "gpt-5.5",
+		serviceTier: "priority" | "flex",
+		inputTokens: number,
+		outputTokens: number,
+	) {
 		const model = getModel("openai", modelId);
 		const sse = `${[
 			`data: ${JSON.stringify({
@@ -265,9 +266,9 @@ describe("openai-responses provider defaults", () => {
 					status: "completed",
 					service_tier: serviceTier,
 					usage: {
-						input_tokens: 1000000,
-						output_tokens: 1000000,
-						total_tokens: 2000000,
+						input_tokens: inputTokens,
+						output_tokens: outputTokens,
+						total_tokens: inputTokens + outputTokens,
 						input_tokens_details: { cached_tokens: 0 },
 					},
 				},
@@ -290,10 +291,39 @@ describe("openai-responses provider defaults", () => {
 			{ apiKey: "test-key", serviceTier },
 		);
 
-		const result = await stream.result();
+		return { model, result: await stream.result() };
+	}
 
-		expect(result.usage.cost.input).toBe(model.cost.input * multiplier);
-		expect(result.usage.cost.output).toBe(model.cost.output * multiplier);
-		expect(result.usage.cost.total).toBe((model.cost.input + model.cost.output) * multiplier);
+	it.each([
+		["gpt-5.4", "priority", 2],
+		["gpt-5.5", "priority", 2.5],
+		["gpt-5.5", "flex", 0.5],
+	] as const)("applies %s %s service-tier cost multiplier", async (modelId, serviceTier, multiplier) => {
+		// Stay below the 272K long-context tier threshold so base rates apply.
+		const inputTokens = 200000;
+		const outputTokens = 100000;
+		const { model, result } = await streamServiceTierUsage(modelId, serviceTier, inputTokens, outputTokens);
+
+		const expectedInput = (model.cost.input / 1_000_000) * inputTokens * multiplier;
+		const expectedOutput = (model.cost.output / 1_000_000) * outputTokens * multiplier;
+		expect(result.usage.cost.input).toBe(expectedInput);
+		expect(result.usage.cost.output).toBe(expectedOutput);
+		expect(result.usage.cost.total).toBe(expectedInput + expectedOutput);
+	});
+
+	it("applies the service-tier multiplier on top of long-context tier pricing", async () => {
+		// Above the 272K input threshold the long-context tier rates apply, then the multiplier.
+		const inputTokens = 1000000;
+		const outputTokens = 100000;
+		const multiplier = 2;
+		const { model, result } = await streamServiceTierUsage("gpt-5.4", "priority", inputTokens, outputTokens);
+
+		const tier = model.cost.tiers?.find((entry) => inputTokens > entry.inputTokensAbove);
+		if (!tier) throw new Error("expected gpt-5.4 to define a long-context pricing tier");
+		const expectedInput = (tier.input / 1_000_000) * inputTokens * multiplier;
+		const expectedOutput = (tier.output / 1_000_000) * outputTokens * multiplier;
+		expect(result.usage.cost.input).toBe(expectedInput);
+		expect(result.usage.cost.output).toBe(expectedOutput);
+		expect(result.usage.cost.total).toBe(expectedInput + expectedOutput);
 	});
 });

@@ -2,10 +2,75 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Replaced the SDK's `CreateAgentSessionOptions.authStorage` and `modelRegistry` options with the async `modelRuntime` option. `AuthStorage` and its storage backends are no longer exported; use `ModelRuntime` (or a custom pi-ai `CredentialStore`), or `readStoredCredential()` for one-off reads of auth.json.
+- Removed redundant `ModelRuntime.getAll()`, `find()`, `getSnapshot()`, and `getAuthOptions()` projections. Use the pi-ai `Models` methods `getModels()`, `getModel()`, `getProviders()`, and `checkAuth()` directly.
+- Replaced SDK request-auth assembly through `ModelRegistry.getApiKeyAndHeaders()` with `ModelRuntime.getAuth()`. Passing a provider ID returns provider-scoped auth; passing a model also resolves built-in, `models.json`, and extension model headers.
+- Changed extension-facing `ModelRegistry.refresh()` from synchronous `void` to `Promise<void>` because `models.json` loading is asynchronous. Extensions must await it before making synchronous registry reads.
+- Removed extension OAuth `modifyModels`. Provider catalogs are now composed independently of credentials; credential-specific availability belongs to canonical provider filtering. The legacy extension OAuth callback and credential types remain available from pi-ai's root and `oauth` subpath.
+
+#### SDK migration
+
+Construct one `ModelRuntime` and pass it to `createAgentSession()`:
+
+```typescript
+// Before
+const authStorage = AuthStorage.create(authPath);
+const modelRegistry = await ModelRegistry.create(authStorage, modelsPath);
+authStorage.setRuntimeApiKey("anthropic", apiKey);
+const { session } = await createAgentSession({ authStorage, modelRegistry });
+
+// After
+const modelRuntime = await ModelRuntime.create({ authPath, modelsPath });
+// Or: ModelRuntime.create({ credentials: myCredentialStore, modelsPath })
+modelRuntime.setRuntimeApiKey("anthropic", apiKey);
+const { session } = await createAgentSession({ modelRuntime });
+```
+
+Replace `ModelRegistry` projections with the corresponding `ModelRuntime`/pi-ai `Models` methods:
+
+```typescript
+const allModels = modelRuntime.getModels();
+const model = modelRuntime.getModel(providerId, modelId);
+const availableModels = await modelRuntime.getAvailable();
+const authStatus = await modelRuntime.checkAuth(providerId);
+const requestAuth = await modelRuntime.getAuth(model); // Includes model headers
+
+modelRuntime.registerProvider(providerId, providerConfig); // Still synchronous
+await modelRuntime.reloadConfig();
+```
+
+`ModelRuntime.stream*()` resolves auth and configured headers itself. Do not call `getAuth(model)` before streaming merely to reconstruct request options. For SDK-level header interception, use the Models-only transform so auth is resolved once:
+
+```typescript
+modelRuntime.streamSimple(model, context, {
+  transformHeaders: async (headers) => ({
+    ...headers,
+    "X-Request-ID": requestId,
+  }),
+});
+```
+
+Use `ModelRuntime` for model lookup, availability, provider auth, login/logout, runtime API-key overrides, provider registration, and config refresh. `ModelRegistry` remains a synchronous-read compatibility facade for extensions; SDK code should use `ModelRuntime`. Extensions that explicitly refresh it must await completion:
+
+```typescript
+await ctx.modelRegistry.refresh();
+const models = ctx.modelRegistry.getAll();
+```
+
+
 ### Added
 
+- Added `ModelRuntime` as the canonical async SDK and internal model/auth facade while preserving the synchronous extension-facing `ModelRegistry` API. `ModelRuntime.create()` accepts any pi-ai `CredentialStore` through its `credentials` option.
+- Added provider-owned `/login` discovery directly from registered pi-ai providers, including ambient auth status and informational links.
 - Added the opt-in `max` thinking level across CLI, SDK, RPC, model selection, and themes. Custom themes can define `thinkingMax`; existing themes fall back to `thinkingXhigh`.
 - Added request-wide input-token pricing tiers to custom model costs in `models.json`, `modelOverrides`, and extension-registered providers.
+
+### Changed
+
+- Changed `ModelRuntime` to compose built-in providers, immutable `models.json` configuration, and extension overlays through ad-hoc pi-ai provider methods.
+- Changed `ModelRuntime` to own final request assembly: `getAuth(model)` includes configured model headers, stream methods resolve auth once, and `before_provider_headers` runs as the Models-only header transform before provider dispatch.
 
 ## [0.80.5] - 2026-07-09
 

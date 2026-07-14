@@ -21,6 +21,14 @@ export * from "./auth/context.ts";
 export * from "./auth/credential-store.ts";
 export * from "./auth/helpers.ts";
 export * from "./auth/types.ts";
+export type {
+	OAuthAuthInfo,
+	OAuthDeviceCodeInfo,
+	OAuthLoginCallbacks,
+	OAuthPrompt,
+	OAuthSelectOption,
+	OAuthSelectPrompt,
+} from "./compat/extension-oauth-types.ts";
 export * from "./images-models.ts";
 export * from "./models.ts";
 export * from "./providers/faux.ts";
@@ -29,19 +37,6 @@ export * from "./types.ts";
 export * from "./utils/diagnostics.ts";
 export * from "./utils/event-stream.ts";
 export * from "./utils/json-parse.ts";
-export type {
-	OAuthAuthInfo,
-	OAuthCredentials,
-	OAuthDeviceCodeInfo,
-	OAuthLoginCallbacks,
-	OAuthPrompt,
-	OAuthProvider,
-	OAuthProviderId,
-	OAuthProviderInfo,
-	OAuthProviderInterface,
-	OAuthSelectOption,
-	OAuthSelectPrompt,
-} from "./utils/oauth/types.ts";
 export * from "./utils/overflow.ts";
 export * from "./utils/retry.ts";
 export * from "./utils/typebox-helpers.ts";

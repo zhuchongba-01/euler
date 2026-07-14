@@ -1,4 +1,4 @@
-import type { OAuthAuth } from "../../auth/types.ts";
+import type { OAuthAuth } from "../types.ts";
 
 /**
  * Loads an OAuth flow module through a variable specifier so bundlers cannot

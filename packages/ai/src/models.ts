@@ -1,8 +1,17 @@
 import { lazyStream } from "./api/lazy.ts";
 import { defaultProviderAuthContext as defaultAuthContext } from "./auth/context.ts";
 import { InMemoryCredentialStore } from "./auth/credential-store.ts";
-import { ModelsError, resolveProviderAuth } from "./auth/resolve.ts";
-import type { AuthContext, AuthResult, CredentialStore, ProviderAuth } from "./auth/types.ts";
+import { type AuthResolutionOverrides, ModelsError, resolveProviderAuth } from "./auth/resolve.ts";
+import type {
+	AuthCheck,
+	AuthContext,
+	AuthInteraction,
+	AuthResult,
+	AuthType,
+	Credential,
+	CredentialStore,
+	ProviderAuth,
+} from "./auth/types.ts";
 import type {
 	Api,
 	ApiStreamOptions,
@@ -19,7 +28,15 @@ import type {
 	Usage,
 } from "./types.ts";
 
-export { type AuthModel, ModelsError, type ModelsErrorCode } from "./auth/resolve.ts";
+export { ModelsError, type ModelsErrorCode } from "./auth/resolve.ts";
+
+export interface ModelsStreamTransforms {
+	/** Transform fully assembled model/auth/request headers before provider dispatch. */
+	transformHeaders?: (headers: ProviderHeaders) => ProviderHeaders | Promise<ProviderHeaders>;
+}
+
+export type ModelsApiStreamOptions<TApi extends Api> = ApiStreamOptions<TApi> & ModelsStreamTransforms;
+export type ModelsSimpleStreamOptions = SimpleStreamOptions & ModelsStreamTransforms;
 
 /**
  * A provider is the concrete runtime unit. It owns id/name/base metadata,
@@ -63,6 +80,13 @@ export interface Provider<TApi extends Api = Api> {
 	 */
 	refreshModels?(): Promise<void>;
 
+	/**
+	 * Optional provider policy for credential-specific model availability.
+	 * `getModels()` remains the complete synchronous catalog; `Models.getAvailable()`
+	 * applies this filter after confirming that provider auth is configured.
+	 */
+	filterModels?(models: readonly Model<TApi>[], credential: Credential | undefined): readonly Model<TApi>[];
+
 	stream<T extends TApi>(
 		model: Model<T>,
 		context: Context,
@@ -101,31 +125,44 @@ export interface Models {
 	 */
 	refresh(provider?: string): Promise<void>;
 
+	/** Check whether a provider has complete auth configuration without refreshing OAuth. */
+	checkAuth(providerId: string): Promise<AuthCheck | undefined>;
+
+	/** Return models whose providers have complete auth configuration. */
+	getAvailable(providerId?: string): Promise<readonly Model<Api>[]>;
+
 	/**
-	 * Resolve request auth for a model. Includes a source label for status UI.
+	 * Resolve provider-scoped auth by provider id, or provider auth plus static
+	 * model headers when passed a model. Includes a source label for status UI.
 	 * Resolves `undefined` when the provider is unknown or unconfigured.
 	 * Rejects with `ModelsError`: code "oauth" when a token refresh fails (the
 	 * stored credential is preserved for retry; re-login fixes it), code "auth"
 	 * when api-key resolution or the credential store fails. Request paths
-	 * surface rejections as stream errors; status/availability UIs catch them
-	 * and render "needs re-login" instead of treating them as unconfigured.
+	 * surface rejections as stream errors.
 	 */
-	getAuth(model: Model<Api>): Promise<AuthResult | undefined>;
+	getAuth(providerId: string, overrides?: AuthResolutionOverrides): Promise<AuthResult | undefined>;
+	getAuth(model: Model<Api>, overrides?: AuthResolutionOverrides): Promise<AuthResult | undefined>;
+
+	/** Run a provider-owned login flow and persist its returned credential. */
+	login(providerId: string, type: AuthType, interaction: AuthInteraction): Promise<Credential>;
+
+	/** Remove the stored credential for a provider. */
+	logout(providerId: string): Promise<void>;
 
 	stream<TApi extends Api>(
 		model: Model<TApi>,
 		context: Context,
-		options?: ApiStreamOptions<TApi>,
+		options?: ModelsApiStreamOptions<TApi>,
 	): AssistantMessageEventStream;
 
 	complete<TApi extends Api>(
 		model: Model<TApi>,
 		context: Context,
-		options?: ApiStreamOptions<TApi>,
+		options?: ModelsApiStreamOptions<TApi>,
 	): Promise<AssistantMessage>;
 
-	streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
-	completeSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): Promise<AssistantMessage>;
+	streamSimple(model: Model<Api>, context: Context, options?: ModelsSimpleStreamOptions): AssistantMessageEventStream;
+	completeSimple(model: Model<Api>, context: Context, options?: ModelsSimpleStreamOptions): Promise<AssistantMessage>;
 }
 
 export interface MutableModels extends Models {
@@ -138,6 +175,22 @@ export interface MutableModels extends Models {
 export interface CreateModelsOptions {
 	credentials?: CredentialStore;
 	authContext?: AuthContext;
+}
+
+function mergeHeaders(
+	base: ProviderHeaders | undefined,
+	override: ProviderHeaders | undefined,
+): ProviderHeaders | undefined {
+	if (!base && !override) return undefined;
+	const merged = { ...base };
+	for (const [name, value] of Object.entries(override ?? {})) {
+		const lowerName = name.toLowerCase();
+		for (const existingName of Object.keys(merged)) {
+			if (existingName.toLowerCase() === lowerName) delete merged[existingName];
+		}
+		merged[name] = value;
+	}
+	return merged;
 }
 
 class ModelsImpl implements MutableModels {
@@ -214,10 +267,103 @@ class ModelsImpl implements MutableModels {
 		await Promise.allSettled(Array.from(this.providers.values(), async (entry) => entry.refreshModels?.()));
 	}
 
-	async getAuth(model: Model<Api>): Promise<AuthResult | undefined> {
-		const provider = this.providers.get(model.provider);
+	private async readCredential(providerId: string): Promise<Credential | undefined> {
+		try {
+			return await this.credentials.read(providerId);
+		} catch (error) {
+			throw new ModelsError("auth", `Credential store read failed for ${providerId}`, { cause: error });
+		}
+	}
+
+	private async checkProviderAuth(
+		provider: Provider,
+		credential: Credential | undefined,
+	): Promise<AuthCheck | undefined> {
+		if (credential?.type === "oauth") {
+			return provider.auth.oauth ? { source: "OAuth", type: "oauth" } : undefined;
+		}
+		const apiKey = provider.auth.apiKey;
+		if (!apiKey) return undefined;
+		if (apiKey.check) {
+			try {
+				return await apiKey.check({
+					ctx: this.authContext,
+					credential: credential?.type === "api_key" ? credential : undefined,
+				});
+			} catch (error) {
+				throw new ModelsError("auth", `API key auth check failed for provider ${provider.id}`, { cause: error });
+			}
+		}
+
+		const resolution = await resolveProviderAuth(provider, this.credentials, this.authContext);
+		return resolution ? { source: resolution.source, type: "api_key" } : undefined;
+	}
+
+	async checkAuth(providerId: string): Promise<AuthCheck | undefined> {
+		const provider = this.providers.get(providerId);
 		if (!provider) return undefined;
-		return resolveProviderAuth(provider, model, this.credentials, this.authContext);
+		return this.checkProviderAuth(provider, await this.readCredential(providerId));
+	}
+
+	async getAvailable(providerId?: string): Promise<readonly Model<Api>[]> {
+		const providers = providerId
+			? [this.providers.get(providerId)].filter((entry) => entry !== undefined)
+			: this.getProviders();
+		const checks = await Promise.all(
+			providers.map(async (provider) => {
+				const credential = await this.readCredential(provider.id);
+				return { provider, credential, auth: await this.checkProviderAuth(provider, credential) };
+			}),
+		);
+		return checks.flatMap(({ provider, credential, auth }) => {
+			if (!auth) return [];
+			const models = provider.getModels();
+			return provider.filterModels?.(models, credential) ?? models;
+		});
+	}
+
+	getAuth(providerId: string, overrides?: AuthResolutionOverrides): Promise<AuthResult | undefined>;
+	getAuth(model: Model<Api>, overrides?: AuthResolutionOverrides): Promise<AuthResult | undefined>;
+	async getAuth(
+		providerOrModel: string | Model<Api>,
+		overrides?: AuthResolutionOverrides,
+	): Promise<AuthResult | undefined> {
+		const providerId = typeof providerOrModel === "string" ? providerOrModel : providerOrModel.provider;
+		const provider = this.providers.get(providerId);
+		if (!provider) return undefined;
+		const result = await resolveProviderAuth(provider, this.credentials, this.authContext, overrides);
+		if (!result || typeof providerOrModel === "string" || !providerOrModel.headers) return result;
+		return {
+			...result,
+			auth: {
+				...result.auth,
+				headers: mergeHeaders(result.auth.headers, providerOrModel.headers),
+			},
+		};
+	}
+
+	async login(providerId: string, type: AuthType, interaction: AuthInteraction): Promise<Credential> {
+		const provider = this.providers.get(providerId);
+		if (!provider) throw new ModelsError("provider", `Unknown provider: ${providerId}`);
+		const method = type === "oauth" ? provider.auth.oauth : provider.auth.apiKey;
+		if (!method?.login) {
+			throw new ModelsError("auth", `${provider.name} does not support ${type} login`);
+		}
+		const credential = await method.login(interaction);
+		try {
+			await this.credentials.modify(providerId, async () => credential);
+		} catch (error) {
+			throw new ModelsError("auth", `Credential store modify failed for ${providerId}`, { cause: error });
+		}
+		return credential;
+	}
+
+	async logout(providerId: string): Promise<void> {
+		try {
+			await this.credentials.delete(providerId);
+		} catch (error) {
+			throw new ModelsError("auth", `Credential store delete failed for ${providerId}`, { cause: error });
+		}
 	}
 
 	private requireProvider(model: Model<Api>): Provider {
@@ -228,30 +374,28 @@ class ModelsImpl implements MutableModels {
 		return provider;
 	}
 
-	private async applyAuth<TOptions extends StreamOptions>(
+	private async applyAuth<TOptions extends StreamOptions & ModelsStreamTransforms>(
 		model: Model<Api>,
 		options: TOptions | undefined,
-	): Promise<{ requestModel: Model<Api>; requestOptions: TOptions | undefined }> {
-		const resolution = await resolveProviderAuth(
-			this.requireProvider(model),
-			model,
-			this.credentials,
-			this.authContext,
-			{
-				apiKey: options?.apiKey,
-				env: options?.env,
-			},
-		);
-		const auth = resolution?.auth;
-		if (!auth) return { requestModel: model, requestOptions: options };
+	): Promise<{ requestModel: Model<Api>; requestOptions: StreamOptions | undefined }> {
+		this.requireProvider(model);
+		const resolution = await this.getAuth(model, {
+			apiKey: options?.apiKey,
+			env: options?.env,
+		});
+		if (!resolution) {
+			throw new ModelsError("auth", `Provider is not configured: ${model.provider}`);
+		}
+		const auth = resolution.auth;
 
-		const requestModel = auth.baseUrl ? { ...model, baseUrl: auth.baseUrl } : model;
-
-		// Explicit request options win per-field; headers/env merge per key.
+		// Explicit request options win per-field; the Models-only transform runs last.
 		const apiKey = options?.apiKey ?? auth.apiKey;
-		const headers = auth.headers || options?.headers ? { ...auth.headers, ...options?.headers } : undefined;
+		let headers = mergeHeaders(auth.headers, options?.headers);
+		if (options?.transformHeaders) headers = await options.transformHeaders(headers ?? {});
 		const env = resolution.env || options?.env ? { ...(resolution.env ?? {}), ...(options?.env ?? {}) } : undefined;
-		const requestOptions = { ...options, apiKey, headers, env } as TOptions;
+		const requestModel = auth.baseUrl ? { ...model, baseUrl: auth.baseUrl } : model;
+		const { transformHeaders: _transformHeaders, ...providerOptions } = options ?? {};
+		const requestOptions = { ...providerOptions, apiKey, headers, env } as StreamOptions;
 
 		return { requestModel, requestOptions };
 	}
@@ -259,11 +403,14 @@ class ModelsImpl implements MutableModels {
 	stream<TApi extends Api>(
 		model: Model<TApi>,
 		context: Context,
-		options?: ApiStreamOptions<TApi>,
+		options?: ModelsApiStreamOptions<TApi>,
 	): AssistantMessageEventStream {
 		return lazyStream(model, async () => {
 			const provider = this.requireProvider(model);
-			const { requestModel, requestOptions } = await this.applyAuth(model, options as StreamOptions | undefined);
+			const { requestModel, requestOptions } = await this.applyAuth(
+				model,
+				options as ModelsApiStreamOptions<Api> | undefined,
+			);
 			return provider.stream(requestModel as Model<TApi>, context, requestOptions as ApiStreamOptions<TApi>);
 		});
 	}
@@ -271,20 +418,24 @@ class ModelsImpl implements MutableModels {
 	async complete<TApi extends Api>(
 		model: Model<TApi>,
 		context: Context,
-		options?: ApiStreamOptions<TApi>,
+		options?: ModelsApiStreamOptions<TApi>,
 	): Promise<AssistantMessage> {
 		return this.stream(model, context, options).result();
 	}
 
-	streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream {
+	streamSimple(model: Model<Api>, context: Context, options?: ModelsSimpleStreamOptions): AssistantMessageEventStream {
 		return lazyStream(model, async () => {
 			const provider = this.requireProvider(model);
 			const { requestModel, requestOptions } = await this.applyAuth(model, options);
-			return provider.streamSimple(requestModel, context, requestOptions);
+			return provider.streamSimple(requestModel, context, requestOptions as SimpleStreamOptions);
 		});
 	}
 
-	async completeSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): Promise<AssistantMessage> {
+	async completeSimple(
+		model: Model<Api>,
+		context: Context,
+		options?: ModelsSimpleStreamOptions,
+	): Promise<AssistantMessage> {
 		return this.streamSimple(model, context, options).result();
 	}
 }
@@ -311,6 +462,7 @@ export interface CreateProviderOptions<TApi extends Api = Api> {
 	 * `Models.refresh(provider)`), and a later call retries.
 	 */
 	refreshModels?: () => Promise<readonly Model<TApi>[]>;
+	filterModels?: (models: readonly Model<TApi>[], credential: Credential | undefined) => readonly Model<TApi>[];
 	/** Single implementation, or map keyed by `model.api` for mixed-API providers. */
 	api: ProviderStreams | Partial<Record<TApi, ProviderStreams>>;
 }
@@ -363,6 +515,7 @@ export function createProvider<TApi extends Api = Api>(input: CreateProviderOpti
 					return inflightRefresh;
 				}
 			: undefined,
+		filterModels: input.filterModels,
 		stream: (model, context, options) => dispatch(model, (streams) => streams.stream(model, context, options)),
 		streamSimple: (model, context, options) =>
 			dispatch(model, (streams) => streams.streamSimple(model, context, options)),

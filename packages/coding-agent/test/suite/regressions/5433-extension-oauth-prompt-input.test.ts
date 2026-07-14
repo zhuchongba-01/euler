@@ -70,6 +70,20 @@ describe("LoginDialogComponent OAuth prompts", () => {
 		expect(output).toContain("First prompt:");
 	});
 
+	test("preserves neutral information and links when showing a prompt", () => {
+		const dialog = createDialog();
+
+		dialog.showInfo("Configure credentials outside pi.", [
+			{ label: "Provider documentation", url: "https://example.invalid/docs" },
+		]);
+		dialog.showPrompt("Press Enter to continue:");
+
+		const output = renderDialog(dialog).join("\n");
+		expect(output).toContain("Configure credentials outside pi.");
+		expect(output).toContain("Provider documentation: https://example.invalid/docs");
+		expect(output).toContain("Press Enter to continue:");
+	});
+
 	test("keeps previous manual input stable when a later prompt is active", async () => {
 		const dialog = createDialog();
 

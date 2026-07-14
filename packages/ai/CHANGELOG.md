@@ -2,13 +2,60 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Changed runtime authentication to provider-scoped `Models.checkAuth()`, `getAuth()`, `login()`, and `logout()` APIs. `checkAuth()` now returns `AuthCheck | undefined`, and API-key auth resolvers no longer receive a model.
+- Removed the legacy built-in OAuth provider objects, global OAuth registry APIs, and public low-level built-in login/refresh functions. Use canonical `Provider.auth.oauth` methods instead; the `oauth` subpath now retains only extension compatibility types.
+- Renamed the canonical login interaction interface from `AuthLoginCallbacks` to `AuthInteraction`; it exposes the provider-neutral `prompt()`/`notify()` protocol used by API-key and OAuth flows.
+- Changed the `Models` request contract: `getAuth(model)` now includes model headers, while `getAuth(providerId)` remains provider-scoped, and Models stream options may include `transformHeaders`. Custom `Models` implementations must execute the transform after merging auth/model and explicit headers, then remove it before provider dispatch.
+
+#### Models migration
+
+Use the `getAuth()` argument to choose the desired scope:
+
+```typescript
+// Provider auth only
+const providerAuth = await models.getAuth(model.provider);
+
+// Provider auth plus model.headers
+const modelAuth = await models.getAuth(model);
+```
+
+Use the Models-only `transformHeaders` option instead of resolving auth before streaming. It runs once on assembled headers and is not passed to `Provider.stream*()`:
+
+```typescript
+models.streamSimple(model, context, {
+  transformHeaders: async (headers) => ({
+    ...headers,
+    "X-Request-ID": requestId,
+  }),
+});
+```
+
+Custom `Models` implementations must apply the same order:
+
+```text
+getAuth(model) -> explicit options.headers -> transformHeaders -> Provider.stream*()
+```
+
+`Provider.stream*()` continues to accept ordinary `ApiStreamOptions`/`SimpleStreamOptions`; providers do not handle `transformHeaders`.
+
 ### Added
 
+- Added provider-owned authentication and availability resolution to `Models`, including stored OAuth refresh and interactive login support through `CredentialStore`.
+- Added async non-secret credential enumeration through `CredentialStore.list()` and credential-aware `Provider.filterModels()` availability policy.
+- Added neutral auth-flow information/link events and provider-owned Amazon Bedrock and Google Vertex AI credential selection flows.
 - Added a separate opt-in `max` thinking level, including native `xhigh` and `max` support for GPT-5.6 and Anthropic adaptive-thinking effort metadata matching Anthropic's documentation: `max` on all adaptive Claude models, native `xhigh` on Opus 4.7/4.8, Sonnet 5, and Fable 5 only.
 - Added request-wide input-token pricing tiers to model cost metadata and usage cost calculation.
 
+### Changed
+
+- Changed `Models.getAuth(model)` to include model headers and added a Models-only `transformHeaders` stream option that runs after auth and explicit header assembly but is not forwarded to providers.
+
 ### Fixed
 
+- Fixed Cloudflare Workers AI and AI Gateway streams to materialize account and gateway endpoint placeholders after auth resolution, including compat streaming with custom model objects.
+- Fixed lazy provider streams to preserve their final assistant message when forwarding an inner stream.
 - Fixed post-compaction output-token budgeting to ignore stale assistant usage from before the compaction boundary ([#6464](https://github.com/earendil-works/pi/issues/6464)).
 - Fixed GPT-5.4 and GPT-5.5 long-context cost accounting while retaining the intentional 272K default context limit for models that require an explicit override.
 - Fixed GPT-5.6 metadata to keep direct OpenAI requests in the 272K short-context tier while exposing the Codex backend's 372K context window with long-context pricing.
