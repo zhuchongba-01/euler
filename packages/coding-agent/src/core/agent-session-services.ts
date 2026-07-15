@@ -165,6 +165,7 @@ export async function createAgentSessionServices(
 		}
 	}
 	extensionsResult.runtime.pendingProviderRegistrations = [];
+	await modelRuntime.refresh({ allowNetwork: false });
 	diagnostics.push(...applyExtensionFlagValues(resourceLoader, options.extensionFlagValues));
 
 	return {

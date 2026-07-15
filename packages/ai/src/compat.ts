@@ -19,6 +19,7 @@ export * from "./api/mistral-conversations.lazy.ts";
 export * from "./api/openai-codex-responses.lazy.ts";
 export * from "./api/openai-completions.lazy.ts";
 export * from "./api/openai-responses.lazy.ts";
+export * from "./api/pi-messages.lazy.ts";
 export * from "./env-api-keys.ts";
 export * from "./image-models.ts";
 export * from "./images.ts";
@@ -36,9 +37,13 @@ import { mistralConversationsApi } from "./api/mistral-conversations.lazy.ts";
 import { openAICodexResponsesApi } from "./api/openai-codex-responses.lazy.ts";
 import { openAICompletionsApi } from "./api/openai-completions.lazy.ts";
 import { openAIResponsesApi } from "./api/openai-responses.lazy.ts";
+import { piMessagesApi } from "./api/pi-messages.lazy.ts";
 import { getEnvApiKey } from "./env-api-keys.ts";
 import type { ModelsApiStreamOptions } from "./models.ts";
 import { builtinModels, getBuiltinModel, getBuiltinModels, getBuiltinProviders } from "./providers/all.ts";
+
+export type { BuiltinProvider } from "./providers/all.ts";
+
 import { createFauxCore, type FauxProviderRegistration, type RegisterFauxProviderOptions } from "./providers/faux.ts";
 import type {
 	Api,
@@ -180,6 +185,7 @@ const BUILTIN_APIS: [Api, ProviderStreams][] = [
 	["google-vertex", googleVertexApi()],
 	["mistral-conversations", mistralConversationsApi()],
 	["bedrock-converse-stream", bedrockConverseStreamApi()],
+	["pi-messages", piMessagesApi()],
 ];
 
 const builtinApiProviderInstances = new Map<Api, ReturnType<typeof getApiProvider>>();
@@ -207,6 +213,7 @@ export function resetApiProviders(): void {
 registerBuiltInApiProviders();
 
 const compatModels = builtinModels();
+const AMBIENT_AUTH_MARKER = "<authenticated>";
 
 function hasExplicitApiKey(apiKey: string | undefined): apiKey is string {
 	return typeof apiKey === "string" && apiKey.trim().length > 0;
@@ -218,7 +225,7 @@ function withEnvApiKey<TOptions extends StreamOptions>(
 ): TOptions | undefined {
 	if (hasExplicitApiKey(options?.apiKey)) return options;
 	const apiKey = getEnvApiKey(model.provider, options?.env);
-	if (!apiKey) return options;
+	if (!apiKey || apiKey === AMBIENT_AUTH_MARKER) return options;
 	return { ...options, apiKey } as TOptions;
 }
 

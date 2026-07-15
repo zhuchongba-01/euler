@@ -36,6 +36,7 @@ export interface ExtensionOAuthConfig {
 	login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials>;
 	refreshToken(credentials: OAuthCredentials): Promise<OAuthCredentials>;
 	getApiKey(credentials: OAuthCredentials): string;
+	modifyModels?(models: Model<Api>[], credentials: OAuthCredentials): Model<Api>[];
 }
 
 /** Input type for the extension registerProvider API. */
@@ -161,6 +162,9 @@ function applyModelsJson(
 	config: ModelsJsonProvider | undefined,
 ): Model<Api>[] {
 	if (!config) return [...baseModels];
+	if (config.oauth && !config.baseUrl) {
+		throw new Error(`Provider ${providerId}: "baseUrl" is required when "oauth" is set.`);
+	}
 	const hasOverrides = config.modelOverrides && Object.keys(config.modelOverrides).length > 0;
 	if (
 		!config.models?.length &&
@@ -169,6 +173,7 @@ function applyModelsJson(
 		!config.compat &&
 		!hasOverrides &&
 		!config.apiKey &&
+		!config.oauth &&
 		config.authHeader === undefined
 	) {
 		throw new Error(
@@ -178,7 +183,7 @@ function applyModelsJson(
 
 	const models: Model<Api>[] = baseModels.map((model) => ({
 		...model,
-		baseUrl: config.baseUrl ?? model.baseUrl,
+		baseUrl: config.oauth === "radius" ? model.baseUrl : (config.baseUrl ?? model.baseUrl),
 		compat: mergeCompat(model.compat, config.compat),
 	}));
 	for (const definition of config.models ?? []) {
@@ -409,15 +414,19 @@ export function composeModelProvider(
 	extension: ProviderConfigInput | undefined,
 ): Provider {
 	const config = modelConfig.getProvider(providerId);
+	let extensionOAuthCredential: OAuthCredentials | undefined;
 	// models.json modelOverrides are the topmost user-config layer: they apply once,
-	// after custom-model upserts and extension model replacement.
-	const getModels = () =>
-		applyExtension(providerId, applyModelsJson(providerId, base?.getModels() ?? [], config), extension).map(
-			(model) => {
-				const override = config?.modelOverrides?.[model.id];
-				return override ? applyModelOverride(model, override) : model;
-			},
-		);
+	// after custom-model upserts, extension model replacement, and legacy OAuth projection.
+	const getModels = () => {
+		let models = applyExtension(providerId, applyModelsJson(providerId, base?.getModels() ?? [], config), extension);
+		if (extensionOAuthCredential && extension?.oauth?.modifyModels) {
+			models = extension.oauth.modifyModels(models, extensionOAuthCredential);
+		}
+		return models.map((model) => {
+			const override = config?.modelOverrides?.[model.id];
+			return override ? applyModelOverride(model, override) : model;
+		});
+	};
 	// Validate eagerly so registration/reload reports structural errors immediately.
 	getModels();
 	const apiKey = composeApiKeyAuth(providerId, base, config, extension);
@@ -454,7 +463,13 @@ export function composeModelProvider(
 		headers: base?.headers,
 		auth: { ...(apiKey ? { apiKey } : {}), ...(oauth ? { oauth } : {}) },
 		getModels,
-		refreshModels: base?.refreshModels ? () => base.refreshModels!() : undefined,
+		refreshModels:
+			base?.refreshModels || extension?.oauth?.modifyModels
+				? async (context) => {
+						await base?.refreshModels?.(context);
+						extensionOAuthCredential = context.credential?.type === "oauth" ? context.credential : undefined;
+					}
+				: undefined,
 		filterModels: base?.filterModels
 			? (models, credential: Credential | undefined) => base.filterModels!(models, credential)
 			: undefined,

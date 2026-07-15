@@ -13,6 +13,7 @@ export const GITHUB_COPILOT_MODELS = {
 		headers: {"User-Agent":"GitHubCopilotChat/0.35.0","Editor-Version":"vscode/1.107.0","Editor-Plugin-Version":"copilot-chat/0.35.0","Copilot-Integration-Id":"vscode-chat"},
 		compat: {"supportsStore":false,"supportsDeveloperRole":false,"supportsReasoningEffort":false},
 		reasoning: true,
+		thinkingLevelMap: {"off":null,"xhigh":"xhigh","max":"max"},
 		input: ["text", "image"],
 		cost: {
 			input: 10,
@@ -524,11 +525,10 @@ export const GITHUB_COPILOT_MODELS = {
 	"mai-code-1-flash-picker": {
 		id: "mai-code-1-flash-picker",
 		name: "MAI-Code-1-Flash",
-		api: "openai-completions",
+		api: "openai-responses",
 		provider: "github-copilot",
 		baseUrl: "https://api.individual.githubcopilot.com",
 		headers: {"User-Agent":"GitHubCopilotChat/0.35.0","Editor-Version":"vscode/1.107.0","Editor-Plugin-Version":"copilot-chat/0.35.0","Copilot-Integration-Id":"vscode-chat"},
-		compat: {"supportsStore":false,"supportsDeveloperRole":false,"supportsReasoningEffort":false},
 		reasoning: true,
 		input: ["text"],
 		cost: {
@@ -539,5 +539,5 @@ export const GITHUB_COPILOT_MODELS = {
 		},
 		contextWindow: 256000,
 		maxTokens: 128000,
-	} satisfies Model<"openai-completions">,
+	} satisfies Model<"openai-responses">,
 } as const;

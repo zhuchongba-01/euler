@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryCredentialStore } from "../src/auth/credential-store.ts";
 import type { ApiKeyAuth, CredentialStore, OAuthAuth, ProviderAuth } from "../src/auth/types.ts";
-import { calculateCost, createModels, hasApi, type Provider } from "../src/models.ts";
+import { calculateCost, createModels, createProvider, hasApi, type Provider } from "../src/models.ts";
+import { InMemoryModelsStore } from "../src/models-store.ts";
 import type { Api, AssistantMessage, Context, Model, SimpleStreamOptions, StreamOptions, Usage } from "../src/types.ts";
 import { AssistantMessageEventStream } from "../src/utils/event-stream.ts";
 
@@ -56,7 +57,7 @@ function testProvider(input: {
 	models?: Model<Api>[];
 	auth?: ProviderAuth;
 	getModels?: () => readonly Model<Api>[];
-	refreshModels?: () => Promise<void>;
+	refreshModels?: Provider["refreshModels"];
 	calls?: ProviderCall[];
 }): Provider {
 	const models = input.models ?? [testModel(input.id, "model-a")];
@@ -215,7 +216,7 @@ describe("Models runtime", () => {
 		expect(() => models.getProvider("broken")?.getModels()).toThrow("boom");
 	});
 
-	it("refresh() updates dynamic providers; single-provider refresh failures reject", async () => {
+	it("refresh() updates every configured dynamic provider and reports failures", async () => {
 		let list = [testModel("dyn", "before")];
 		let refreshes = 0;
 		const models = createModels();
@@ -232,17 +233,12 @@ describe("Models runtime", () => {
 		models.setProvider(testProvider({ id: "static", models: [testModel("static", "s1")] }));
 
 		expect(models.getModel("dyn", "before")).toBeDefined();
-		await models.refresh("dyn");
+		const first = await models.refresh();
+		expect(first.errors.size).toBe(0);
 		expect(refreshes).toBe(1);
 		expect(models.getModel("dyn", "after")).toBeDefined();
 		expect(models.getModel("dyn", "before")).toBeUndefined();
 
-		// static providers are no-ops; refresh-all is best-effort
-		await models.refresh("static");
-		await models.refresh();
-		expect(refreshes).toBe(2);
-
-		// single-provider refresh failures reject with ModelsError
 		models.setProvider(
 			testProvider({
 				id: "flaky",
@@ -251,9 +247,120 @@ describe("Models runtime", () => {
 				},
 			}),
 		);
-		await expect(models.refresh("flaky")).rejects.toMatchObject({ code: "model_source" });
-		// refresh-all swallows the same failure
-		await expect(models.refresh()).resolves.toBeUndefined();
+		const second = await models.refresh();
+		expect(refreshes).toBe(2);
+		expect(second.errors.get("flaky")?.message).toBe("fetch failed");
+	});
+
+	it("persists dynamic catalogs and restores them without network access", async () => {
+		const credentials = new InMemoryCredentialStore();
+		const modelsStore = new InMemoryModelsStore();
+		await credentials.modify("dynamic", async () => ({ type: "api_key", key: "key" }));
+		const createDynamicProvider = (fetchModels: (() => Promise<readonly Model<Api>[]>) | undefined) =>
+			createProvider({
+				id: "dynamic",
+				auth: { apiKey: envKeyAuth(undefined) },
+				models: [],
+				fetchModels: fetchModels ? () => fetchModels() : undefined,
+				api: {
+					stream: () => new AssistantMessageEventStream(),
+					streamSimple: () => new AssistantMessageEventStream(),
+				},
+			});
+
+		const online = createModels({ credentials, modelsStore });
+		online.setProvider(createDynamicProvider(async () => [testModel("dynamic", "fetched")]));
+		expect((await online.refresh()).errors.size).toBe(0);
+		expect(online.getModel("dynamic", "fetched")).toBeDefined();
+
+		const offline = createModels({ credentials, modelsStore });
+		offline.setProvider(
+			createDynamicProvider(async () => {
+				throw new Error("must not fetch");
+			}),
+		);
+		expect((await offline.refresh({ allowNetwork: false })).errors.size).toBe(0);
+		expect(offline.getModel("dynamic", "fetched")).toBeDefined();
+	});
+
+	it("passes effective API-key credentials and skips unconfigured providers", async () => {
+		let effectiveCredential: unknown;
+		let unconfiguredRefreshes = 0;
+		const models = createModels();
+		models.setProvider(
+			testProvider({
+				id: "configured",
+				auth: { apiKey: envKeyAuth("ambient-key") },
+				refreshModels: async (context) => {
+					effectiveCredential = context.credential;
+				},
+			}),
+		);
+		models.setProvider(
+			testProvider({
+				id: "unconfigured",
+				auth: { apiKey: envKeyAuth(undefined) },
+				refreshModels: async () => {
+					unconfiguredRefreshes++;
+				},
+			}),
+		);
+
+		await models.refresh();
+		expect(effectiveCredential).toEqual({ type: "api_key", key: "ambient-key", env: undefined });
+		expect(unconfiguredRefreshes).toBe(0);
+	});
+
+	it("refreshes expired OAuth before refreshing models", async () => {
+		const credentials = new InMemoryCredentialStore();
+		let modelRefreshCredential: unknown;
+		await credentials.modify("oauth-dynamic", async () => ({
+			type: "oauth",
+			access: "expired",
+			refresh: "refresh",
+			expires: 0,
+		}));
+		const models = createModels({ credentials });
+		models.setProvider(
+			testProvider({
+				id: "oauth-dynamic",
+				auth: {
+					oauth: testOAuth({
+						refresh: async () => ({
+							type: "oauth",
+							access: "fresh",
+							refresh: "rotated",
+							expires: Date.now() + 60_000,
+						}),
+					}),
+				},
+				refreshModels: async (context) => {
+					modelRefreshCredential = context.credential;
+				},
+			}),
+		);
+
+		expect((await models.refresh()).errors.size).toBe(0);
+		expect(modelRefreshCredential).toMatchObject({ type: "oauth", access: "fresh", refresh: "rotated" });
+		expect(await credentials.read("oauth-dynamic")).toMatchObject({ access: "fresh", refresh: "rotated" });
+	});
+
+	it("returns aborted state without reporting cancellation as a provider error", async () => {
+		const controller = new AbortController();
+		const models = createModels();
+		models.setProvider(
+			testProvider({
+				id: "dynamic",
+				refreshModels: async ({ signal }) => {
+					controller.abort();
+					if (signal?.aborted) return;
+				},
+			}),
+		);
+
+		const result = await models.refresh({ signal: controller.signal });
+		expect(result.aborted).toBe(true);
+		expect(result.errors.size).toBe(0);
 	});
 
 	it("resolves auth: stored credential owns the provider, ambient only when nothing stored", async () => {

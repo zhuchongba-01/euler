@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { envApiKeyAuth } from "../src/auth/helpers.ts";
 import type { AuthContext, AuthEvent } from "../src/auth/types.ts";
 import { createModels, createProvider } from "../src/models.ts";
+import { InMemoryModelsStore } from "../src/models-store.ts";
 import { builtinModels, builtinProviders } from "../src/providers/all.ts";
 import { amazonBedrockProvider } from "../src/providers/amazon-bedrock.ts";
 import { anthropicProvider } from "../src/providers/anthropic.ts";
@@ -34,10 +35,11 @@ describe("builtin providers", () => {
 		const all = models.getModels();
 		expect(all.length).toBeGreaterThan(500);
 
-		// every provider lists at least one model and owns its models
+		// Static providers list models immediately; Radius is purely dynamic.
 		for (const provider of providers) {
 			const list = models.getModels(provider.id);
-			expect(list.length).toBeGreaterThan(0);
+			if (provider.id === "radius") expect(list).toEqual([]);
+			else expect(list.length).toBeGreaterThan(0);
 			expect(list.every((m) => m.provider === provider.id)).toBe(true);
 		}
 	});
@@ -345,7 +347,7 @@ describe("createProvider", () => {
 			id: "dynamic",
 			auth: { apiKey: { name: "Test", resolve: async () => ({ auth: {} }) } },
 			models: [],
-			refreshModels: async () => {
+			fetchModels: async () => {
 				fetches++;
 				await new Promise((resolve) => setTimeout(resolve, 5));
 				return [testModel("api-a", "listed")];
@@ -353,13 +355,23 @@ describe("createProvider", () => {
 			api: recordingStreams("a", []),
 		});
 
+		const store = new InMemoryModelsStore();
+		const refreshContext = {
+			credential: { type: "api_key" as const },
+			store: {
+				read: () => store.read("dynamic"),
+				write: (listed: readonly Model<Api>[]) => store.write("dynamic", listed),
+				delete: () => store.delete("dynamic"),
+			},
+			allowNetwork: true,
+		};
 		expect(provider.getModels()).toEqual([]);
-		await Promise.all([provider.refreshModels?.(), provider.refreshModels?.()]);
+		await Promise.all([provider.refreshModels?.(refreshContext), provider.refreshModels?.(refreshContext)]);
 		expect(fetches).toBe(1);
 		expect(provider.getModels().map((m) => m.id)).toEqual(["listed"]);
 
 		// a later refresh fetches again
-		await provider.refreshModels?.();
+		await provider.refreshModels?.(refreshContext);
 		expect(fetches).toBe(2);
 	});
 });

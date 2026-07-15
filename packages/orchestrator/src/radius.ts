@@ -128,16 +128,16 @@ export function getRadiusAccessToken(): string {
 		return storedCredential.access;
 	}
 
-	const apiKey = process.env.PI_RADIUS_API_KEY;
+	const apiKey = process.env.RADIUS_API_KEY;
 	if (apiKey) {
 		return apiKey;
 	}
 
-	throw new Error("Radius credentials are required in ~/.pi/agent/auth.json or PI_RADIUS_API_KEY");
+	throw new Error("Radius credentials are required in ~/.pi/agent/auth.json or RADIUS_API_KEY");
 }
 
 export function isRadiusEnabled(): boolean {
-	return !!getStoredRadiusCredential()?.access || !!process.env.PI_RADIUS_API_KEY;
+	return !!getStoredRadiusCredential()?.access || !!process.env.RADIUS_API_KEY;
 }
 
 export class RadiusPresence {

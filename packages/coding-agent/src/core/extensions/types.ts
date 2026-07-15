@@ -1432,6 +1432,8 @@ export interface ProviderConfig {
 		refreshToken(credentials: OAuthCredentials): Promise<OAuthCredentials>;
 		/** Convert credentials to API key string for the provider. */
 		getApiKey(credentials: OAuthCredentials): string;
+		/** Legacy synchronous credential-dependent model projection. */
+		modifyModels?(models: Model<Api>[], credentials: OAuthCredentials): Model<Api>[];
 	};
 }
 

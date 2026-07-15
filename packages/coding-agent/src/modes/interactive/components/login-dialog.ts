@@ -175,6 +175,16 @@ export class LoginDialogComponent extends Container implements Focusable {
 		});
 	}
 
+	/** Show informational text before another login step. */
+	showDetails(lines: string[]): void {
+		this.contentContainer.clear();
+		this.contentContainer.addChild(new Spacer(1));
+		for (const line of lines) {
+			this.contentContainer.addChild(new Text(line, 1, 0));
+		}
+		this.tui.requestRender();
+	}
+
 	/** Show provider-owned information and links without starting an auth callback flow. */
 	showInfo(message: string, links: readonly AuthInfoLink[] = [], showCloseHint = false): void {
 		this.contentContainer.addChild(new Spacer(1));

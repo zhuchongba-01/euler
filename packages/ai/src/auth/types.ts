@@ -196,7 +196,7 @@ export interface OAuthAuth {
 	 * Exchange the refresh token. Network call; throws on failure
 	 * (invalid_grant etc.). `Models` runs this under the store lock.
 	 */
-	refresh(credential: OAuthCredential): Promise<OAuthCredential>;
+	refresh(credential: OAuthCredential, signal?: AbortSignal): Promise<OAuthCredential>;
 
 	/**
 	 * Side-effect-free derivation of request auth from a valid credential.

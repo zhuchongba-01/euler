@@ -192,6 +192,7 @@ export const OPENROUTER_MODELS = {
 		baseUrl: "https://openrouter.ai/api/v1",
 		compat: {"thinkingFormat":"openrouter","cacheControlFormat":"anthropic"},
 		reasoning: true,
+		thinkingLevelMap: {"off":null,"xhigh":"xhigh","max":"max"},
 		input: ["text", "image"],
 		cost: {
 			input: 10,
@@ -461,6 +462,24 @@ export const OPENROUTER_MODELS = {
 		contextWindow: 262144,
 		maxTokens: 80000,
 	} satisfies Model<"openai-completions">,
+	"arcee-ai/trinity-mini": {
+		id: "arcee-ai/trinity-mini",
+		name: "Arcee AI: Trinity Mini",
+		api: "openai-completions",
+		provider: "openrouter",
+		baseUrl: "https://openrouter.ai/api/v1",
+		compat: {"supportsDeveloperRole":false,"thinkingFormat":"openrouter"},
+		reasoning: true,
+		input: ["text"],
+		cost: {
+			input: 0.045,
+			output: 0.15,
+			cacheRead: 0,
+			cacheWrite: 0,
+		},
+		contextWindow: 131072,
+		maxTokens: 131072,
+	} satisfies Model<"openai-completions">,
 	"arcee-ai/virtuoso-large": {
 		id: "arcee-ai/virtuoso-large",
 		name: "Arcee AI: Virtuoso Large",
@@ -638,7 +657,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 131072,
+		contextWindow: 128000,
 		maxTokens: 16000,
 	} satisfies Model<"openai-completions">,
 	"deepseek/deepseek-chat-v3-0324": {
@@ -669,8 +688,8 @@ export const OPENROUTER_MODELS = {
 		reasoning: true,
 		input: ["text"],
 		cost: {
-			input: 0.25,
-			output: 0.95,
+			input: 0.21,
+			output: 0.79,
 			cacheRead: 0.13,
 			cacheWrite: 0,
 		},
@@ -692,7 +711,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 163840,
+		contextWindow: 64000,
 		maxTokens: 16000,
 	} satisfies Model<"openai-completions">,
 	"deepseek/deepseek-r1-0528": {
@@ -746,7 +765,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0.02145,
 			cacheWrite: 0,
 		},
-		contextWindow: 131072,
+		contextWindow: 128000,
 		maxTokens: 64000,
 	} satisfies Model<"openai-completions">,
 	"deepseek/deepseek-v3.2-exp": {
@@ -1000,7 +1019,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0.2,
 			cacheWrite: 0.375,
 		},
-		contextWindow: 1048756,
+		contextWindow: 1048576,
 		maxTokens: 65536,
 	} satisfies Model<"openai-completions">,
 	"google/gemini-3.5-flash": {
@@ -1090,7 +1109,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 262144,
+		contextWindow: 131072,
 		maxTokens: 32768,
 	} satisfies Model<"openai-completions">,
 	"google/gemma-4-31b-it": {
@@ -1103,13 +1122,13 @@ export const OPENROUTER_MODELS = {
 		reasoning: true,
 		input: ["text", "image"],
 		cost: {
-			input: 0.06,
+			input: 0.12,
 			output: 0.35,
-			cacheRead: 0,
+			cacheRead: 0.09,
 			cacheWrite: 0,
 		},
 		contextWindow: 262144,
-		maxTokens: 8192,
+		maxTokens: 262144,
 	} satisfies Model<"openai-completions">,
 	"google/gemma-4-31b-it:free": {
 		id: "google/gemma-4-31b-it:free",
@@ -1127,7 +1146,7 @@ export const OPENROUTER_MODELS = {
 			cacheWrite: 0,
 		},
 		contextWindow: 262144,
-		maxTokens: 32768,
+		maxTokens: 8192,
 	} satisfies Model<"openai-completions">,
 	"ibm-granite/granite-4.1-8b": {
 		id: "ibm-granite/granite-4.1-8b",
@@ -1220,24 +1239,6 @@ export const OPENROUTER_MODELS = {
 		contextWindow: 262144,
 		maxTokens: 65536,
 	} satisfies Model<"openai-completions">,
-	"kwaipilot/kat-coder-air-v2.5": {
-		id: "kwaipilot/kat-coder-air-v2.5",
-		name: "Kwaipilot: KAT-Coder-Air V2.5",
-		api: "openai-completions",
-		provider: "openrouter",
-		baseUrl: "https://openrouter.ai/api/v1",
-		compat: {"supportsDeveloperRole":false,"thinkingFormat":"openrouter"},
-		reasoning: false,
-		input: ["text"],
-		cost: {
-			input: 0.15,
-			output: 0.6,
-			cacheRead: 0.03,
-			cacheWrite: 0,
-		},
-		contextWindow: 256000,
-		maxTokens: 80000,
-	} satisfies Model<"openai-completions">,
 	"kwaipilot/kat-coder-pro-v2": {
 		id: "kwaipilot/kat-coder-pro-v2",
 		name: "Kwaipilot: KAT-Coder-Pro V2",
@@ -1256,23 +1257,23 @@ export const OPENROUTER_MODELS = {
 		contextWindow: 256000,
 		maxTokens: 80000,
 	} satisfies Model<"openai-completions">,
-	"kwaipilot/kat-coder-pro-v2.5": {
-		id: "kwaipilot/kat-coder-pro-v2.5",
-		name: "Kwaipilot: KAT-Coder-Pro V2.5",
+	"liquid/lfm-2.5-1.2b-thinking:free": {
+		id: "liquid/lfm-2.5-1.2b-thinking:free",
+		name: "LiquidAI: LFM2.5-1.2B-Thinking (free)",
 		api: "openai-completions",
 		provider: "openrouter",
 		baseUrl: "https://openrouter.ai/api/v1",
 		compat: {"supportsDeveloperRole":false,"thinkingFormat":"openrouter"},
-		reasoning: false,
+		reasoning: true,
 		input: ["text"],
 		cost: {
-			input: 0.74,
-			output: 2.96,
-			cacheRead: 0.15,
+			input: 0,
+			output: 0,
+			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 256000,
-		maxTokens: 80000,
+		contextWindow: 32768,
+		maxTokens: 4096,
 	} satisfies Model<"openai-completions">,
 	"meta-llama/llama-3.1-70b-instruct": {
 		id: "meta-llama/llama-3.1-70b-instruct",
@@ -1343,7 +1344,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 131072,
+		contextWindow: 65536,
 		maxTokens: 4096,
 	} satisfies Model<"openai-completions">,
 	"meta-llama/llama-4-maverick": {
@@ -1356,8 +1357,8 @@ export const OPENROUTER_MODELS = {
 		reasoning: false,
 		input: ["text", "image"],
 		cost: {
-			input: 0.2,
-			output: 0.8,
+			input: 0.15,
+			output: 0.6,
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
@@ -1379,7 +1380,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 10000000,
+		contextWindow: 327680,
 		maxTokens: 16384,
 	} satisfies Model<"openai-completions">,
 	"minimax/minimax-m1": {
@@ -1451,7 +1452,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0.05,
 			cacheWrite: 0,
 		},
-		contextWindow: 204800,
+		contextWindow: 196608,
 		maxTokens: 196608,
 	} satisfies Model<"openai-completions">,
 	"minimax/minimax-m2.7": {
@@ -1469,7 +1470,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 204800,
+		contextWindow: 196608,
 		maxTokens: 196608,
 	} satisfies Model<"openai-completions">,
 	"minimax/minimax-m3": {
@@ -1487,7 +1488,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0.06,
 			cacheWrite: 0,
 		},
-		contextWindow: 1048576,
+		contextWindow: 1000000,
 		maxTokens: 131072,
 	} satisfies Model<"openai-completions">,
 	"mistralai/codestral-2508": {
@@ -1865,7 +1866,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0.07,
 			cacheWrite: 0,
 		},
-		contextWindow: 262144,
+		contextWindow: 256000,
 		maxTokens: 4096,
 	} satisfies Model<"openai-completions">,
 	"moonshotai/kimi-k2.6": {
@@ -1896,9 +1897,9 @@ export const OPENROUTER_MODELS = {
 		reasoning: true,
 		input: ["text", "image"],
 		cost: {
-			input: 0.719,
+			input: 0.72,
 			output: 3.49,
-			cacheRead: 0.149,
+			cacheRead: 0.159,
 			cacheWrite: 0,
 		},
 		contextWindow: 262144,
@@ -2027,7 +2028,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 1000000,
+		contextWindow: 262144,
 		maxTokens: 4096,
 	} satisfies Model<"openai-completions">,
 	"nvidia/nemotron-3-super-120b-a12b:free": {
@@ -2045,7 +2046,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 1000000,
+		contextWindow: 262144,
 		maxTokens: 262144,
 	} satisfies Model<"openai-completions">,
 	"nvidia/nemotron-3-ultra-550b-a55b": {
@@ -2063,7 +2064,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0.1,
 			cacheWrite: 0,
 		},
-		contextWindow: 1000000,
+		contextWindow: 262144,
 		maxTokens: 16384,
 	} satisfies Model<"openai-completions">,
 	"nvidia/nemotron-3-ultra-550b-a55b:free": {
@@ -2456,11 +2457,11 @@ export const OPENROUTER_MODELS = {
 		cost: {
 			input: 0.05,
 			output: 0.4,
-			cacheRead: 0.005,
+			cacheRead: 0.01,
 			cacheWrite: 0,
 		},
 		contextWindow: 400000,
-		maxTokens: 128000,
+		maxTokens: 4096,
 	} satisfies Model<"openai-completions">,
 	"openai/gpt-5-pro": {
 		id: "openai/gpt-5-pro",
@@ -2492,7 +2493,7 @@ export const OPENROUTER_MODELS = {
 		cost: {
 			input: 1.25,
 			output: 10,
-			cacheRead: 0.125,
+			cacheRead: 0.13,
 			cacheWrite: 0,
 		},
 		contextWindow: 400000,
@@ -2976,8 +2977,26 @@ export const OPENROUTER_MODELS = {
 		reasoning: true,
 		input: ["text"],
 		cost: {
-			input: 0.03,
-			output: 0.15,
+			input: 0.036,
+			output: 0.18,
+			cacheRead: 0,
+			cacheWrite: 0,
+		},
+		contextWindow: 131072,
+		maxTokens: 4096,
+	} satisfies Model<"openai-completions">,
+	"openai/gpt-oss-120b:free": {
+		id: "openai/gpt-oss-120b:free",
+		name: "OpenAI: gpt-oss-120b (free)",
+		api: "openai-completions",
+		provider: "openrouter",
+		baseUrl: "https://openrouter.ai/api/v1",
+		compat: {"thinkingFormat":"openrouter"},
+		reasoning: true,
+		input: ["text"],
+		cost: {
+			input: 0,
+			output: 0,
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
@@ -3341,7 +3360,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 131072,
+		contextWindow: 32768,
 		maxTokens: 16384,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen-2.5-7b-instruct": {
@@ -3359,7 +3378,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 131072,
+		contextWindow: 32768,
 		maxTokens: 32768,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen-plus": {
@@ -3431,7 +3450,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 131702,
+		contextWindow: 40960,
 		maxTokens: 40960,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-235b-a22b": {
@@ -3463,7 +3482,7 @@ export const OPENROUTER_MODELS = {
 		input: ["text"],
 		cost: {
 			input: 0.09,
-			output: 0.55,
+			output: 0.1,
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
@@ -3485,7 +3504,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 262144,
+		contextWindow: 131072,
 		maxTokens: 4096,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-30b-a3b": {
@@ -3503,7 +3522,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 131072,
+		contextWindow: 40960,
 		maxTokens: 16384,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-30b-a3b-instruct-2507": {
@@ -3521,7 +3540,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 131072,
+		contextWindow: 128000,
 		maxTokens: 32000,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-30b-a3b-thinking-2507": {
@@ -3539,7 +3558,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 131072,
+		contextWindow: 81920,
 		maxTokens: 32768,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-32b": {
@@ -3557,7 +3576,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 131072,
+		contextWindow: 40960,
 		maxTokens: 16384,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-8b": {
@@ -3593,7 +3612,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 1048576,
+		contextWindow: 262144,
 		maxTokens: 65536,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-coder-30b-a3b-instruct": {
@@ -3683,7 +3702,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 1048576,
+		contextWindow: 262000,
 		maxTokens: 262000,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-max": {
@@ -3773,7 +3792,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 262144,
+		contextWindow: 131072,
 		maxTokens: 32768,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-vl-235b-a22b-instruct": {
@@ -3827,7 +3846,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 262144,
+		contextWindow: 131072,
 		maxTokens: 32768,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-vl-30b-a3b-thinking": {
@@ -3863,7 +3882,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 262144,
+		contextWindow: 131072,
 		maxTokens: 32768,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-vl-8b-instruct": {
@@ -3881,7 +3900,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 256000,
+		contextWindow: 131072,
 		maxTokens: 32768,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3-vl-8b-thinking": {
@@ -3899,7 +3918,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0,
 			cacheWrite: 0,
 		},
-		contextWindow: 256000,
+		contextWindow: 131072,
 		maxTokens: 32768,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3.5-122b-a10b": {
@@ -3971,7 +3990,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0.111,
 			cacheWrite: 0,
 		},
-		contextWindow: 256000,
+		contextWindow: 131072,
 		maxTokens: 4096,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3.5-9b": {
@@ -4056,13 +4075,13 @@ export const OPENROUTER_MODELS = {
 		reasoning: true,
 		input: ["text", "image"],
 		cost: {
-			input: 0.289,
+			input: 0.285,
 			output: 2.4,
-			cacheRead: 0,
+			cacheRead: 0.15,
 			cacheWrite: 0,
 		},
-		contextWindow: 262144,
-		maxTokens: 131072,
+		contextWindow: 262140,
+		maxTokens: 262140,
 	} satisfies Model<"openai-completions">,
 	"qwen/qwen3.6-35b-a3b": {
 		id: "qwen/qwen3.6-35b-a3b",
@@ -4457,7 +4476,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0.028,
 			cacheWrite: 0,
 		},
-		contextWindow: 1048576,
+		contextWindow: 32000,
 		maxTokens: 4096,
 	} satisfies Model<"openai-completions">,
 	"xiaomi/mimo-v2.5-pro": {
@@ -4543,12 +4562,12 @@ export const OPENROUTER_MODELS = {
 		input: ["text"],
 		cost: {
 			input: 0.43,
-			output: 1.75,
+			output: 1.74,
 			cacheRead: 0.08,
 			cacheWrite: 0,
 		},
-		contextWindow: 200000,
-		maxTokens: 16384,
+		contextWindow: 202752,
+		maxTokens: 131072,
 	} satisfies Model<"openai-completions">,
 	"z-ai/glm-4.6v": {
 		id: "z-ai/glm-4.6v",
@@ -4620,7 +4639,7 @@ export const OPENROUTER_MODELS = {
 			cacheWrite: 0,
 		},
 		contextWindow: 202752,
-		maxTokens: 128000,
+		maxTokens: 4096,
 	} satisfies Model<"openai-completions">,
 	"z-ai/glm-5-turbo": {
 		id: "z-ai/glm-5-turbo",
@@ -4655,7 +4674,7 @@ export const OPENROUTER_MODELS = {
 			cacheRead: 0.1794,
 			cacheWrite: 0,
 		},
-		contextWindow: 202752,
+		contextWindow: 200000,
 		maxTokens: 128000,
 	} satisfies Model<"openai-completions">,
 	"z-ai/glm-5.2": {
@@ -4669,13 +4688,13 @@ export const OPENROUTER_MODELS = {
 		thinkingLevelMap: {"xhigh":"xhigh"},
 		input: ["text"],
 		cost: {
-			input: 0.924,
-			output: 2.904,
-			cacheRead: 0.1716,
+			input: 0.84,
+			output: 2.64,
+			cacheRead: 0.156,
 			cacheWrite: 0,
 		},
-		contextWindow: 1048576,
-		maxTokens: 131072,
+		contextWindow: 1024000,
+		maxTokens: 128000,
 	} satisfies Model<"openai-completions">,
 	"z-ai/glm-5v-turbo": {
 		id: "z-ai/glm-5v-turbo",
