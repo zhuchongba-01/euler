@@ -18,8 +18,34 @@ function model(id: string): Model<"openai-completions"> {
 	};
 }
 
-describe("legacy extension OAuth modifyModels", () => {
-	it("applies the synchronous projection after async credential initialization", async () => {
+describe("extension provider model lifecycle", () => {
+	it("publishes refreshModels results without forcing ModelsStore persistence", async () => {
+		const modelsStore = new InMemoryModelsStore();
+		const runtime = await ModelRuntime.create({
+			credentials: AuthStorage.inMemory(),
+			modelsStore,
+			modelsPath: null,
+			allowModelNetwork: false,
+		});
+		runtime.registerProvider("extension-dynamic", {
+			baseUrl: "http://localhost:8080/v1",
+			apiKey: "local",
+			api: "openai-completions",
+			refreshModels: async () => [
+				{
+					...model("live"),
+					provider: "extension-dynamic",
+					baseUrl: "http://localhost:8080/v1",
+				},
+			],
+		});
+
+		await runtime.refresh({ allowNetwork: false });
+		expect(runtime.getModel("extension-dynamic", "live")).toBeDefined();
+		expect(await modelsStore.read("extension-dynamic")).toBeUndefined();
+	});
+
+	it("applies legacy OAuth modifyModels after async credential initialization", async () => {
 		const runtime = await ModelRuntime.create({
 			credentials: AuthStorage.inMemory({
 				"extension-oauth": {

@@ -37,14 +37,14 @@ export function radiusProvider(options: RadiusProviderOptions = {}): Provider<"p
 			inflightRefresh ??= (async () => {
 				try {
 					const stored = await context.store.read();
-					if (stored) models = stored.filter((model) => model.provider === id) as typeof models;
+					if (stored) models = stored.models.filter((model) => model.provider === id) as typeof models;
 
 					// Import catalogs cached by the pre-ModelsStore Radius implementation.
 					if (!stored && context.credential?.type === "oauth") {
 						const legacy = getRadiusModels(id, context.credential);
 						if (legacy.length > 0) {
 							models = legacy;
-							await context.store.write(legacy);
+							await context.store.write({ models: legacy, checkedAt: Date.now() });
 						}
 					}
 
@@ -54,7 +54,7 @@ export function radiusProvider(options: RadiusProviderOptions = {}): Provider<"p
 					const config = await loadRadiusGatewayConfig(gateway, apiKey, context.signal);
 					if (context.signal?.aborted) return;
 					models = getRadiusModelsFromConfig(id, config);
-					await context.store.write(models);
+					await context.store.write({ models, checkedAt: Date.now() });
 				} finally {
 					inflightRefresh = undefined;
 				}

@@ -1,5 +1,6 @@
 import { createProvider, InMemoryModelsStore, type Model } from "@earendil-works/pi-ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { VERSION } from "../src/config.ts";
 import { withRemoteCatalog } from "../src/core/remote-catalog-provider.ts";
 
 function model(id: string): Model<"openai-completions"> {
@@ -20,8 +21,8 @@ function model(id: string): Model<"openai-completions"> {
 afterEach(() => vi.restoreAllMocks());
 
 describe("remote catalog provider", () => {
-	it("parses catalogs keyed by model ID", async () => {
-		vi.spyOn(globalThis, "fetch").mockResolvedValue(
+	it("parses keyed catalogs, sends version headers, and observes the refresh TTL", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
 			new Response(JSON.stringify({ dynamic: model("dynamic") }), {
 				status: 200,
 				headers: { "content-type": "application/json" },
@@ -47,14 +48,27 @@ describe("remote catalog provider", () => {
 			credential: { type: "api_key" },
 			store: {
 				read: () => store.read(provider.id),
-				write: (models) => store.write(provider.id, models),
+				write: (entry) => store.write(provider.id, entry),
+				delete: () => store.delete(provider.id),
+			},
+			allowNetwork: true,
+		});
+		await provider.refreshModels?.({
+			credential: { type: "api_key" },
+			store: {
+				read: () => store.read(provider.id),
+				write: (entry) => store.write(provider.id, entry),
 				delete: () => store.delete(provider.id),
 			},
 			allowNetwork: true,
 		});
 
 		expect(provider.getModels().map((entry) => entry.id)).toEqual(["static", "dynamic"]);
-		expect((await store.read(provider.id))?.map((entry) => entry.id)).toEqual(["dynamic"]);
+		expect((await store.read(provider.id))?.models.map((entry) => entry.id)).toEqual(["dynamic"]);
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+		expect(fetchSpy.mock.calls[0]?.[1]?.headers).toMatchObject({
+			"User-Agent": expect.stringContaining(`pi/${VERSION}`),
+		});
 	});
 
 	it("treats unimplemented pi.dev catalog routes as an unavailable overlay", async () => {
@@ -81,13 +95,13 @@ describe("remote catalog provider", () => {
 				credential: { type: "api_key" },
 				store: {
 					read: () => store.read(provider.id),
-					write: (models) => store.write(provider.id, models),
+					write: (entry) => store.write(provider.id, entry),
 					delete: () => store.delete(provider.id),
 				},
 				allowNetwork: true,
 			}),
 		).resolves.toBeUndefined();
 		expect(provider.getModels().map((entry) => entry.id)).toEqual(["static"]);
-		expect(await store.read(provider.id)).toBeUndefined();
+		expect(await store.read(provider.id)).toMatchObject({ models: [], checkedAt: expect.any(Number) });
 	});
 });

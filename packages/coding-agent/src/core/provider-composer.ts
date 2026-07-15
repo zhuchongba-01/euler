@@ -15,6 +15,7 @@ import {
 	type OAuthLoginCallbacks,
 	type Provider,
 	type ProviderHeaders,
+	type RefreshModelsContext,
 	type SimpleStreamOptions,
 	type StreamOptions,
 } from "@earendil-works/pi-ai";
@@ -63,6 +64,7 @@ export interface ProviderConfigInput {
 		headers?: Record<string, string>;
 		compat?: Model<Api>["compat"];
 	}>;
+	refreshModels?(context: RefreshModelsContext): Promise<NonNullable<ProviderConfigInput["models"]>>;
 }
 
 export type AuthStatus = {
@@ -415,10 +417,17 @@ export function composeModelProvider(
 ): Provider {
 	const config = modelConfig.getProvider(providerId);
 	let extensionOAuthCredential: OAuthCredentials | undefined;
+	let refreshedExtensionModels: ProviderConfigInput["models"];
+	const currentExtension = (): ProviderConfigInput | undefined =>
+		extension && refreshedExtensionModels ? { ...extension, models: refreshedExtensionModels } : extension;
 	// models.json modelOverrides are the topmost user-config layer: they apply once,
 	// after custom-model upserts, extension model replacement, and legacy OAuth projection.
 	const getModels = () => {
-		let models = applyExtension(providerId, applyModelsJson(providerId, base?.getModels() ?? [], config), extension);
+		let models = applyExtension(
+			providerId,
+			applyModelsJson(providerId, base?.getModels() ?? [], config),
+			currentExtension(),
+		);
 		if (extensionOAuthCredential && extension?.oauth?.modifyModels) {
 			models = extension.oauth.modifyModels(models, extensionOAuthCredential);
 		}
@@ -464,9 +473,20 @@ export function composeModelProvider(
 		auth: { ...(apiKey ? { apiKey } : {}), ...(oauth ? { oauth } : {}) },
 		getModels,
 		refreshModels:
-			base?.refreshModels || extension?.oauth?.modifyModels
+			base?.refreshModels || extension?.refreshModels || extension?.oauth?.modifyModels
 				? async (context) => {
 						await base?.refreshModels?.(context);
+						if (extension?.refreshModels) {
+							const refreshed = await extension.refreshModels(context);
+							if (!context.signal?.aborted) {
+								// Validate before publishing the new synchronous list.
+								applyExtension(providerId, applyModelsJson(providerId, base?.getModels() ?? [], config), {
+									...extension,
+									models: refreshed,
+								});
+								refreshedExtensionModels = refreshed;
+							}
+						}
 						extensionOAuthCredential = context.credential?.type === "oauth" ? context.credential : undefined;
 					}
 				: undefined,

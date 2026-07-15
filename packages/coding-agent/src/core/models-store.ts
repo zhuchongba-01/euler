@@ -1,23 +1,23 @@
 import { join } from "node:path";
-import type { Api, Model, ModelsStore } from "@earendil-works/pi-ai";
+import type { ModelsStore, ModelsStoreEntry } from "@earendil-works/pi-ai";
 import { getAgentDir } from "../config.ts";
 import { type AuthStorageBackend, FileAuthStorageBackend } from "./auth-storage.ts";
 
-type StoredModels = Record<string, Model<Api>[]>;
+type StoredModels = Record<string, ModelsStoreEntry>;
 
 export class InMemoryCodingAgentModelsStore implements ModelsStore {
-	private readonly models = new Map<string, readonly Model<Api>[]>();
+	private readonly entries = new Map<string, ModelsStoreEntry>();
 
-	async read(providerId: string): Promise<readonly Model<Api>[] | undefined> {
-		return this.models.get(providerId);
+	async read(providerId: string): Promise<ModelsStoreEntry | undefined> {
+		return this.entries.get(providerId);
 	}
 
-	async write(providerId: string, models: readonly Model<Api>[]): Promise<void> {
-		this.models.set(providerId, models);
+	async write(providerId: string, entry: ModelsStoreEntry): Promise<void> {
+		this.entries.set(providerId, entry);
 	}
 
 	async delete(providerId: string): Promise<void> {
-		this.models.delete(providerId);
+		this.entries.delete(providerId);
 	}
 }
 
@@ -33,16 +33,16 @@ export class FileModelsStore implements ModelsStore {
 		return content ? (JSON.parse(content) as StoredModels) : {};
 	}
 
-	async read(providerId: string): Promise<readonly Model<Api>[] | undefined> {
+	async read(providerId: string): Promise<ModelsStoreEntry | undefined> {
 		return this.storage.withLock((content) => ({
-			result: this.parse(content)[providerId]?.map((model) => structuredClone(model)),
+			result: structuredClone(this.parse(content)[providerId]),
 		}));
 	}
 
-	async write(providerId: string, models: readonly Model<Api>[]): Promise<void> {
+	async write(providerId: string, entry: ModelsStoreEntry): Promise<void> {
 		await this.storage.withLockAsync(async (content) => {
 			const current = this.parse(content);
-			current[providerId] = models.map((model) => structuredClone(model));
+			current[providerId] = structuredClone(entry);
 			return { result: undefined, next: JSON.stringify(current, null, 2) };
 		});
 	}

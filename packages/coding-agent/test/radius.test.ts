@@ -87,7 +87,7 @@ describe("Radius provider", () => {
 		});
 
 		expect(runtime.getModel(RADIUS_PROVIDER_ID, "auto")).toBeDefined();
-		expect(await modelsStore.read(RADIUS_PROVIDER_ID)).toHaveLength(1);
+		expect((await modelsStore.read(RADIUS_PROVIDER_ID))?.models).toHaveLength(1);
 		expect(vi.mocked(fetch).mock.calls[0]?.[1]?.headers).toMatchObject({ authorization: "Bearer access-token" });
 	});
 

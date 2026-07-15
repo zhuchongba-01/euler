@@ -282,7 +282,7 @@ class ModelsImpl implements MutableModels {
 				if (options.signal?.aborted) return;
 				const store: ProviderModelsStore = {
 					read: () => this.modelsStore.read(provider.id),
-					write: (models) => this.modelsStore.write(provider.id, models),
+					write: (entry) => this.modelsStore.write(provider.id, entry),
 					delete: () => this.modelsStore.delete(provider.id),
 				};
 				let stored: Credential | undefined;
@@ -589,7 +589,7 @@ export function createProvider<TApi extends Api = Api>(input: CreateProviderOpti
 						try {
 							const stored = await context.store.read();
 							if (stored) {
-								dynamicModels = stored
+								dynamicModels = stored.models
 									.filter((model) => model.provider === input.id)
 									.map((model) => model as Model<TApi>);
 							}
@@ -597,7 +597,7 @@ export function createProvider<TApi extends Api = Api>(input: CreateProviderOpti
 							const refreshed = await fetchModels(context);
 							if (context.signal?.aborted) return;
 							dynamicModels = refreshed;
-							await context.store.write(refreshed);
+							await context.store.write({ models: refreshed, checkedAt: Date.now() });
 						} finally {
 							inflightRefresh = undefined;
 						}

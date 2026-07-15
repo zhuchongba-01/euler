@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { envApiKeyAuth } from "../src/auth/helpers.ts";
 import type { AuthContext, AuthEvent } from "../src/auth/types.ts";
 import { createModels, createProvider } from "../src/models.ts";
-import { InMemoryModelsStore } from "../src/models-store.ts";
+import { InMemoryModelsStore, type ModelsStoreEntry } from "../src/models-store.ts";
 import { builtinModels, builtinProviders } from "../src/providers/all.ts";
 import { amazonBedrockProvider } from "../src/providers/amazon-bedrock.ts";
 import { anthropicProvider } from "../src/providers/anthropic.ts";
@@ -360,7 +360,7 @@ describe("createProvider", () => {
 			credential: { type: "api_key" as const },
 			store: {
 				read: () => store.read("dynamic"),
-				write: (listed: readonly Model<Api>[]) => store.write("dynamic", listed),
+				write: (entry: ModelsStoreEntry) => store.write("dynamic", entry),
 				delete: () => store.delete("dynamic"),
 			},
 			allowNetwork: true,

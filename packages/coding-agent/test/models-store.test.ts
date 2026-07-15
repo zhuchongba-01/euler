@@ -36,15 +36,16 @@ describe("FileModelsStore", () => {
 		const path = join(dir, "models-store.json");
 		const store = new FileModelsStore(path);
 
-		await store.write("one", [model("one", "m1")]);
-		await store.write("two", [model("two", "m2")]);
+		await store.write("one", { models: [model("one", "m1")], checkedAt: 100 });
+		await store.write("two", { models: [model("two", "m2")], checkedAt: 200 });
 
 		const reloaded = new FileModelsStore(path);
-		expect((await reloaded.read("one"))?.map((entry) => entry.id)).toEqual(["m1"]);
-		expect((await reloaded.read("two"))?.map((entry) => entry.id)).toEqual(["m2"]);
+		expect((await reloaded.read("one"))?.models.map((entry) => entry.id)).toEqual(["m1"]);
+		expect((await reloaded.read("one"))?.checkedAt).toBe(100);
+		expect((await reloaded.read("two"))?.models.map((entry) => entry.id)).toEqual(["m2"]);
 
 		await reloaded.delete("one");
 		expect(await reloaded.read("one")).toBeUndefined();
-		expect((await reloaded.read("two"))?.map((entry) => entry.id)).toEqual(["m2"]);
+		expect((await reloaded.read("two"))?.models.map((entry) => entry.id)).toEqual(["m2"]);
 	});
 });
