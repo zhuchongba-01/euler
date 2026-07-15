@@ -501,10 +501,14 @@ export class ModelRuntime implements Models {
 	}
 
 	async refresh(options: ModelsRefreshOptions = {}): Promise<ModelsRefreshResult> {
+		const refreshOptions = {
+			...options,
+			allowNetwork: options.allowNetwork ?? this.allowModelNetwork,
+		};
 		// Published pi-ai builds before ModelsStore returned void and accepted a provider ID.
 		// The fallback keeps source-mode CLI tests working without rebuilding workspace dependencies.
-		const result = ((await this.models.refresh(options)) as ModelsRefreshResult | undefined) ?? {
-			aborted: options.signal?.aborted ?? false,
+		const result = ((await this.models.refresh(refreshOptions)) as ModelsRefreshResult | undefined) ?? {
+			aborted: refreshOptions.signal?.aborted ?? false,
 			errors: new Map(),
 		};
 		this.updateModelSnapshot();

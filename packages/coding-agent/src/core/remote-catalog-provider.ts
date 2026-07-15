@@ -17,7 +17,9 @@ function parseCatalog(providerId: string, value: unknown): Model<Api>[] {
 		? value
 		: typeof value === "object" && value !== null && "models" in value && Array.isArray(value.models)
 			? value.models
-			: undefined;
+			: typeof value === "object" && value !== null
+				? Object.values(value)
+				: undefined;
 	if (!entries) throw new Error(`Invalid model catalog for provider "${providerId}"`);
 	return entries
 		.filter((entry): entry is Model<Api> => typeof entry === "object" && entry !== null && "id" in entry)
@@ -44,6 +46,7 @@ export function withRemoteCatalog(provider: Provider, catalogBaseUrl: string = D
 						headers: { accept: "application/json" },
 						signal: context.signal,
 					});
+					if (response.status === 404 || response.status === 501) return;
 					if (!response.ok) {
 						throw new Error(`Model catalog request failed for ${provider.id}: ${response.status}`);
 					}

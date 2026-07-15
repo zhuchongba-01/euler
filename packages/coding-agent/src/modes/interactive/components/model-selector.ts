@@ -56,6 +56,8 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	private onSelectCallback: (model: Model<any>) => void;
 	private onCancelCallback: () => void;
 	private errorMessage?: string;
+	private refreshStatusMessage = "Refreshing model catalogs…";
+	private refreshStatusSuccess = false;
 	private tui: TUI;
 	private scopedModels: ReadonlyArray<ScopedModelItem>;
 	private scope: ModelScope = "all";
@@ -167,12 +169,19 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		try {
 			const result = await this.modelRuntime.refresh({ signal: this.refreshAbortController.signal });
 			if (this.closed) return;
+			this.refreshStatusMessage = "";
 			if (result.aborted && timedOut) {
 				this.errorMessage = "Model refresh timed out; showing cached models.";
-			} else if (result.errors.size > 0) {
-				this.errorMessage = `Model refresh failed for: ${[...result.errors.keys()].join(", ")}`;
+			} else if (result.errors.size === 1) {
+				this.errorMessage = `Could not refresh ${result.errors.keys().next().value}; showing cached models.`;
+			} else if (result.errors.size > 1) {
+				this.errorMessage = `Could not refresh ${result.errors.size} model catalogs; showing cached models.`;
 			} else {
 				this.errorMessage = this.modelRuntime.getError();
+				if (!this.errorMessage) {
+					this.refreshStatusMessage = "Model catalogs refreshed.";
+					this.refreshStatusSuccess = true;
+				}
 			}
 			this.loadModelsFromSnapshot();
 			this.filterModels(this.searchInput.getValue());
@@ -287,6 +296,12 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			const selected = this.filteredModels[this.selectedIndex];
 			this.listContainer.addChild(new Spacer(1));
 			this.listContainer.addChild(new Text(theme.fg("muted", `  Model Name: ${selected.model.name}`), 0, 0));
+		}
+		if (this.refreshStatusMessage) {
+			this.listContainer.addChild(new Spacer(1));
+			this.listContainer.addChild(
+				new Text(theme.fg(this.refreshStatusSuccess ? "success" : "muted", `  ${this.refreshStatusMessage}`), 0, 0),
+			);
 		}
 	}
 
