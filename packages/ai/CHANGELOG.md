@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fixed Kimi Coding K3 thinking-level metadata to expose only the supported `max` level ([#6737](https://github.com/earendil-works/pi/issues/6737)).
+- Fixed catalog generation restoring xAI models removed in 0.80.9 ([#6736](https://github.com/earendil-works/pi/issues/6736)).
 
 ## [0.80.9] - 2026-07-16
 
