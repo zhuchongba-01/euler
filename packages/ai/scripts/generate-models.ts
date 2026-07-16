@@ -1627,6 +1627,7 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 
 				const normalizedId = kimiAliases.has(modelId) ? "kimi-for-coding" : modelId;
 				const normalizedName = kimiAliases.has(modelId) ? "Kimi For Coding" : m.name || normalizedId;
+				const isKimiK3 = normalizedId === "k3";
 
 				models.push({
 					id: normalizedId,
@@ -1636,7 +1637,8 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					// Kimi For Coding's Anthropic-compatible API - SDK appends /v1/messages
 					baseUrl: "https://api.kimi.com/coding",
 					headers: { ...KIMI_STATIC_HEADERS },
-					reasoning: m.reasoning === true,
+					reasoning: isKimiK3 || m.reasoning === true,
+					...(isKimiK3 ? { thinkingLevelMap: KIMI_K3_THINKING_LEVEL_MAP } : {}),
 					input: m.modalities?.input?.includes("image") ? ["text", "image"] : ["text"],
 					cost: {
 						input: m.cost?.input || 0,

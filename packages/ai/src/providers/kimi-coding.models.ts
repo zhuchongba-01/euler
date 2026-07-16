@@ -30,6 +30,7 @@ export const KIMI_CODING_MODELS = {
 		baseUrl: "https://api.kimi.com/coding",
 		headers: {"User-Agent":"KimiCLI/1.5"},
 		reasoning: true,
+		thinkingLevelMap: {"off":null,"minimal":null,"low":null,"medium":null,"high":null,"xhigh":null,"max":"max"},
 		input: ["text", "image"],
 		cost: {
 			input: 0,
