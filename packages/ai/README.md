@@ -1047,7 +1047,7 @@ if (result.aborted) console.log('refresh cancelled');
 for (const [provider, error] of result.errors) console.error(provider, error);
 ```
 
-Use `models.refresh({ allowNetwork: false })` to restore persisted catalogs without network access. Model reads stay synchronous and return the last restored or refreshed list.
+Use `models.refresh({ allowNetwork: false })` to restore persisted catalogs without network access, or `models.refresh({ force: true })` to bypass provider freshness checks. Model reads stay synchronous and return the last restored or refreshed list.
 
 Custom models can carry `headers` (e.g. proxies behind bot detection) and `compat` flags. `Models.getAuth(model)` includes those model headers, and stream methods merge them before explicit request headers and `transformHeaders`. See [OpenAI Compatibility Settings](#openai-compatibility-settings).
 

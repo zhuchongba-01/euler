@@ -96,7 +96,7 @@ Then just talk to pi. By default, pi gives the model four tools: `read`, `write`
 
 ## Providers & Models
 
-For each built-in provider, pi maintains a list of tool-capable models, updated with every release. Authenticate via subscription (`/login`) or API key, then select any model from that provider via `/model` (or Ctrl+L).
+For each built-in provider, pi maintains a list of tool-capable models. Configured provider catalogs refresh automatically; run `pi update --models` to force an immediate refresh. Authenticate via subscription (`/login`) or API key, then select any model from that provider via `/model` (or Ctrl+L).
 
 **Subscriptions:**
 - Anthropic Claude Pro/Max
@@ -421,6 +421,7 @@ pi list
 pi update                               # update pi only
 pi update --all                         # update pi and packages
 pi update --extensions                  # update packages only
+pi update --models                      # refresh model catalogs only
 pi update --self                        # update pi only
 pi update --self --force                # reinstall pi even if current
 pi update npm:@foo/pi-tools             # update one package
@@ -519,6 +520,7 @@ pi uninstall <source> [-l]   # Alias for remove
 pi update [source|self|pi]   # Update pi only, or one package source
 pi update --all              # Update pi and packages
 pi update --extensions       # Update packages only
+pi update --models           # Refresh model catalogs only
 pi update --self             # Update pi only
 pi update --self --force     # Reinstall pi even if current
 pi update --extension <src>  # Update one package
