@@ -225,6 +225,16 @@ const DEEPSEEK_V4_THINKING_LEVEL_MAP = {
 	max: "max",
 } as const;
 
+const KIMI_K3_THINKING_LEVEL_MAP = {
+	off: null,
+	minimal: null,
+	low: null,
+	medium: null,
+	high: null,
+	xhigh: null,
+	max: "max",
+} as const;
+
 const ANT_LING_RING_THINKING_LEVEL_MAP = {
 	off: null,
 	minimal: null,
@@ -1663,13 +1673,15 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 			for (const [modelId, m] of Object.entries(moonshotModels[key])) {
 				if (m.tool_call !== true) continue;
 
+				const isKimiK3 = modelId === "kimi-k3";
 				models.push({
 					id: modelId,
 					name: m.name || modelId,
 					api: "openai-completions",
 					provider,
 					baseUrl,
-					reasoning: m.reasoning === true,
+					reasoning: isKimiK3 || m.reasoning === true,
+					...(isKimiK3 ? { thinkingLevelMap: KIMI_K3_THINKING_LEVEL_MAP } : {}),
 					input: m.modalities?.input?.includes("image") ? ["text", "image"] : ["text"],
 					cost: {
 						input: m.cost?.input || 0,
@@ -1679,7 +1691,9 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					},
 					contextWindow: m.limit?.context || 4096,
 					maxTokens: m.limit?.output || 4096,
-					compat: moonshotCompat,
+					compat: isKimiK3
+						? { ...moonshotCompat, requiresReasoningContentOnAssistantMessages: true }
+						: moonshotCompat,
 				});
 			}
 		}
