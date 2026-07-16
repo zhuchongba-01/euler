@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Kimi K3 output limits for Vercel AI Gateway and OpenRouter models.
+
 ## [0.80.8] - 2026-07-16
 
 ### Breaking Changes
