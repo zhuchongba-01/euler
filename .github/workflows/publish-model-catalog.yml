@@ -36,7 +36,7 @@ jobs:
     if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
     env:
-      SOURCE_REF: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || inputs.source_ref || github.sha }}
+      SOURCE_REF: ${{ github.event.workflow_run.head_sha || inputs.source_ref || github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
