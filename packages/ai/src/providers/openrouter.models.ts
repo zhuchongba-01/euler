@@ -441,10 +441,6 @@ export const OPENROUTER_MODELS = values as {
 		id: "nex-agi/nex-n2-pro";
 		provider: "openrouter";
 	};
-	"nvidia/llama-3.3-nemotron-super-49b-v1.5": Model<"openai-completions"> & {
-		id: "nvidia/llama-3.3-nemotron-super-49b-v1.5";
-		provider: "openrouter";
-	};
 	"nvidia/nemotron-3-nano-30b-a3b": Model<"openai-completions"> & {
 		id: "nvidia/nemotron-3-nano-30b-a3b";
 		provider: "openrouter";

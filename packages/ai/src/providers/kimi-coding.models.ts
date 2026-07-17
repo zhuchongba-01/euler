@@ -13,16 +13,8 @@ export const KIMI_CODING_MODELS = values as {
 		id: "k3";
 		provider: "kimi-coding";
 	};
-	"kimi-for-coding": Model<"anthropic-messages"> & {
-		id: "kimi-for-coding";
-		provider: "kimi-coding";
-	};
 	"kimi-for-coding-highspeed": Model<"anthropic-messages"> & {
 		id: "kimi-for-coding-highspeed";
-		provider: "kimi-coding";
-	};
-	"kimi-k2-thinking": Model<"anthropic-messages"> & {
-		id: "kimi-k2-thinking";
 		provider: "kimi-coding";
 	};
 };
