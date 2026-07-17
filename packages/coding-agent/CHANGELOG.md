@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added extension registration for complete pi-ai providers, including native authentication, model refresh, filtering, and streaming behavior.
+
 ### Fixed
 
 - Fixed obsolete custom UI, custom tool, and custom editor examples in the extension documentation ([#6735](https://github.com/earendil-works/pi/issues/6735)).
