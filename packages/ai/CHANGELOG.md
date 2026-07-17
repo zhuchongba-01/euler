@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Kimi Coding subscription models to report API-equivalent implied costs when models.dev reports zero pricing.
+
 ## [0.80.10] - 2026-07-16
 
 ### Fixed
