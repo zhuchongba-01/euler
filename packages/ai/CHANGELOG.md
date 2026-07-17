@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fixed Kimi Coding subscription models to report API-equivalent implied costs when models.dev reports zero pricing.
+- Fixed OpenAI Responses early stream endings to be classified as retryable provider errors ([#6727](https://github.com/earendil-works/pi/issues/6727)).
 
 ## [0.80.10] - 2026-07-16
 
