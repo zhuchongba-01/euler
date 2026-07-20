@@ -6,6 +6,10 @@
 
 - Moved the `uuidv7` export to `@earendil-works/pi-ai`.
 
+### Added
+
+- Added usage metadata to tool results, compaction entries, and branch summaries in the agent harness ([#6671](https://github.com/earendil-works/pi/pull/6671) by [@davidbrai](https://github.com/davidbrai)).
+
 ## [0.80.10] - 2026-07-16
 
 ## [0.80.9] - 2026-07-16

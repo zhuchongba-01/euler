@@ -6,6 +6,7 @@
 
 - Added `contentText` for extracting joined text from message content.
 - Added a shared `uuidv7` utility for time-ordered identifiers.
+- Added optional usage metadata to tool result messages ([#6671](https://github.com/earendil-works/pi/pull/6671) by [@davidbrai](https://github.com/davidbrai)).
 
 ### Fixed
 
