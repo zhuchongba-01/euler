@@ -426,7 +426,7 @@ export class AgentSession {
 		headers?: Record<string, string>;
 		env?: Record<string, string>;
 	}> {
-		if (this.agent.streamFn === streamSimple) {
+		if (this.agent.streamFunction === streamSimple) {
 			return this._getRequiredRequestAuth(model);
 		}
 
@@ -1836,7 +1836,7 @@ export class AgentSession {
 					customInstructions,
 					this._compactionAbortController.signal,
 					this.thinkingLevel,
-					this.agent.streamFn,
+					this.agent.streamFunction,
 					env,
 				);
 				summary = result.summary;
@@ -2037,7 +2037,7 @@ export class AgentSession {
 			let apiKey: string | undefined;
 			let headers: Record<string, string> | undefined;
 			let env: Record<string, string> | undefined;
-			if (this.agent.streamFn === streamSimple) {
+			if (this.agent.streamFunction === streamSimple) {
 				const authResult = await this._modelRuntime.getAuth(this.model);
 				if (!authResult?.auth.apiKey) return false;
 				apiKey = authResult.auth.apiKey;
@@ -2112,7 +2112,7 @@ export class AgentSession {
 					undefined,
 					this._autoCompactionAbortController.signal,
 					this.thinkingLevel,
-					this.agent.streamFn,
+					this.agent.streamFunction,
 					env,
 				);
 				summary = compactResult.summary;
@@ -2933,7 +2933,7 @@ export class AgentSession {
 					customInstructions,
 					replaceInstructions,
 					reserveTokens: branchSummarySettings.reserveTokens,
-					streamFn: this.agent.streamFn,
+					streamFn: this.agent.streamFunction,
 				});
 				if (result.aborted) {
 					return { cancelled: true, aborted: true };

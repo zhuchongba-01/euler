@@ -1,5 +1,11 @@
 import { Agent } from "@earendil-works/pi-agent-core";
-import { type AssistantMessage, getModel, type ToolResultMessage, type Usage } from "@earendil-works/pi-ai/compat";
+import {
+	type AssistantMessage,
+	getModel,
+	streamSimple,
+	type ToolResultMessage,
+	type Usage,
+} from "@earendil-works/pi-ai/compat";
 import { describe, expect, it } from "vitest";
 import { AgentSession } from "../src/core/agent-session.ts";
 import { AuthStorage } from "../src/core/auth-storage.ts";
@@ -69,6 +75,7 @@ async function createSession() {
 	const session = new AgentSession({
 		agent: new Agent({
 			getApiKey: () => "test-key",
+			streamFunction: streamSimple,
 			initialState: {
 				model,
 				systemPrompt: "You are a helpful assistant.",

@@ -5,6 +5,7 @@
 ### Breaking Changes
 
 - Moved the `uuidv7` export to `@earendil-works/pi-ai`.
+- Replaced the optional `Agent` `streamFn` fallback with a required `streamFunction` and made low-level loop stream functions required, preventing `@earendil-works/pi-ai/compat` and all built-in providers from entering selective-provider bundles ([#6851](https://github.com/earendil-works/pi/issues/6851)).
 
 ### Added
 
