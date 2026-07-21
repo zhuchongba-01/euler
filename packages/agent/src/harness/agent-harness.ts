@@ -32,8 +32,9 @@ import type {
 	AgentHarnessResources,
 	AgentHarnessStreamOptions,
 	AgentHarnessStreamOptionsPatch,
+	AgentHarnessTool,
+	AgentHarnessToolContextSource,
 	CompactResult,
-	ExecutionEnv,
 	NavigateTreeResult,
 	PendingSessionWrite,
 	PromptTemplate,
@@ -147,12 +148,14 @@ function normalizeHookError(error: unknown): AgentHarnessError {
 }
 
 interface AgentHarnessTurnState<
+	TContext extends object | undefined,
 	TSkill extends Skill = Skill,
 	TPromptTemplate extends PromptTemplate = PromptTemplate,
-	TTool extends AgentTool = AgentTool,
+	TTool extends AgentHarnessTool<TContext> = AgentHarnessTool<TContext>,
 > {
 	messages: AgentMessage[];
 	resources: AgentHarnessResources<TSkill, TPromptTemplate>;
+	toolContext: TContext;
 	streamOptions: AgentHarnessStreamOptions;
 	sessionId: string;
 	systemPrompt: string;
@@ -163,11 +166,11 @@ interface AgentHarnessTurnState<
 }
 
 export class AgentHarness<
+	TContext extends object | undefined = undefined,
 	TSkill extends Skill = Skill,
 	TPromptTemplate extends PromptTemplate = PromptTemplate,
-	TTool extends AgentTool = AgentTool,
+	TTool extends AgentHarnessTool<TContext> = AgentHarnessTool<TContext>,
 > {
-	readonly env: ExecutionEnv;
 	private session: Session;
 	readonly models: Models;
 	private phase: AgentHarnessPhase = "idle";
@@ -176,7 +179,8 @@ export class AgentHarness<
 	private pendingSessionWrites: PendingSessionWrite[] = [];
 	private model: Model<any>;
 	private thinkingLevel: ThinkingLevel;
-	private systemPrompt: AgentHarnessOptions<TSkill, TPromptTemplate, TTool>["systemPrompt"];
+	private systemPrompt: AgentHarnessOptions<TContext, TSkill, TPromptTemplate, TTool>["systemPrompt"];
+	private toolContext: AgentHarnessToolContextSource<TContext> | undefined;
 	private streamOptions: AgentHarnessStreamOptions;
 	private resources: AgentHarnessResources<TSkill, TPromptTemplate>;
 	private tools = new Map<string, TTool>();
@@ -188,13 +192,13 @@ export class AgentHarness<
 	private nextTurnQueue: AgentMessage[] = [];
 	private handlers = new Map<string, Set<AgentHarnessHandler>>();
 
-	constructor(options: AgentHarnessOptions<TSkill, TPromptTemplate, TTool>) {
-		this.env = options.env;
+	constructor(options: AgentHarnessOptions<TContext, TSkill, TPromptTemplate, TTool>) {
 		this.session = options.session;
 		this.models = options.models;
 		this.resources = options.resources ?? {};
 		this.streamOptions = cloneStreamOptions(options.streamOptions);
 		this.systemPrompt = options.systemPrompt;
+		this.toolContext = options.toolContext;
 		this.validateUniqueNames(
 			(options.tools ?? []).map((tool) => tool.name),
 			"Duplicate tool name(s)",
@@ -319,10 +323,25 @@ export class AgentHarness<
 		};
 	}
 
-	private async createTurnState(): Promise<AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>> {
+	private async resolveToolContext(): Promise<TContext> {
+		if (typeof this.toolContext === "function") {
+			return await (this.toolContext as () => TContext | Promise<TContext>)();
+		}
+		return this.toolContext as TContext;
+	}
+
+	private bindToolContext(tool: TTool, context: TContext): AgentTool {
+		return {
+			...tool,
+			execute: (toolCallId, params, signal, onUpdate) => tool.execute(toolCallId, params, signal, onUpdate, context),
+		};
+	}
+
+	private async createTurnState(): Promise<AgentHarnessTurnState<TContext, TSkill, TPromptTemplate, TTool>> {
 		const context = await this.session.buildContext();
 		const resources = this.getResources();
 		const sessionMetadata = await this.session.getMetadata();
+		const toolContext = await this.resolveToolContext();
 		const tools = [...this.tools.values()];
 		const activeTools = this.activeToolNames
 			.map((name) => this.tools.get(name))
@@ -332,7 +351,6 @@ export class AgentHarness<
 			systemPrompt = this.systemPrompt;
 		} else if (this.systemPrompt) {
 			systemPrompt = await this.systemPrompt({
-				env: this.env,
 				session: this.session,
 				model: this.model,
 				thinkingLevel: this.thinkingLevel,
@@ -343,6 +361,7 @@ export class AgentHarness<
 		return {
 			messages: context.messages,
 			resources,
+			toolContext,
 			streamOptions: cloneStreamOptions(this.streamOptions),
 			sessionId: sessionMetadata.id,
 			systemPrompt,
@@ -354,17 +373,19 @@ export class AgentHarness<
 	}
 
 	private createContext(
-		turnState: AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>,
+		turnState: AgentHarnessTurnState<TContext, TSkill, TPromptTemplate, TTool>,
 		systemPrompt?: string,
 	): AgentContext {
 		return {
 			systemPrompt: systemPrompt ?? turnState.systemPrompt,
 			messages: turnState.messages.slice(),
-			tools: turnState.activeTools.slice(),
+			tools: turnState.activeTools.map((tool) => this.bindToolContext(tool, turnState.toolContext)),
 		};
 	}
 
-	private createStreamFn(getTurnState: () => AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>): StreamFn {
+	private createStreamFn(
+		getTurnState: () => AgentHarnessTurnState<TContext, TSkill, TPromptTemplate, TTool>,
+	): StreamFn {
 		return async (model, context, streamOptions) => {
 			const turnState = getTurnState();
 			const snapshotOptions: AgentHarnessStreamOptions = { ...turnState.streamOptions };
@@ -405,8 +426,8 @@ export class AgentHarness<
 	}
 
 	private createLoopConfig(
-		getTurnState: () => AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>,
-		setTurnState: (turnState: AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>) => void,
+		getTurnState: () => AgentHarnessTurnState<TContext, TSkill, TPromptTemplate, TTool>,
+		setTurnState: (turnState: AgentHarnessTurnState<TContext, TSkill, TPromptTemplate, TTool>) => void,
 	): AgentLoopConfig {
 		const turnState = getTurnState();
 		return {
@@ -544,7 +565,7 @@ export class AgentHarness<
 	}
 
 	private async executeTurn(
-		turnState: AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>,
+		turnState: AgentHarnessTurnState<TContext, TSkill, TPromptTemplate, TTool>,
 		text: string,
 		options?: { images?: ImageContent[] },
 	): Promise<AssistantMessage> {
@@ -571,7 +592,7 @@ export class AgentHarness<
 
 		const abortController = new AbortController();
 		const getTurnState = () => activeTurnState;
-		const setTurnState = (nextTurnState: AgentHarnessTurnState<TSkill, TPromptTemplate, TTool>) => {
+		const setTurnState = (nextTurnState: AgentHarnessTurnState<TContext, TSkill, TPromptTemplate, TTool>) => {
 			activeTurnState = nextTurnState;
 		};
 		this.runAbortController = abortController;

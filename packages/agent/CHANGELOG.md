@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Replaced `AgentHarness`'s `ExecutionEnv` dependency and context-free `AgentTool` inputs with application-defined `toolContext` values and context-aware `AgentHarnessTool` definitions.
+
+### Added
+
+- Added context-aware `read`, `write`, `edit`, and `bash` harness tools backed by `ExecutionEnv`.
+
 ## [0.81.0] - 2026-07-21
 
 ### Breaking Changes
