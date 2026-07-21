@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed interactive startup waiting for background model catalog refresh while computing the footer provider count.
+
 ## [0.81.0] - 2026-07-21
 
 ### New Features
