@@ -1,5 +1,5 @@
 {
-	"name": "@earendil-works/pi-agent-sqlite-node",
+	"name": "@earendil-works/pi-storage-sqlite-node",
 	"version": "0.80.10",
 	"description": "Node sqlite storage backend for @earendil-works/pi-agent-core sessions",
 	"type": "module",
@@ -13,7 +13,8 @@
 	},
 	"files": [
 		"dist",
-		"README.md"
+		"README.md",
+		"CHANGELOG.md"
 	],
 	"scripts": {
 		"clean": "node -e \"import('node:fs/promises').then(fs=>fs.rm('dist',{recursive:true,force:true}))\"",
