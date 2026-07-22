@@ -8,7 +8,11 @@
 
 ### Added
 
-- Added context-aware `read`, `write`, `edit`, and `bash` harness tools backed by `ExecutionEnv`.
+- Added context-aware `read`, `write`, `edit`, and `bash` harness tools backed by `ExecutionEnv`, including async bash execution preparation.
+
+### Changed
+
+- Aligned harness tool path handling, edit serialization, shell output capture, explicit non-inherited environments, and cross-platform process cleanup with coding-agent behavior.
 
 ## [0.81.1] - 2026-07-21
 
