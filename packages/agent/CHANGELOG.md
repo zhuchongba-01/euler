@@ -10,6 +10,16 @@
 
 - Added context-aware `read`, `write`, `edit`, and `bash` harness tools backed by `ExecutionEnv`.
 
+## [0.81.1] - 2026-07-21
+
+### Added
+
+- Added retry policy support and lifecycle events for compaction and branch-summary operations in `AgentHarness` ([#6901](https://github.com/earendil-works/pi/pull/6901) by [@davidbrai](https://github.com/davidbrai)).
+
+### Fixed
+
+- Restored the `Agent` `streamFn` option and host-configurable fallback for omitted agent-loop stream functions without reintroducing a `pi-ai/compat` dependency ([#6915](https://github.com/earendil-works/pi/issues/6915)).
+
 ## [0.81.0] - 2026-07-21
 
 ### Breaking Changes
