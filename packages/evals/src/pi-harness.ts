@@ -1,7 +1,10 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { contentText } from "@earendil-works/pi-ai";
 import {
+	type AgentSession,
+	type CreateAgentSessionOptions,
 	createAgentSessionFromServices,
 	createAgentSessionServices,
 	ModelRuntime,
@@ -10,22 +13,19 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
 	createHarness,
-	type JsonValue,
+	normalizeRecord,
 	type SimpleHarnessResult,
 	type TranscriptEvent,
 	toJsonValue,
 } from "vitest-evals/harness";
 
-type EvalSession = Awaited<ReturnType<typeof createAgentSessionFromServices>>["session"];
-type EvalMessage = EvalSession["messages"][number];
-
 type PiCodingAgentHarnessOptions = {
 	name?: string;
-	noTools?: "all" | "builtin";
+	noTools?: CreateAgentSessionOptions["noTools"];
 	run?: (args: {
 		input: string;
 		cwd: string;
-		session: EvalSession;
+		session: AgentSession;
 		prompt: (input: string) => Promise<string>;
 	}) => Promise<string>;
 };
@@ -37,33 +37,13 @@ function getRequiredModelSelection(): { provider: string; model: string } {
 	return { provider, model };
 }
 
-function textContent(content: unknown): string {
-	if (typeof content === "string") return content;
-	if (!Array.isArray(content)) return "";
-	return content
-		.filter(
-			(part): part is { type: "text"; text: string } =>
-				part !== null &&
-				typeof part === "object" &&
-				(part as { type?: unknown }).type === "text" &&
-				typeof (part as { text?: unknown }).text === "string",
-		)
-		.map((part) => part.text)
-		.join("");
-}
-
-function jsonRecord(value: unknown): Record<string, JsonValue> | undefined {
-	const json = toJsonValue(value);
-	return json !== null && typeof json === "object" && !Array.isArray(json) ? json : undefined;
-}
-
-function transcriptEvents(messages: EvalMessage[]): TranscriptEvent[] {
+function toTranscriptEvents(messages: AgentSession["messages"]): TranscriptEvent[] {
 	const events: TranscriptEvent[] = [];
 	for (const message of messages) {
 		if (message.role === "user") {
-			events.push({ type: "message", role: "user", content: textContent(message.content) });
+			events.push({ type: "message", role: "user", content: contentText(message.content) });
 		} else if (message.role === "assistant") {
-			const text = textContent(message.content);
+			const text = contentText(message.content);
 			if (text) events.push({ type: "message", role: "assistant", content: text });
 			for (const part of message.content) {
 				if (part.type === "toolCall") {
@@ -71,29 +51,30 @@ function transcriptEvents(messages: EvalMessage[]): TranscriptEvent[] {
 						type: "tool_call",
 						id: part.id,
 						name: part.name,
-						arguments: jsonRecord(part.arguments),
+						arguments: normalizeRecord(part.arguments),
 					});
 				}
 			}
 		} else if (message.role === "toolResult") {
-			const content = textContent(message.content) || toJsonValue(message.content);
+			const text = contentText(message.content);
 			events.push({
 				type: "tool_result",
 				toolCallId: message.toolCallId,
 				name: message.toolName,
-				content,
-				...(message.isError ? { error: { message: textContent(message.content) || "Tool failed" } } : {}),
+				content: text || toJsonValue(message.content),
+				...(message.isError ? { error: { message: text || "Tool failed" } } : {}),
 			});
 		}
 	}
 	return events;
 }
 
-async function prompt(session: EvalSession, input: string, signal: AbortSignal | undefined): Promise<string> {
+async function promptAgent(session: AgentSession, input: string, signal: AbortSignal | undefined): Promise<string> {
 	signal?.throwIfAborted();
+	const previousMessageCount = session.messages.length;
 	await session.prompt(input);
 	const assistant = session.messages
-		.slice()
+		.slice(previousMessageCount)
 		.reverse()
 		.find((message) => message.role === "assistant");
 	if (!assistant) throw new Error("Pi eval did not produce an assistant message.");
@@ -119,7 +100,7 @@ async function runPiCodingAgent(
 	const root = await mkdtemp(join(tmpdir(), "pi-eval-"));
 	const cwd = join(root, "workspace");
 	const agentDir = join(root, "agent");
-	let session: EvalSession | undefined;
+	let session: AgentSession | undefined;
 	try {
 		await Promise.all([mkdir(cwd), mkdir(agentDir)]);
 		const services = await createAgentSessionServices({
@@ -143,14 +124,15 @@ async function runPiCodingAgent(
 		const abort = () => void evalSession.abort();
 		signal?.addEventListener("abort", abort, { once: true });
 		try {
-			const sendPrompt = (promptInput: string) => prompt(evalSession, promptInput, signal);
+			signal?.throwIfAborted();
+			const sendPrompt = (promptInput: string) => promptAgent(evalSession, promptInput, signal);
 			const output = options.run
 				? await options.run({ input, cwd, session: evalSession, prompt: sendPrompt })
 				: await sendPrompt(input);
 			const stats = evalSession.getSessionStats();
 			return {
 				output,
-				events: transcriptEvents(evalSession.messages),
+				events: toTranscriptEvents(evalSession.messages),
 				usage: {
 					provider: model.provider,
 					model: model.id,
