@@ -2,8 +2,13 @@
 
 Behavioral evaluations for Pi using `vitest-evals`.
 
-The Pi harness in `src/pi-harness.ts` is built on `createHarness` from `vitest-evals/harness`. It drives a real
-`createAgentSession` in a temporary workspace and reports the final assistant message, transcript, and token usage.
+`src/pi-harness.ts` mirrors the upstream `@vitest-evals/harness-pi-ai` implementation, except that it imports Pi AI
+from `@earendil-works/pi-ai/compat`. Keep it synchronized with
+[`getsentry/vitest-evals`](https://github.com/getsentry/vitest-evals/blob/main/packages/harness-pi-ai/src/index.ts).
+
+Pi's `AgentSession` is the system under test. `src/pi-agent.ts` adapts it to the harness's agent contract, while
+`piAiHarness(...)` handles eval execution and trace normalization. Each run uses a temporary workspace that is removed
+afterward.
 
 ## Running
 
