@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
@@ -10,7 +11,11 @@ const createHelloExtensionPrompt =
 const piExtensionsHarness = createPiCodingAgentHarness({
 	name: "pi-coding-agent-extensions",
 	run: async ({ input, cwd, prompt, session }) => {
-		expect(session.extensionRunner.getExtensionPaths()).toHaveLength(0);
+		assert.strictEqual(
+			session.extensionRunner.getExtensionPaths().length,
+			0,
+			"Expected no extensions before creation",
+		);
 		await prompt(input);
 		const extensionPath = join(cwd, ".pi", "extensions", "hello.ts");
 		const extensionCreated = await stat(extensionPath).then(
@@ -20,7 +25,7 @@ const piExtensionsHarness = createPiCodingAgentHarness({
 		if (!extensionCreated) throw new Error(`Extension was not created at ${extensionPath}`);
 
 		await session.reload();
-		expect(session.extensionRunner.getExtensionPaths()).toHaveLength(1);
+		assert.strictEqual(session.extensionRunner.getExtensionPaths().length, 1, "Expected one extension after reload");
 		if (!session.getActiveToolNames().includes("hello")) {
 			throw new Error("Extension tool 'hello' was not loaded");
 		}
