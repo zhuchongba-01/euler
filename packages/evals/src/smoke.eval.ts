@@ -1,11 +1,8 @@
 import { expect } from "vitest";
 import { describeEval } from "vitest-evals";
-import { createPiEvalAgent } from "./pi-agent.ts";
-import { piAiHarness } from "./pi-harness.ts";
+import { createPiCodingAgentHarness } from "./pi-harness.ts";
 
-const piCodingAgentHarness = piAiHarness({
-	agent: ({ context }) => createPiEvalAgent({ noTools: "all" }, context.signal),
-});
+const piCodingAgentHarness = createPiCodingAgentHarness({ noTools: "all" });
 
 describeEval("Pi Coding Agent smoke", { harness: piCodingAgentHarness }, (it) => {
 	it("runs a basic prompt end to end", async ({ run }) => {

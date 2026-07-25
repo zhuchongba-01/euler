@@ -2,13 +2,8 @@
 
 Behavioral evaluations for Pi using `vitest-evals`.
 
-`src/pi-harness.ts` mirrors the upstream `@vitest-evals/harness-pi-ai` implementation, except that it imports Pi AI
-from `@earendil-works/pi-ai/compat`. Keep it synchronized with
-[`getsentry/vitest-evals`](https://github.com/getsentry/vitest-evals/blob/main/packages/harness-pi-ai/src/index.ts).
-
-Pi's `AgentSession` is the system under test. `src/pi-agent.ts` adapts it to the harness's agent contract, while
-`piAiHarness(...)` handles eval execution and trace normalization. Each run uses a temporary workspace that is removed
-afterward.
+`src/pi-harness.ts` adapts Pi's `AgentSession` directly to `vitest-evals`. Each run uses isolated temporary project and
+agent directories that are removed afterward. Judge harnesses are configured separately from the application harness.
 
 ## Running
 
