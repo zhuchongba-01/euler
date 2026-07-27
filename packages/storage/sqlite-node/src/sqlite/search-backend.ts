@@ -1,7 +1,6 @@
 import type {
 	SessionMetadata,
 	SessionSearchBackend,
-	SessionSearchBackendFactory,
 	SessionSearchHit,
 	SessionSearchOptions,
 	SessionSearchRecord,
@@ -41,42 +40,6 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
  * Storage-independent SQLite FTS search. Its database may be separate from,
  * or shared with, the canonical session backend.
  */
-export function createExistingSqliteSessionSearchBackendFactory<
-	TMetadata extends SessionMetadata = SessionMetadata,
->(options: {
-	env: Pick<SqliteSessionRepoEnv, "absolutePath" | "createDir" | "exists">;
-	sqlite: SqliteDatabaseFactory;
-	databasePath: string;
-}): SessionSearchBackendFactory<TMetadata> {
-	let resolvedPath: string | undefined;
-
-	async function getDatabasePath(): Promise<string> {
-		if (!resolvedPath) {
-			resolvedPath = getFileSystemResultOrThrow(
-				await options.env.absolutePath(options.databasePath),
-				`Failed to resolve SQLite search database ${options.databasePath}`,
-			);
-		}
-		return resolvedPath;
-	}
-
-	return {
-		create: async () => {
-			const path = await getDatabasePath();
-			const exists = getFileSystemResultOrThrow(
-				await options.env.exists(path),
-				`Failed to check SQLite search database ${path}`,
-			);
-			if (!exists) return undefined;
-			return new SqliteSessionSearchBackend<TMetadata>({
-				env: options.env,
-				sqlite: options.sqlite,
-				databasePath: path,
-			});
-		},
-	} as SessionSearchBackendFactory<TMetadata>;
-}
-
 export class SqliteSessionSearchBackend<TMetadata extends SessionMetadata = SessionMetadata>
 	implements SessionSearchBackend<TMetadata>
 {
