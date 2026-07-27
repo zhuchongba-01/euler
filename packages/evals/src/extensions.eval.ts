@@ -1,9 +1,25 @@
+import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
 import { describeEval, toolCalls } from "vitest-evals";
 import { createPiCodingAgentHarness } from "./pi-harness.ts";
 
-const piExtensionsHarness = createPiCodingAgentHarness({ name: "pi-coding-agent-extensions" });
+const piExtensionsHarness = createPiCodingAgentHarness({
+	name: "pi-coding-agent-extensions",
+	output: async ({ response, session }) => {
+		const extensionPath = join(session.sessionManager.getCwd(), ".pi", "extensions", "hello.ts");
+		const extensionCreated = await stat(extensionPath).then(
+			(file) => file.isFile(),
+			() => false,
+		);
+		return {
+			response,
+			extensionCreated,
+			loadedExtensionCount: session.extensionRunner.getExtensionPaths().length,
+			helloToolLabel: session.getToolDefinition("hello")?.label ?? null,
+		};
+	},
+});
 
 describeEval("Pi extensions", { harness: piExtensionsHarness }, (it) => {
 	it("creates, reloads, and uses a hello extension", async ({ run }) => {
@@ -20,15 +36,13 @@ describeEval("Pi extensions", { harness: piExtensionsHarness }, (it) => {
 			},
 		]);
 
-		expect(result.output.trim()).toBe("Hello, Bob!");
+		expect(result.output).toEqual({
+			response: "Hello, Bob!",
+			extensionCreated: true,
+			loadedExtensionCount: 1,
+			helloToolLabel: "Hello",
+		});
 		expect(result.errors).toEqual([]);
-		expect(result.artifacts?.workspaceFiles).toContain(join(".pi", "extensions", "hello.ts"));
-		expect(result.artifacts?.reloads).toEqual([
-			expect.objectContaining({
-				loadedExtensionCount: 1,
-				activeTools: expect.arrayContaining([{ name: "hello", label: "Hello" }]),
-			}),
-		]);
 		expect(toolCalls(result.session)).toContainEqual({
 			name: "hello",
 			arguments: { name: "Bob" },

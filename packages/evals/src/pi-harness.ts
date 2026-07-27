@@ -1,7 +1,7 @@
 import assert from "node:assert";
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import { contentText } from "@earendil-works/pi-ai";
 import {
 	type AgentSession,
@@ -14,6 +14,8 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
 	createHarness,
+	type Harness,
+	type JsonValue,
 	normalizeRecord,
 	type SimpleHarnessResult,
 	type TranscriptEvent,
@@ -25,6 +27,10 @@ type PiCodingAgentInput = string | Array<{ type: "prompt"; content: string } | {
 type PiCodingAgentHarnessOptions = {
 	name?: string;
 	noTools?: CreateAgentSessionOptions["noTools"];
+};
+
+type PiCodingAgentHarnessWithOutput<TOutput extends JsonValue> = PiCodingAgentHarnessOptions & {
+	output: (args: { response: string; session: AgentSession }) => TOutput | Promise<TOutput>;
 };
 
 function getRequiredModelSelection(): { provider: string; model: string } {
@@ -85,11 +91,11 @@ async function promptAgent(session: AgentSession, input: string, signal: AbortSi
 	return output;
 }
 
-async function runPiCodingAgent(
+async function runPiCodingAgent<TOutput extends JsonValue>(
 	input: PiCodingAgentInput,
 	signal: AbortSignal | undefined,
-	options: PiCodingAgentHarnessOptions,
-): Promise<SimpleHarnessResult<string>> {
+	options: PiCodingAgentHarnessOptions | PiCodingAgentHarnessWithOutput<TOutput>,
+): Promise<SimpleHarnessResult<string | TOutput>> {
 	signal?.throwIfAborted();
 	const selection = getRequiredModelSelection();
 	const modelRuntime = await ModelRuntime.create();
@@ -130,35 +136,20 @@ async function runPiCodingAgent(
 				"Expected an isolated eval session to start without extensions",
 			);
 			const steps = typeof input === "string" ? [{ type: "prompt" as const, content: input }] : input;
-			const reloads: Array<{
-				loadedExtensionCount: number;
-				activeTools: Array<{ name: string; label: string }>;
-			}> = [];
-			let output: string | undefined;
+			let response: string | undefined;
 			for (const step of steps) {
 				if (step.type === "prompt") {
-					output = await promptAgent(evalSession, step.content, signal);
+					response = await promptAgent(evalSession, step.content, signal);
 				} else {
 					await evalSession.reload();
-					reloads.push({
-						loadedExtensionCount: evalSession.extensionRunner.getExtensionPaths().length,
-						activeTools: evalSession
-							.getActiveToolNames()
-							.map((name) => ({ name, label: evalSession.getToolDefinition(name)?.label ?? name }))
-							.sort((left, right) => left.name.localeCompare(right.name)),
-					});
 				}
 			}
-			if (output === undefined) throw new Error("Pi eval input must include at least one prompt step.");
-			const workspaceFiles = (await readdir(cwd, { recursive: true, withFileTypes: true }))
-				.filter((entry) => entry.isFile())
-				.map((entry) => relative(cwd, join(entry.parentPath, entry.name)))
-				.sort();
+			if (response === undefined) throw new Error("Pi eval input must include at least one prompt step.");
+			const output = "output" in options ? await options.output({ response, session: evalSession }) : response;
 			const stats = evalSession.getSessionStats();
 			return {
 				output,
 				events: toTranscriptEvents(evalSession.messages),
-				artifacts: { reloads, workspaceFiles },
 				usage: {
 					provider: model.provider,
 					model: model.id,
@@ -180,8 +171,14 @@ async function runPiCodingAgent(
 	}
 }
 
-export function createPiCodingAgentHarness(options: PiCodingAgentHarnessOptions = {}) {
-	return createHarness<PiCodingAgentInput, string>({
+export function createPiCodingAgentHarness<TOutput extends JsonValue>(
+	options: PiCodingAgentHarnessWithOutput<TOutput>,
+): Harness<PiCodingAgentInput, TOutput>;
+export function createPiCodingAgentHarness(options?: PiCodingAgentHarnessOptions): Harness<PiCodingAgentInput, string>;
+export function createPiCodingAgentHarness<TOutput extends JsonValue>(
+	options: PiCodingAgentHarnessOptions | PiCodingAgentHarnessWithOutput<TOutput> = {},
+) {
+	return createHarness<PiCodingAgentInput, string | TOutput>({
 		name: options.name ?? "pi-coding-agent",
 		run: ({ input, signal }) => runPiCodingAgent(input, signal, options),
 	});
