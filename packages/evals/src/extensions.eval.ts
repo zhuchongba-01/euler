@@ -7,20 +7,18 @@ const piExtensionsHarness = createPiCodingAgentHarness({ name: "pi-coding-agent-
 
 describeEval("Pi extensions", { harness: piExtensionsHarness }, (it) => {
 	it("creates, reloads, and uses a hello extension", async ({ run }) => {
-		const result = await run({
-			steps: [
-				{
-					type: "prompt",
-					content:
-						"Create a Pi extension with a hello tool that takes a name and returns a greeting. For example, passing Bob should return `Hello, Bob!`.",
-				},
-				{ type: "reload" },
-				{
-					type: "prompt",
-					content: "Use the hello tool to greet Bob. Respond with exactly the text returned by the tool.",
-				},
-			],
-		});
+		const result = await run([
+			{
+				type: "prompt",
+				content:
+					"Create a Pi extension with a hello tool that takes a name and returns a greeting. For example, passing Bob should return `Hello, Bob!`.",
+			},
+			{ type: "reload" },
+			{
+				type: "prompt",
+				content: "Use the hello tool to greet Bob. Respond with exactly the text returned by the tool.",
+			},
+		]);
 
 		expect(result.output.trim()).toBe("Hello, Bob!");
 		expect(result.errors).toEqual([]);

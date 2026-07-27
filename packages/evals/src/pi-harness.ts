@@ -20,11 +20,7 @@ import {
 	toJsonValue,
 } from "vitest-evals/harness";
 
-type PiCodingAgentInput =
-	| string
-	| {
-			steps: Array<{ type: "prompt"; content: string } | { type: "reload" }>;
-	  };
+type PiCodingAgentInput = string | Array<{ type: "prompt"; content: string } | { type: "reload" }>;
 
 type PiCodingAgentHarnessOptions = {
 	name?: string;
@@ -133,7 +129,7 @@ async function runPiCodingAgent(
 				0,
 				"Expected an isolated eval session to start without extensions",
 			);
-			const steps = typeof input === "string" ? [{ type: "prompt" as const, content: input }] : input.steps;
+			const steps = typeof input === "string" ? [{ type: "prompt" as const, content: input }] : input;
 			const reloads: Array<{
 				loadedExtensionCount: number;
 				activeTools: Array<{ name: string; label: string }>;
