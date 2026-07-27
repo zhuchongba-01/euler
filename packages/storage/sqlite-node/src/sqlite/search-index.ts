@@ -1,15 +1,15 @@
 import type {
 	SessionSearchHit,
+	SessionSearchIndex,
 	SessionSearchIndexRecord,
-	SessionSearchIndexSink,
 	SessionSearchOptions,
 } from "@earendil-works/pi-agent-core";
 import { SessionError } from "@earendil-works/pi-agent-core";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type { SqliteDatabase, SqliteSessionMetadata } from "./types.ts";
 
-/** SQLite-backed search index and sink for persisted session entries. */
-export class SqliteSessionSearchIndex implements SessionSearchIndexSink {
+/** SQLite-backed search index for persisted session entries. */
+export class SqliteSessionSearchIndex implements SessionSearchIndex<SqliteSessionMetadata> {
 	private readonly db: SqliteDatabase;
 	private readonly databasePath: string;
 
@@ -18,7 +18,7 @@ export class SqliteSessionSearchIndex implements SessionSearchIndexSink {
 		this.databasePath = databasePath;
 	}
 
-	async write(record: SessionSearchIndexRecord): Promise<void> {
+	async write(record: SessionSearchIndexRecord<SqliteSessionMetadata>): Promise<void> {
 		const row = await this.db
 			.prepare("SELECT rowid FROM session_entries WHERE session_id = ? AND id = ?")
 			.get<{ rowid: number }>(record.metadata.id, record.entry.id);
@@ -30,7 +30,7 @@ export class SqliteSessionSearchIndex implements SessionSearchIndexSink {
 			.run(row.rowid, JSON.stringify(record.entry));
 	}
 
-	async remove(record: SessionSearchIndexRecord): Promise<void> {
+	async remove(record: SessionSearchIndexRecord<SqliteSessionMetadata>): Promise<void> {
 		const row = await this.db
 			.prepare("SELECT rowid FROM session_entries WHERE session_id = ? AND id = ?")
 			.get<{ rowid: number }>(record.metadata.id, record.entry.id);
