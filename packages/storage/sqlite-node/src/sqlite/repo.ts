@@ -14,6 +14,7 @@ import {
 	type SessionSearch,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
+import { SqliteSessionSearchBackend } from "./search-backend.ts";
 import { SqliteSessionStorage } from "./storage/index.ts";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type {
@@ -61,10 +62,20 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 		this.env = options.env;
 		this.sqlite = options.sqlite;
 		this.databasePathInput = options.databasePath;
-		this.sessionSearch = createSessionSearch(options.searchBackendFactory, {
-			open: (metadata) => this.open(metadata),
-			list: () => this.list(),
-		});
+		this.sessionSearch = createSessionSearch(
+			options.searchBackendFactory ?? {
+				create: () =>
+					new SqliteSessionSearchBackend({
+						env: this.env,
+						sqlite: this.sqlite,
+						databasePath: this.databasePathInput,
+					}),
+			},
+			{
+				open: (metadata) => this.open(metadata),
+				list: () => this.list(),
+			},
+		);
 	}
 
 	private async getDatabasePath(): Promise<string> {
