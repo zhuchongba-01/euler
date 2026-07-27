@@ -1,22 +1,21 @@
 import type {
 	Session,
-	SessionSearchHit,
+	SessionSearchBackendFactory,
 	SessionSearchOptions,
 	SessionStorage,
 	SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import {
 	createSessionId,
+	createSessionSearch,
 	getEntriesToFork,
 	getFileSystemResultOrThrow,
 	SessionError,
+	type SessionSearch,
 	toSession,
-	toSessionSearchRecord,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
-import { SqliteSessionSearchBackend } from "./search-backend.ts";
 import { SqliteSessionStorage } from "./storage/index.ts";
-import { decodeEntry, type SessionEntryRow } from "./storage/session-entries.ts";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type {
 	SqliteDatabase,
@@ -26,7 +25,6 @@ import type {
 	SqliteSessionMetadata,
 	SqliteSessionRepoApi,
 	SqliteSessionRepoEnv,
-	SqliteSessionSearchBackendFactory,
 } from "./types.ts";
 
 function getParentPath(path: string): string {
@@ -45,29 +43,29 @@ async function configureSqliteDatabase(db: SqliteDatabase): Promise<void> {
 
 async function cleanupSessionStorage(storage: SessionStorage): Promise<void> {
 	const maybeClosable = storage as SessionStorage & { cleanup?: () => Promise<void> };
-	if (typeof maybeClosable.cleanup === "function") {
-		await maybeClosable.cleanup();
-	}
+	if (typeof maybeClosable.cleanup === "function") await maybeClosable.cleanup();
 }
 
 export class SqliteSessionRepo implements SqliteSessionRepoApi {
 	private readonly env: SqliteSessionRepoEnv;
 	private readonly sqlite: SqliteDatabaseFactory;
 	private readonly databasePathInput: string;
-	private readonly searchBackendFactory: SqliteSessionSearchBackendFactory;
+	private readonly sessionSearch: SessionSearch<SqliteSessionMetadata>;
 	private databasePath: string | undefined;
 
 	constructor(options: {
 		env: SqliteSessionRepoEnv;
 		sqlite: SqliteDatabaseFactory;
 		databasePath: string;
-		searchBackendFactory?: SqliteSessionSearchBackendFactory;
+		searchBackendFactory?: SessionSearchBackendFactory<SqliteSessionMetadata>;
 	}) {
 		this.env = options.env;
 		this.sqlite = options.sqlite;
 		this.databasePathInput = options.databasePath;
-		this.searchBackendFactory =
-			options.searchBackendFactory ?? (({ db, databasePath }) => new SqliteSessionSearchBackend(db, databasePath));
+		this.sessionSearch = createSessionSearch(options.searchBackendFactory, {
+			open: (metadata) => this.open(metadata),
+			list: () => this.list(),
+		});
 	}
 
 	private async getDatabasePath(): Promise<string> {
@@ -78,10 +76,6 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 			);
 		}
 		return this.databasePath;
-	}
-
-	private async createSearchBackend(db: SqliteDatabase) {
-		return this.searchBackendFactory({ db, databasePath: await this.getDatabasePath() });
 	}
 
 	private async ensureDatabaseDir(): Promise<void> {
@@ -116,7 +110,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 				parentSessionId: options.parentSessionId,
 				metadata: options.metadata,
 			});
-			return toSession(storage, await this.createSearchBackend(db));
+			return toSession(await this.sessionSearch.wrapStorage(storage));
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -131,8 +125,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 		}
 		const db = await this.openDatabase();
 		try {
-			const storage = await SqliteSessionStorage.open(db, metadata);
-			return toSession(storage, await this.createSearchBackend(db));
+			return toSession(await this.sessionSearch.wrapStorage(await SqliteSessionStorage.open(db, metadata)));
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -141,9 +134,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 
 	async list(options: SqliteSessionListOptions = {}): Promise<SqliteSessionMetadata[]> {
 		const path = await this.getDatabasePath();
-		if (!getFileSystemResultOrThrow(await this.env.exists(path), `Failed to check database ${path}`)) {
-			return [];
-		}
+		if (!getFileSystemResultOrThrow(await this.env.exists(path), `Failed to check database ${path}`)) return [];
 		const db = await this.openDatabase();
 		try {
 			const rows = options.cwd
@@ -163,39 +154,22 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 		}
 	}
 
-	async search(options: SessionSearchOptions): Promise<SessionSearchHit<SqliteSessionMetadata>[]> {
-		const path = await this.getDatabasePath();
-		if (!getFileSystemResultOrThrow(await this.env.exists(path), `Failed to check database ${path}`)) return [];
-		const db = await this.openDatabase();
-		try {
-			return await (await this.createSearchBackend(db)).search(options);
-		} finally {
-			await db.close();
-		}
+	async search(options: SessionSearchOptions) {
+		return await this.sessionSearch.search(options);
 	}
 
 	async delete(metadata: SqliteSessionMetadata): Promise<void> {
+		await this.sessionSearch.removeSession(metadata);
 		const db = await this.openDatabase();
 		try {
 			await db.transaction(async () => {
-				const searchBackend = await this.createSearchBackend(db);
-				const entries = await db
-					.prepare(
-						"SELECT rowid, session_id, id, entry_seq, parent_id, type, timestamp, payload FROM session_entries WHERE session_id = ?",
-					)
-					.all<SessionEntryRow & { rowid: number }>(metadata.id);
-				for (const row of entries) {
-					await searchBackend.remove(toSessionSearchRecord(metadata, decodeEntry(row)));
-				}
 				await db.prepare("DELETE FROM branch_entries WHERE session_id = ?").run(metadata.id);
 				await db.prepare("DELETE FROM session_entries WHERE session_id = ?").run(metadata.id);
 				await db.prepare("DELETE FROM entry_materialized WHERE session_id = ?").run(metadata.id);
 				await db.prepare("DELETE FROM session_materialized WHERE session_id = ?").run(metadata.id);
 				await db.prepare("DELETE FROM session_sequences WHERE session_id = ?").run(metadata.id);
 				const result = await db.prepare("DELETE FROM sessions WHERE id = ?").run(metadata.id);
-				if (result.changes === 0) {
-					throw new SessionError("not_found", `Session not found: ${metadata.id}`);
-				}
+				if (result.changes === 0) throw new SessionError("not_found", `Session not found: ${metadata.id}`);
 			});
 		} finally {
 			await db.close();
@@ -222,13 +196,10 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 				parentSessionId: options.parentSessionId ?? sourceMetadata.id,
 				metadata: options.metadata ?? sourceMetadata.metadata,
 			});
-			const searchBackend = await this.createSearchBackend(db);
-			const metadata = await storage.getMetadata();
-			for (const entry of forkedEntries) {
-				await storage.appendEntry(entry);
-				await searchBackend.upsert(toSessionSearchRecord(metadata, entry));
-			}
-			return toSession(storage, searchBackend);
+			for (const entry of forkedEntries) await storage.appendEntry(entry);
+			const session = toSession(await this.sessionSearch.wrapStorage(storage));
+			await this.sessionSearch.indexSession(session);
+			return session;
 		} catch (error) {
 			await db.close();
 			throw error;

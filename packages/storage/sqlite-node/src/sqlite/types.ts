@@ -1,10 +1,4 @@
-import type {
-	FileSystem,
-	SessionCreateOptions,
-	SessionMetadata,
-	SessionRepo,
-	SessionSearchBackend,
-} from "@earendil-works/pi-agent-core";
+import type { FileSystem, SessionCreateOptions, SessionMetadata, SessionRepo } from "@earendil-works/pi-agent-core";
 
 /** Result of a prepared SQLite statement execution. */
 export interface SqliteRunResult {
@@ -50,17 +44,7 @@ export interface SqliteSessionListOptions {
 	cwd?: string;
 }
 
-export interface SqliteSessionBackendOptions {
-	kind: "sqlite";
-	databasePath: string;
-}
-
 export interface SqliteSessionRepoApi
 	extends SessionRepo<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions> {}
 
 export type SqliteSessionRepoEnv = Pick<FileSystem, "absolutePath" | "createDir" | "exists">;
-
-export type SqliteSessionSearchBackendFactory = (options: {
-	db: SqliteDatabase;
-	databasePath: string;
-}) => SessionSearchBackend<SqliteSessionMetadata>;
