@@ -78,12 +78,14 @@ async function promptAgent(session: AgentSession, input: string, signal: AbortSi
 		.slice(previousMessageCount)
 		.reverse()
 		.find((message) => message.role === "assistant");
-	if (!assistant) throw new Error("Pi eval did not produce an assistant message.");
+	if (!assistant) throw new Error("Agent run completed without an assistant message.");
 	if (assistant.stopReason !== "stop") {
-		throw new Error(assistant.errorMessage ?? `Pi eval stopped unexpectedly: ${assistant.stopReason}`);
+		throw new Error(
+			assistant.errorMessage ?? `Agent run ended with unexpected stop reason: ${assistant.stopReason}.`,
+		);
 	}
 	const output = session.getLastAssistantText();
-	if (!output) throw new Error("Pi eval produced an empty assistant response.");
+	if (!output) throw new Error("Agent run produced no assistant text.");
 	return output;
 }
 
