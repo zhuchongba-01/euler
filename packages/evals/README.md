@@ -5,6 +5,9 @@ Behavioral evaluations for Pi using `vitest-evals`.
 `src/pi-harness.ts` adapts Pi's `AgentSession` directly to `vitest-evals`. Each run uses isolated temporary project and
 agent directories that are removed afterward. Judge harnesses are configured separately from the application harness.
 
+Eval cases supply either one prompt or a JSON-safe sequence of prompt and reload steps. The harness executes that input,
+normalizes the resulting session, and returns diagnostic artifacts without defining scenario-specific behavior.
+
 ## Running
 
 From the repository root, run with an explicit provider and model:

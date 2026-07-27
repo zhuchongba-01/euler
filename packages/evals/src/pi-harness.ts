@@ -1,6 +1,7 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import assert from "node:assert";
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { contentText } from "@earendil-works/pi-ai";
 import {
 	type AgentSession,
@@ -19,15 +20,15 @@ import {
 	toJsonValue,
 } from "vitest-evals/harness";
 
+type PiCodingAgentInput =
+	| string
+	| {
+			steps: Array<{ type: "prompt"; content: string } | { type: "reload" }>;
+	  };
+
 type PiCodingAgentHarnessOptions = {
 	name?: string;
 	noTools?: CreateAgentSessionOptions["noTools"];
-	run?: (args: {
-		input: string;
-		cwd: string;
-		session: AgentSession;
-		prompt: (input: string) => Promise<string>;
-	}) => Promise<string>;
 };
 
 function getRequiredModelSelection(): { provider: string; model: string } {
@@ -87,7 +88,7 @@ async function promptAgent(session: AgentSession, input: string, signal: AbortSi
 }
 
 async function runPiCodingAgent(
-	input: string,
+	input: PiCodingAgentInput,
 	signal: AbortSignal | undefined,
 	options: PiCodingAgentHarnessOptions,
 ): Promise<SimpleHarnessResult<string>> {
@@ -125,14 +126,41 @@ async function runPiCodingAgent(
 		signal?.addEventListener("abort", abort, { once: true });
 		try {
 			signal?.throwIfAborted();
-			const sendPrompt = (promptInput: string) => promptAgent(evalSession, promptInput, signal);
-			const output = options.run
-				? await options.run({ input, cwd, session: evalSession, prompt: sendPrompt })
-				: await sendPrompt(input);
+			assert.strictEqual(
+				evalSession.extensionRunner.getExtensionPaths().length,
+				0,
+				"Expected an isolated eval session to start without extensions",
+			);
+			const steps = typeof input === "string" ? [{ type: "prompt" as const, content: input }] : input.steps;
+			const reloads: Array<{
+				loadedExtensionCount: number;
+				activeTools: Array<{ name: string; label: string }>;
+			}> = [];
+			let output: string | undefined;
+			for (const step of steps) {
+				if (step.type === "prompt") {
+					output = await promptAgent(evalSession, step.content, signal);
+				} else {
+					await evalSession.reload();
+					reloads.push({
+						loadedExtensionCount: evalSession.extensionRunner.getExtensionPaths().length,
+						activeTools: evalSession
+							.getActiveToolNames()
+							.map((name) => ({ name, label: evalSession.getToolDefinition(name)?.label ?? name }))
+							.sort((left, right) => left.name.localeCompare(right.name)),
+					});
+				}
+			}
+			if (output === undefined) throw new Error("Pi eval input must include at least one prompt step.");
+			const workspaceFiles = (await readdir(cwd, { recursive: true, withFileTypes: true }))
+				.filter((entry) => entry.isFile())
+				.map((entry) => relative(cwd, join(entry.parentPath, entry.name)))
+				.sort();
 			const stats = evalSession.getSessionStats();
 			return {
 				output,
 				events: toTranscriptEvents(evalSession.messages),
+				artifacts: { reloads, workspaceFiles },
 				usage: {
 					provider: model.provider,
 					model: model.id,
@@ -155,7 +183,7 @@ async function runPiCodingAgent(
 }
 
 export function createPiCodingAgentHarness(options: PiCodingAgentHarnessOptions = {}) {
-	return createHarness<string, string>({
+	return createHarness<PiCodingAgentInput, string>({
 		name: options.name ?? "pi-coding-agent",
 		run: ({ input, signal }) => runPiCodingAgent(input, signal, options),
 	});
