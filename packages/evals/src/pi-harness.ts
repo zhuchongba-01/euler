@@ -64,7 +64,7 @@ function toTranscriptEvents(messages: AgentSession["messages"]): TranscriptEvent
 				type: "tool_result",
 				toolCallId: message.toolCallId,
 				name: message.toolName,
-				content: text || toJsonValue(message.content),
+				content: message.content.every((part) => part.type === "text") ? text : toJsonValue(message.content),
 				...(message.isError ? { error: { message: text || "Tool failed" } } : {}),
 			});
 		}
@@ -106,6 +106,7 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 	const cwd = join(root, "workspace");
 	const agentDir = join(root, "agent");
 	let session: AgentSession | undefined;
+	let outcome: { success: true; result: SimpleHarnessResult<string | TOutput> } | { success: false; error: unknown };
 	try {
 		await Promise.all([mkdir(cwd), mkdir(agentDir)]);
 		const services = await createAgentSessionServices({
@@ -147,28 +148,47 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 			if (response === undefined) throw new Error("Pi eval input must include at least one prompt step.");
 			const output = "output" in options ? await options.output({ response, session: evalSession }) : response;
 			const stats = evalSession.getSessionStats();
-			return {
-				output,
-				events: toTranscriptEvents(evalSession.messages),
-				usage: {
-					provider: model.provider,
-					model: model.id,
-					inputTokens: stats.tokens.input,
-					outputTokens: stats.tokens.output,
-					totalTokens: stats.tokens.total,
-					toolCalls: stats.toolCalls,
+			outcome = {
+				success: true,
+				result: {
+					output,
+					events: toTranscriptEvents(evalSession.messages),
+					usage: {
+						provider: model.provider,
+						model: model.id,
+						inputTokens: stats.tokens.input,
+						outputTokens: stats.tokens.output,
+						totalTokens: stats.tokens.total,
+						toolCalls: stats.toolCalls,
+					},
 				},
 			};
 		} finally {
 			signal?.removeEventListener("abort", abort);
 		}
-	} finally {
-		try {
-			session?.dispose();
-		} finally {
-			await rm(root, { recursive: true, force: true });
-		}
+	} catch (error) {
+		outcome = { success: false, error };
 	}
+
+	const cleanupErrors: unknown[] = [];
+	try {
+		session?.dispose();
+	} catch (error) {
+		cleanupErrors.push(error);
+	}
+	try {
+		await rm(root, { recursive: true, force: true });
+	} catch (error) {
+		cleanupErrors.push(error);
+	}
+
+	if (!outcome.success) {
+		if (cleanupErrors.length === 0) throw outcome.error;
+		throw new AggregateError([outcome.error, ...cleanupErrors], "Agent run failed and cleanup also failed.");
+	}
+	if (cleanupErrors.length === 1) throw cleanupErrors[0];
+	if (cleanupErrors.length > 1) throw new AggregateError(cleanupErrors, "Agent cleanup failed.");
+	return outcome.result;
 }
 
 export function createPiCodingAgentHarness<TOutput extends JsonValue>(
