@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createNodeSqliteFactory } from "../../../storage/sqlite-node/src/index.ts";
-import { createTempDir } from "./session-test-utils.ts";
+import { createNodeSqliteFactory, SqliteSessionRepo } from "../../../storage/sqlite-node/src/index.ts";
+import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
+import { createTempDir, createUserMessage } from "./session-test-utils.ts";
 
 describe("sqlite-node adapter", () => {
 	it("supports node:sqlite-style named parameters", async () => {
@@ -17,5 +18,30 @@ describe("sqlite-node adapter", () => {
 		} finally {
 			await db.close();
 		}
+	});
+
+	it("searches and deletes transactionally indexed canonical entries", async () => {
+		const root = createTempDir();
+		const databasePath = join(root, "sessions.sqlite");
+		const repo = new SqliteSessionRepo({
+			env: new NodeExecutionEnv({ cwd: root }),
+			sqlite: createNodeSqliteFactory(),
+			databasePath,
+		});
+		const included = await repo.create({ cwd: root, id: "included" });
+		const excluded = await repo.create({ cwd: `${root}/other`, id: "excluded" });
+		const metadata = await included.getMetadata();
+		const entryId = await included.appendMessage(createUserMessage("Find the auth defect"));
+		await excluded.appendMessage(createUserMessage("Find the auth defect"));
+
+		await expect(repo.search({ text: "auth", cwd: root })).resolves.toEqual([
+			expect.objectContaining({ entryId, metadata: expect.objectContaining({ id: "included" }) }),
+		]);
+		await expect(repo.search({ text: "uth", cwd: root })).resolves.toEqual([
+			expect.objectContaining({ entryId, metadata: expect.objectContaining({ id: "included" }) }),
+		]);
+
+		await repo.delete(metadata);
+		await expect(repo.search({ text: "auth", cwd: root })).resolves.toEqual([]);
 	});
 });

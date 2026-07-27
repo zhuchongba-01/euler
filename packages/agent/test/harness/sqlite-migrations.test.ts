@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
 	applyMigrations,
 	createNodeSqliteFactory,
+	loadMigrations,
 	type SqliteDatabase,
 	type SqliteDatabaseFactory,
 	type SqliteRunResult,
@@ -75,7 +76,7 @@ describe("SQLite migrations", () => {
 		const db = await sqlite.open(databasePath);
 		try {
 			const rows = await db.prepare("SELECT id FROM migrations ORDER BY id").all<{ id: string }>();
-			expect(rows.map((row) => row.id)).toEqual(["001_initial.sql"]);
+			expect(rows.map((row) => row.id)).toEqual(["001_initial.sql", "002_session_search.sql"]);
 			const tables = await db
 				.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name")
 				.all<{ name: string; sql: string | null }>();
@@ -102,6 +103,53 @@ describe("SQLite migrations", () => {
 				const table = tables.find((row) => row.name === tableName);
 				expect(table?.sql).toContain("WITHOUT ROWID");
 			}
+		} finally {
+			await db.close();
+		}
+	});
+
+	it("does not materialize existing entry data when the search migration runs", async () => {
+		const root = createTempDir();
+		const db = await createNodeSqliteFactory().open(join(root, "sessions.sqlite"));
+		try {
+			const [initialMigration] = await loadMigrations();
+			await db.exec(initialMigration!.sql);
+			await db.exec("CREATE TABLE migrations (id TEXT PRIMARY KEY, applied_at TEXT NOT NULL)");
+			await db.prepare("INSERT INTO migrations (id, applied_at) VALUES (?, ?)").run("001_initial.sql", "now");
+			await db
+				.prepare(
+					"INSERT INTO session_entries (session_id, id, entry_seq, parent_id, type, timestamp, payload) VALUES (?, ?, ?, ?, ?, ?, ?)",
+				)
+				.run(
+					"session-1",
+					"entry-1",
+					1,
+					null,
+					"custom",
+					"2026-01-01T00:00:00.000Z",
+					'{"customType":"note","data":{"text":"backfilled"}}',
+				);
+
+			await applyMigrations(db);
+
+			await expect(
+				db
+					.prepare(
+						"SELECT session_entries.session_id, session_entries.id AS entry_id FROM session_entry_search_fts JOIN session_entries ON session_entries.rowid = session_entry_search_fts.rowid WHERE session_entry_search_fts MATCH ?",
+					)
+					.get<{ session_id: string; entry_id: string }>("backfilled"),
+			).resolves.toBeUndefined();
+
+			await expect(
+				db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_search_records'").get(),
+			).resolves.toBeUndefined();
+			await expect(
+				db
+					.prepare(
+						"SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'session_entries_search_%'",
+					)
+					.get(),
+			).resolves.toBeUndefined();
 		} finally {
 			await db.close();
 		}

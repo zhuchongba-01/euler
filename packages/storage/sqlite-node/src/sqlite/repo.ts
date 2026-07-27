@@ -1,13 +1,22 @@
-import type { Session, SessionStorage, SessionTreeEntry } from "@earendil-works/pi-agent-core";
+import type {
+	Session,
+	SessionSearchHit,
+	SessionSearchOptions,
+	SessionStorage,
+	SessionTreeEntry,
+} from "@earendil-works/pi-agent-core";
 import {
 	createSessionId,
 	getEntriesToFork,
 	getFileSystemResultOrThrow,
 	SessionError,
 	toSession,
+	toSessionSearchIndexRecord,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
+import { SqliteSessionSearchIndex } from "./search-index-sink.ts";
 import { SqliteSessionStorage } from "./storage/index.ts";
+import { decodeEntry, type SessionEntryRow } from "./storage/session-entries.ts";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type {
 	SqliteDatabase,
@@ -94,7 +103,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 				parentSessionId: options.parentSessionId,
 				metadata: options.metadata,
 			});
-			return toSession(storage);
+			return toSession(storage, new SqliteSessionSearchIndex(db, await this.getDatabasePath()));
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -110,7 +119,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 		const db = await this.openDatabase();
 		try {
 			const storage = await SqliteSessionStorage.open(db, metadata);
-			return toSession(storage);
+			return toSession(storage, new SqliteSessionSearchIndex(db, await this.getDatabasePath()));
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -141,10 +150,30 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 		}
 	}
 
+	async search(options: SessionSearchOptions): Promise<SessionSearchHit<SqliteSessionMetadata>[]> {
+		const path = await this.getDatabasePath();
+		if (!getFileSystemResultOrThrow(await this.env.exists(path), `Failed to check database ${path}`)) return [];
+		const db = await this.openDatabase();
+		try {
+			return await new SqliteSessionSearchIndex(db, path).search(options);
+		} finally {
+			await db.close();
+		}
+	}
+
 	async delete(metadata: SqliteSessionMetadata): Promise<void> {
 		const db = await this.openDatabase();
 		try {
 			await db.transaction(async () => {
+				const searchIndexSink = new SqliteSessionSearchIndex(db, await this.getDatabasePath());
+				const entries = await db
+					.prepare(
+						"SELECT rowid, session_id, id, entry_seq, parent_id, type, timestamp, payload FROM session_entries WHERE session_id = ?",
+					)
+					.all<SessionEntryRow & { rowid: number }>(metadata.id);
+				for (const row of entries) {
+					await searchIndexSink.remove(toSessionSearchIndexRecord(metadata, decodeEntry(row)));
+				}
 				await db.prepare("DELETE FROM branch_entries WHERE session_id = ?").run(metadata.id);
 				await db.prepare("DELETE FROM session_entries WHERE session_id = ?").run(metadata.id);
 				await db.prepare("DELETE FROM entry_materialized WHERE session_id = ?").run(metadata.id);
@@ -180,10 +209,13 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 				parentSessionId: options.parentSessionId ?? sourceMetadata.id,
 				metadata: options.metadata ?? sourceMetadata.metadata,
 			});
+			const searchIndexSink = new SqliteSessionSearchIndex(db, await this.getDatabasePath());
+			const metadata = await storage.getMetadata();
 			for (const entry of forkedEntries) {
 				await storage.appendEntry(entry);
+				await searchIndexSink.write(toSessionSearchIndexRecord(metadata, entry));
 			}
-			return toSession(storage);
+			return toSession(storage, searchIndexSink);
 		} catch (error) {
 			await db.close();
 			throw error;
