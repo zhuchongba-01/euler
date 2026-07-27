@@ -12,7 +12,6 @@ import {
 	getFileSystemResultOrThrow,
 	SessionError,
 	type SessionSearch,
-	toSession,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
 import { SqliteSessionStorage } from "./storage/index.ts";
@@ -110,7 +109,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 				parentSessionId: options.parentSessionId,
 				metadata: options.metadata,
 			});
-			return toSession(await this.sessionSearch.wrapStorage(storage));
+			return this.sessionSearch.createSession(storage);
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -125,7 +124,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 		}
 		const db = await this.openDatabase();
 		try {
-			return toSession(await this.sessionSearch.wrapStorage(await SqliteSessionStorage.open(db, metadata)));
+			return this.sessionSearch.createSession(await SqliteSessionStorage.open(db, metadata));
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -197,7 +196,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 				metadata: options.metadata ?? sourceMetadata.metadata,
 			});
 			for (const entry of forkedEntries) await storage.appendEntry(entry);
-			const session = toSession(await this.sessionSearch.wrapStorage(storage));
+			const session = this.sessionSearch.createSession(storage);
 			await this.sessionSearch.indexSession(session);
 			return session;
 		} catch (error) {
