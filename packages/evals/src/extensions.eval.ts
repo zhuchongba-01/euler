@@ -16,7 +16,7 @@ describeEval("Pi extensions", { harness: piExtensionsHarness }, (it) => {
 			{ type: "reload" },
 			{
 				type: "prompt",
-				content: "Use the hello tool to greet Bob. Respond with exactly the text returned by the tool.",
+				content: "Use the hello tool to greet Bob.",
 			},
 		]);
 
