@@ -3,7 +3,7 @@ import type {
 	SessionCreateOptions,
 	SessionMetadata,
 	SessionRepo,
-	SessionSearchIndex,
+	SessionSearchBackend,
 } from "@earendil-works/pi-agent-core";
 
 /** Result of a prepared SQLite statement execution. */
@@ -60,7 +60,7 @@ export interface SqliteSessionRepoApi
 
 export type SqliteSessionRepoEnv = Pick<FileSystem, "absolutePath" | "createDir" | "exists">;
 
-export type SqliteSessionSearchIndexFactory = (options: {
+export type SqliteSessionSearchBackendFactory = (options: {
 	db: SqliteDatabase;
 	databasePath: string;
-}) => SessionSearchIndex<SqliteSessionMetadata>;
+}) => SessionSearchBackend<SqliteSessionMetadata>;

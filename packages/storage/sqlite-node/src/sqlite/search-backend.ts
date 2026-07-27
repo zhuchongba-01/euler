@@ -1,15 +1,15 @@
 import type {
+	SessionSearchBackend,
 	SessionSearchHit,
-	SessionSearchIndex,
-	SessionSearchIndexRecord,
 	SessionSearchOptions,
+	SessionSearchRecord,
 } from "@earendil-works/pi-agent-core";
 import { SessionError } from "@earendil-works/pi-agent-core";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type { SqliteDatabase, SqliteSessionMetadata } from "./types.ts";
 
-/** SQLite-backed search index for persisted session entries. */
-export class SqliteSessionSearchIndex implements SessionSearchIndex<SqliteSessionMetadata> {
+/** SQLite-backed search backend for persisted session entries. */
+export class SqliteSessionSearchBackend implements SessionSearchBackend<SqliteSessionMetadata> {
 	private readonly db: SqliteDatabase;
 	private readonly databasePath: string;
 
@@ -18,19 +18,19 @@ export class SqliteSessionSearchIndex implements SessionSearchIndex<SqliteSessio
 		this.databasePath = databasePath;
 	}
 
-	async write(record: SessionSearchIndexRecord<SqliteSessionMetadata>): Promise<void> {
+	async upsert(record: SessionSearchRecord<SqliteSessionMetadata>): Promise<void> {
 		const row = await this.db
 			.prepare("SELECT rowid FROM session_entries WHERE session_id = ? AND id = ?")
 			.get<{ rowid: number }>(record.metadata.id, record.entry.id);
 		if (!row) {
-			throw new SessionError("not_found", `Entry ${record.entry.id} not found for search indexing`);
+			throw new SessionError("not_found", `Entry ${record.entry.id} not found for search persistence`);
 		}
 		await this.db
 			.prepare("INSERT INTO session_entry_search_fts (rowid, search_text) VALUES (?, ?)")
 			.run(row.rowid, JSON.stringify(record.entry));
 	}
 
-	async remove(record: SessionSearchIndexRecord<SqliteSessionMetadata>): Promise<void> {
+	async remove(record: SessionSearchRecord<SqliteSessionMetadata>): Promise<void> {
 		const row = await this.db
 			.prepare("SELECT rowid FROM session_entries WHERE session_id = ? AND id = ?")
 			.get<{ rowid: number }>(record.metadata.id, record.entry.id);

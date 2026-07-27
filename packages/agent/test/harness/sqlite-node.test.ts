@@ -7,10 +7,10 @@ import {
 } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
 import type {
+	SessionSearchBackend,
 	SessionSearchHit,
-	SessionSearchIndex,
-	SessionSearchIndexRecord,
 	SessionSearchOptions,
+	SessionSearchRecord,
 } from "../../src/harness/types.ts";
 import { createTempDir, createUserMessage } from "./session-test-utils.ts";
 
@@ -30,14 +30,14 @@ describe("sqlite-node adapter", () => {
 		}
 	});
 
-	it("delegates lifecycle events and queries to an injected search index", async () => {
+	it("delegates lifecycle events and queries to an injected search backend", async () => {
 		const root = createTempDir();
-		const writes: SessionSearchIndexRecord<SqliteSessionMetadata>[] = [];
-		const removals: SessionSearchIndexRecord<SqliteSessionMetadata>[] = [];
+		const upserts: SessionSearchRecord<SqliteSessionMetadata>[] = [];
+		const removals: SessionSearchRecord<SqliteSessionMetadata>[] = [];
 		const searches: SessionSearchOptions[] = [];
-		const index: SessionSearchIndex<SqliteSessionMetadata> = {
-			async write(record) {
-				writes.push(record);
+		const index: SessionSearchBackend<SqliteSessionMetadata> = {
+			async upsert(record) {
+				upserts.push(record);
 			},
 			async remove(record) {
 				removals.push(record);
@@ -51,13 +51,13 @@ describe("sqlite-node adapter", () => {
 			env: new NodeExecutionEnv({ cwd: root }),
 			sqlite: createNodeSqliteFactory(),
 			databasePath: join(root, "sessions.sqlite"),
-			searchIndexFactory: () => index,
+			searchBackendFactory: () => index,
 		});
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const metadata = await session.getMetadata();
 		const entryId = await session.appendMessage(createUserMessage("indexed remotely"));
 
-		expect(writes).toEqual([expect.objectContaining({ metadata, entry: expect.objectContaining({ id: entryId }) })]);
+		expect(upserts).toEqual([expect.objectContaining({ metadata, entry: expect.objectContaining({ id: entryId }) })]);
 		await expect(repo.search({ text: "indexed remotely" })).resolves.toEqual([]);
 		expect(searches).toEqual([{ text: "indexed remotely" }]);
 		await repo.delete(metadata);
