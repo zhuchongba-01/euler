@@ -1702,6 +1702,7 @@ Content`,
 		});
 
 		it("should resolve autoload-disabled package entries as positive-only without a global package", async () => {
+			vi.stubEnv("HOME", tempDir);
 			const pkgDir = join(tempDir, "positive-only-pkg");
 			mkdirSync(join(pkgDir, "extensions"), { recursive: true });
 			mkdirSync(join(pkgDir, "skills", "foo"), { recursive: true });
