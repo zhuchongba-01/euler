@@ -1,6 +1,6 @@
 import assert from "node:assert";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -24,7 +24,7 @@ import {
 	type TranscriptEvent,
 	toJsonValue,
 } from "vitest-evals/harness";
-import { getCurrentEvalTest, recordEvalFileArtifact } from "./vitest-evals/artifacts.ts";
+import { PI_SESSION_JSONL_RUN_ARTIFACT } from "./vitest-evals/artifact-names.ts";
 
 export type PiCodingAgentInput = string | Array<{ type: "prompt"; content: string } | { type: "reload" }>;
 
@@ -114,8 +114,6 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 	options: PiCodingAgentHarnessOptions | PiCodingAgentHarnessWithOutput<TOutput>,
 ): Promise<SimpleHarnessResult<string | TOutput>> {
 	const startedAt = performance.now();
-	const artifactDirectory = process.env.PI_EVAL_ARTIFACT_DIR?.trim();
-	const evalTest = artifactDirectory ? getCurrentEvalTest() : undefined;
 	signal?.throwIfAborted();
 	const selection = resolveModelSelection(options.model);
 	const modelRuntime = await ModelRuntime.create();
@@ -215,14 +213,11 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 	}
 
 	const cleanupErrors: unknown[] = [];
-	if (sessionManager && artifactDirectory && evalTest) {
+	if (sessionManager) {
 		try {
 			const sessionPath = sessionManager.getSessionFile();
 			if (sessionPath && existsSync(sessionPath)) {
-				await recordEvalFileArtifact(evalTest, sessionManager.getSessionId(), {
-					name: "session",
-					path: sessionPath,
-				});
+				setArtifact(PI_SESSION_JSONL_RUN_ARTIFACT, await readFile(sessionPath, "utf8"));
 			}
 		} catch (error) {
 			cleanupErrors.push(error);

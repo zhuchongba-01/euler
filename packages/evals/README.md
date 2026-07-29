@@ -43,12 +43,14 @@ to each `describeEval(...)` suite:
 import { expect } from "vitest";
 import { describeEval } from "vitest-evals";
 import { createPiCodingAgentHarness } from "./pi-harness.ts";
+import { recordEvalSessionArtifact } from "./vitest-evals/artifacts.ts";
 
 const harness = createPiCodingAgentHarness({ noTools: "all" });
 
 describeEval("Pi smoke", { harness }, (it) => {
-	it("answers a factual question", async ({ run }) => {
+	it("answers a factual question", async ({ run, task }) => {
 		const result = await run("What is the capital of France? Reply with only the city name.");
+		await recordEvalSessionArtifact(task, result);
 		expect(result.output).toBe("Paris");
 	});
 });
@@ -109,6 +111,7 @@ Harnesses may differ by prompt, tools, skills, model, or any other Pi configurat
 ```ts
 import { describe } from "vitest";
 import { createJudge, describeEval } from "vitest-evals";
+import { recordEvalSessionArtifact } from "./vitest-evals/artifacts.ts";
 import { evalHarnessTable } from "./vitest-evals/harness-table.ts";
 
 const TargetTaskJudge = createJudge<string, string>("TargetTaskJudge", ({ output }) => ({
@@ -126,8 +129,9 @@ const harnessTable = evalHarnessTable(
 
 describe.for(harnessTable)("$name repetition $repetition", ({ harness }) => {
 	describeEval("target skill effectiveness", { harness, judges: [TargetTaskJudge], judgeThreshold: null }, (it) => {
-		it("completes the target task", async ({ run }) => {
-			await run("Complete the target task.");
+		it("completes the target task", async ({ run, task }) => {
+			const result = await run("Complete the target task.");
+			await recordEvalSessionArtifact(task, result);
 		});
 	});
 });
@@ -136,6 +140,10 @@ describe.for(harnessTable)("$name repetition $repetition", ({ harness }) => {
 Comparative suites should record correctness with deterministic or model-backed judges and set `judgeThreshold: null`.
 This keeps a low score as an observation instead of making the Vitest invocation fail. Use hard assertions only for
 suite invariants and infrastructure contracts. `expect.soft(...)` still fails the test and is not a scoring mechanism.
+
+Record session attachments with the explicit Vitest `task` after `run(...)` returns. The Pi harness snapshots the native
+session before deleting its temporary workspace, while `recordEvalSessionArtifact(...)` registers that snapshot through
+Vitest's custom-artifact API.
 
 Harness names must be stable and unique within an eval set. The grouping key combines repetition and seed with a
 non-empty string `input.id` when available, otherwise with a SHA-256 hash of strict canonical JSON input. Execution order

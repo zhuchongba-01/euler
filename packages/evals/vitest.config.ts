@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { defineConfig, mergeConfig } from "vitest/config";
 import baseConfig, { workspaceSourcePaths } from "../../vitest.base.ts";
 
@@ -10,7 +9,6 @@ export default mergeConfig(
 			fileParallelism: false,
 			include: ["src/**/*.eval.ts"],
 			testTimeout: 120000,
-			attachmentsDir: join(process.env.PI_EVAL_ARTIFACT_DIR ?? ".eval", "sessions"),
 			hookTimeout: 30000,
 			reporters: ["vitest-evals/reporter", "./src/vitest-evals/reporter.ts"],
 		},

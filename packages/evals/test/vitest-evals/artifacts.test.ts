@@ -1,53 +1,48 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 import {
-	getCurrentEvalTest,
 	persistEvalArtifactReferences,
 	recordEvalExtensionSourceArtifact,
-	recordEvalFileArtifact,
+	recordEvalSessionArtifact,
 } from "../../src/vitest-evals/artifacts.ts";
 
-it("records file and inline Vitest attachments", async ({ task }) => {
-	const root = await mkdtemp(join(tmpdir(), "pi-eval-artifact-test-"));
-	try {
-		const runId = "run-1";
-		const sessionPath = join(root, "session.jsonl");
-		await writeFile(sessionPath, '{"type":"session"}\n', "utf8");
+it("records session and extension source artifacts against the explicit test task", async ({ task }) => {
+	const runId = "run-1";
+	await recordEvalSessionArtifact(task, {
+		artifacts: { runId, piSessionJsonl: '{"type":"session"}\n' },
+	});
+	await recordEvalExtensionSourceArtifact(task, runId, "export default function () {}\n");
 
-		const test = getCurrentEvalTest();
-		await recordEvalFileArtifact(test, runId, { name: "session", path: sessionPath });
-		await recordEvalExtensionSourceArtifact(task, runId, "export default function () {}\n");
-		expect(test.artifacts).toContainEqual(
-			expect.objectContaining({
-				type: "@earendil-works/pi-evals:file",
-				runId,
-				attachments: [
-					expect.objectContaining({
-						name: "session",
-						path: expect.any(String),
-					}),
-				],
-			}),
-		);
-		expect(test.artifacts).toContainEqual(
-			expect.objectContaining({
-				type: "@earendil-works/pi-evals:extension-source",
-				runId,
-				attachments: [
-					expect.objectContaining({
-						name: "hello.ts",
-						body: "export default function () {}\n",
-						bodyEncoding: "utf-8",
-						contentType: "text/typescript",
-					}),
-				],
-			}),
-		);
-	} finally {
-		await rm(root, { recursive: true, force: true });
-	}
+	expect(task.artifacts).toContainEqual(
+		expect.objectContaining({
+			type: "@earendil-works/pi-evals:session",
+			runId,
+			attachments: [
+				expect.objectContaining({
+					name: "session.jsonl",
+					body: '{"type":"session"}\n',
+					bodyEncoding: "utf-8",
+					contentType: "application/x-ndjson",
+				}),
+			],
+		}),
+	);
+	expect(task.artifacts).toContainEqual(
+		expect.objectContaining({
+			type: "@earendil-works/pi-evals:extension-source",
+			runId,
+			attachments: [
+				expect.objectContaining({
+					name: "hello.ts",
+					body: "export default function () {}\n",
+					bodyEncoding: "utf-8",
+					contentType: "text/typescript",
+				}),
+			],
+		}),
+	);
 });
 
 it("persists and selects attachments belonging to the reported run", async () => {
@@ -56,14 +51,21 @@ it("persists and selects attachments belonging to the reported run", async () =>
 		const references = await persistEvalArtifactReferences(
 			[
 				{
-					type: "@earendil-works/pi-evals:file",
+					type: "@earendil-works/pi-evals:session",
 					runId: "run-1",
-					attachments: [{ name: "session", path: join(root, "sessions", "run-1.jsonl") }],
+					attachments: [
+						{
+							name: "session.jsonl",
+							body: '{"type":"session"}\n',
+							bodyEncoding: "utf-8",
+							contentType: "application/x-ndjson",
+						},
+					],
 				},
 				{
-					type: "@earendil-works/pi-evals:file",
+					type: "@earendil-works/pi-evals:session",
 					runId: "run-2",
-					attachments: [{ name: "session", path: "/eval/sessions/run-2.jsonl" }],
+					attachments: [],
 				},
 				{
 					type: "@earendil-works/pi-evals:extension-source",
@@ -83,12 +85,13 @@ it("persists and selects attachments belonging to the reported run", async () =>
 			root,
 		);
 		expect(references).toEqual([
-			{ name: "session", path: "sessions/run-1.jsonl" },
+			{ name: "session.jsonl", path: expect.stringMatching(/^sessions\/[a-f0-9]{64}\/session\.jsonl$/) },
 			{ name: "hello.ts", path: expect.stringMatching(/^sources\/[a-f0-9]{64}\/hello\.ts$/) },
 		]);
-		const source = references.find(({ name }) => name === "hello.ts");
-		if (!source) throw new TypeError("Expected a persisted extension source reference.");
-		expect(await readFile(join(root, source.path), "utf8")).toBe("export default function () {}\n");
+		for (const { name, path } of references) {
+			const expected = name === "session.jsonl" ? '{"type":"session"}\n' : "export default function () {}\n";
+			expect(await readFile(join(root, path), "utf8")).toBe(expected);
+		}
 	} finally {
 		await rm(root, { recursive: true, force: true });
 	}
