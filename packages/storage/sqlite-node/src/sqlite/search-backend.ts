@@ -8,7 +8,7 @@ import type {
 	SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import { getFileSystemResultOrThrow } from "@earendil-works/pi-agent-core";
-import type { SqliteDatabase, SqliteDatabaseFactory, SqliteSessionRepoEnv } from "./types.ts";
+import type { SqliteDatabase, SqliteDatabaseFactory, SqliteSessionStoreEnv } from "./types.ts";
 
 function getParentPath(path: string): string {
 	const normalized = path.replace(/[\\/]+$/, "");
@@ -47,14 +47,14 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 {
 	readonly index: SessionSearchIndex<TMetadata> = this;
 	private readonly options: {
-		env: Pick<SqliteSessionRepoEnv, "absolutePath" | "createDir">;
+		env: Pick<SqliteSessionStoreEnv, "absolutePath" | "createDir">;
 		sqlite: SqliteDatabaseFactory;
 		databasePath: string;
 	};
 	private databasePath: string | undefined;
 
 	constructor(options: {
-		env: Pick<SqliteSessionRepoEnv, "absolutePath" | "createDir">;
+		env: Pick<SqliteSessionStoreEnv, "absolutePath" | "createDir">;
 		sqlite: SqliteDatabaseFactory;
 		databasePath: string;
 	}) {
