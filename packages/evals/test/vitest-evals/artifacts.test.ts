@@ -5,15 +5,20 @@ import { expect, it } from "vitest";
 import {
 	persistEvalArtifactReferences,
 	recordEvalSessionArtifact,
-	recordEvalTypeScriptSourceArtifact,
+	recordEvalSourceArtifact,
 } from "../../src/vitest-evals/artifacts.ts";
 
-it("records session and extension source artifacts against the explicit test task", async ({ task }) => {
+it("records session and source artifacts against the explicit test task", async ({ task }) => {
 	const runId = "run-1";
 	await recordEvalSessionArtifact(task, {
 		artifacts: { runId, piSessionJsonl: '{"type":"session"}\n' },
 	});
-	await recordEvalTypeScriptSourceArtifact(task, runId, "hello.ts", "export default function () {}\n");
+	await recordEvalSourceArtifact(task, runId, {
+		name: "hello.ts",
+		contentType: "text/typescript",
+		body: "export default function () {}\n",
+		bodyEncoding: "utf-8",
+	});
 
 	expect(task.artifacts).toContainEqual(
 		expect.objectContaining({

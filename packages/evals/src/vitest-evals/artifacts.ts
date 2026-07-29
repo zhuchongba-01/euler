@@ -22,9 +22,9 @@ interface PiSessionAttachment extends TestAttachment {
 	bodyEncoding: "utf-8";
 }
 
-interface TypeScriptSourceAttachment extends TestAttachment {
+export interface SourceAttachment extends TestAttachment {
 	name: string;
-	contentType: "text/typescript";
+	contentType: string;
 	body: string;
 	bodyEncoding: "utf-8";
 }
@@ -38,7 +38,7 @@ interface PiSessionArtifact extends TestArtifactBase {
 interface SourceArtifact extends TestArtifactBase {
 	type: "@earendil-works/pi-evals:source";
 	runId: string;
-	attachments: [TypeScriptSourceAttachment] | [];
+	attachments: [SourceAttachment] | [];
 }
 
 declare module "vitest" {
@@ -72,23 +72,15 @@ export async function recordEvalSessionArtifact(
 	});
 }
 
-export async function recordEvalTypeScriptSourceArtifact(
+export async function recordEvalSourceArtifact(
 	task: Readonly<RunnerTestCase>,
 	runId: string,
-	name: string,
-	source: string,
+	attachment: SourceAttachment,
 ): Promise<void> {
 	await recordArtifact(task, {
 		type: "@earendil-works/pi-evals:source",
 		runId,
-		attachments: [
-			{
-				name,
-				contentType: "text/typescript",
-				body: source,
-				bodyEncoding: "utf-8",
-			},
-		],
+		attachments: [attachment],
 	});
 }
 
