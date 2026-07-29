@@ -10,6 +10,7 @@ export default mergeConfig(
 			include: ["src/**/*.eval.ts"],
 			testTimeout: 120000,
 			hookTimeout: 30000,
+			setupFiles: ["./src/vitest-evals/setup.ts"],
 			reporters: ["vitest-evals/reporter", "./src/vitest-evals/reporter.ts"],
 		},
 		resolve: {

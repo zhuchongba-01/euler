@@ -1,14 +1,12 @@
 import { expect } from "vitest";
 import { describeEval } from "vitest-evals";
 import { createPiCodingAgentHarness } from "./pi-harness.ts";
-import { recordEvalSessionArtifact } from "./vitest-evals/artifacts.ts";
 
 const piCodingAgentHarness = createPiCodingAgentHarness({ noTools: "all" });
 
 describeEval("Pi Coding Agent smoke", { harness: piCodingAgentHarness }, (it) => {
-	it("runs a basic prompt end to end", async ({ run, task }) => {
+	it("runs a basic prompt end to end", async ({ run }) => {
 		const result = await run("What's the capital of France? Respond with only the city name.");
-		await recordEvalSessionArtifact(task, result);
 
 		expect(result.output.trim()).toBe("Paris");
 		expect(result.errors).toEqual([]);

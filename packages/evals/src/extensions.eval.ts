@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { createJudge, describeEval } from "vitest-evals";
 import { createPiCodingAgentHarness, type PiCodingAgentInput } from "./pi-harness.ts";
-import { recordEvalSessionArtifact, recordEvalSourceArtifact } from "./vitest-evals/artifacts.ts";
+import { recordEvalSourceArtifact } from "./vitest-evals/artifacts.ts";
 import { evalHarnessTable } from "./vitest-evals/harness-table.ts";
 
 type ExtensionAuthoringOutput = {
@@ -125,7 +125,6 @@ describe.for(extensionHarnessTable)("$name", ({ harness }) => {
 							"Use the hello tool to greet Bob. Respond with exactly the tool's greeting and nothing else.",
 					},
 				]);
-				await recordEvalSessionArtifact(task, result);
 				if (result.output.extensionSource !== null) {
 					const runId = result.artifacts?.runId;
 					if (typeof runId !== "string") throw new Error("Pi eval run did not record a run ID.");
