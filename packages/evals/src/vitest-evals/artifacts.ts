@@ -15,29 +15,36 @@ export const PI_SESSION_SNAPSHOT_ARTIFACT = "piSessionJsonl";
 const evalSessionArtifactKey = Symbol("pi-evals-session-artifact");
 const evalExtensionSourceArtifactKey = Symbol("pi-evals-extension-source-artifact");
 
-interface EvalTextAttachment extends TestAttachment {
-	name: string;
-	contentType: string;
+interface PiSessionAttachment extends TestAttachment {
+	name: "session.jsonl";
+	contentType: "application/jsonl";
 	body: string;
 	bodyEncoding: "utf-8";
 }
 
-interface EvalSessionArtifact extends TestArtifactBase {
-	type: "@earendil-works/pi-evals:session";
-	runId: string;
-	attachments: [EvalTextAttachment] | [];
+interface TypeScriptSourceAttachment extends TestAttachment {
+	name: "hello.ts";
+	contentType: "text/typescript";
+	body: string;
+	bodyEncoding: "utf-8";
 }
 
-interface EvalExtensionSourceArtifact extends TestArtifactBase {
+interface PiSessionArtifact extends TestArtifactBase {
+	type: "@earendil-works/pi-evals:session";
+	runId: string;
+	attachments: [PiSessionAttachment] | [];
+}
+
+interface ExtensionSourceArtifact extends TestArtifactBase {
 	type: "@earendil-works/pi-evals:extension-source";
 	runId: string;
-	attachments: [EvalTextAttachment] | [];
+	attachments: [TypeScriptSourceAttachment] | [];
 }
 
 declare module "vitest" {
 	interface TestArtifactRegistry {
-		[evalSessionArtifactKey]: EvalSessionArtifact;
-		[evalExtensionSourceArtifactKey]: EvalExtensionSourceArtifact;
+		[evalSessionArtifactKey]: PiSessionArtifact;
+		[evalExtensionSourceArtifactKey]: ExtensionSourceArtifact;
 	}
 }
 
@@ -57,7 +64,7 @@ export async function recordEvalSessionArtifact(
 		attachments: [
 			{
 				name: "session.jsonl",
-				contentType: "application/x-ndjson",
+				contentType: "application/jsonl",
 				body: session,
 				bodyEncoding: "utf-8",
 			},
