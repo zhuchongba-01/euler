@@ -2,6 +2,7 @@ import type {
 	SessionMetadata,
 	SessionSearch,
 	SessionSearchHit,
+	SessionSearchIndex,
 	SessionSearchOptions,
 	SessionSearchRecord,
 	SessionTreeEntry,
@@ -42,8 +43,9 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
  * or shared with, the canonical session backend.
  */
 export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>
-	implements SessionSearch<TMetadata>
+	implements SessionSearch<TMetadata>, SessionSearchIndex<TMetadata>
 {
+	readonly index: SessionSearchIndex<TMetadata> = this;
 	private readonly options: {
 		env: Pick<SqliteSessionRepoEnv, "absolutePath" | "createDir">;
 		sqlite: SqliteDatabaseFactory;
@@ -111,7 +113,8 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 		}
 	}
 
-	async indexSession(metadata: TMetadata, entries: readonly SessionTreeEntry[]): Promise<void> {
+	async replaceSession(metadata: TMetadata, entries: readonly SessionTreeEntry[]): Promise<void> {
+		await this.removeSession(metadata);
 		for (const entry of entries) {
 			await this.upsert({ metadata, entry });
 		}

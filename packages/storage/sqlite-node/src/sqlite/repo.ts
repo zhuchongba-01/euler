@@ -161,7 +161,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 	}
 
 	async delete(metadata: SqliteSessionMetadata): Promise<void> {
-		await this.sessionSearch.removeSession(metadata);
+		await this.sessionSearch.index?.removeSession(metadata);
 		const db = await this.openDatabase();
 		try {
 			await db.transaction(async () => {
@@ -199,7 +199,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 				metadata: options.metadata ?? sourceMetadata.metadata,
 			});
 			for (const entry of forkedEntries) await storage.appendEntry(entry);
-			await this.sessionSearch.indexSession(await storage.getMetadata(), forkedEntries);
+			await this.sessionSearch.index?.replaceSession(await storage.getMetadata(), forkedEntries);
 			return await toRepoSession(storage, this.sessionSearch);
 		} catch (error) {
 			await db.close();

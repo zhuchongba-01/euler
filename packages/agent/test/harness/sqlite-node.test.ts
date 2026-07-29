@@ -8,11 +8,12 @@ import {
 } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
 import { JsonlSessionRepo } from "../../src/harness/session/jsonl-repo.ts";
-import { MultiSessionSearch } from "../../src/harness/session/search-backend.ts";
+import { FanoutSessionSearch } from "../../src/harness/session/search-backend.ts";
 import type {
 	JsonlSessionMetadata,
 	SessionSearch,
 	SessionSearchHit,
+	SessionSearchIndex,
 	SessionSearchOptions,
 	SessionSearchRecord,
 	SessionTreeEntry,
@@ -110,7 +111,7 @@ describe("JsonlSessionRepo with multiple search indexes", () => {
 		const repo = new JsonlSessionRepo({
 			fs: env,
 			sessionsRoot: join(root, "sessions"),
-			search: new MultiSessionSearch({ reader: primary, writers: [primary, secondary] }),
+			search: new FanoutSessionSearch({ reader: primary, writers: [primary, secondary] }),
 		});
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("indexed in both places"));
@@ -130,16 +131,19 @@ describe("SqliteSessionRepo with custom search", () => {
 		const upserts: SessionSearchRecord<SqliteSessionMetadata>[] = [];
 		const removals: SqliteSessionMetadata[] = [];
 		const searches: SessionSearchOptions[] = [];
-		const search: SessionSearch<SqliteSessionMetadata> = {
+		const index: SessionSearchIndex<SqliteSessionMetadata> = {
 			async upsert(record) {
 				upserts.push(record);
 			},
-			async indexSession(metadata, entries: readonly SessionTreeEntry[]) {
+			async replaceSession(metadata, entries: readonly SessionTreeEntry[]) {
 				for (const entry of entries) upserts.push({ metadata, entry });
 			},
 			async removeSession(metadata) {
 				removals.push(metadata);
 			},
+		};
+		const search: SessionSearch<SqliteSessionMetadata> = {
+			index,
 			async search(options): Promise<SessionSearchHit<SqliteSessionMetadata>[]> {
 				searches.push(options);
 				return [];
