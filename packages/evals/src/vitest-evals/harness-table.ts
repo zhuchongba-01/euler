@@ -61,34 +61,35 @@ function createSeededRandom(seed: number): () => number {
 	};
 }
 
-function serializeString(value: string): string {
-	const serialized = JSON.stringify(value);
-	if (serialized === undefined) throw new TypeError("Eval input must be JSON-serializable.");
-	return serialized;
-}
-
-function canonicalJson(value: unknown, ancestors: WeakSet<object>): string {
-	if (value === null) return "null";
-	if (typeof value === "string") return serializeString(value);
-	if (typeof value === "boolean") return String(value);
+function canonicalizeJson(value: unknown, ancestors: WeakSet<object>): JsonValue {
+	if (value === null || typeof value === "string" || typeof value === "boolean") return value;
 	if (typeof value === "number") {
 		if (!Number.isFinite(value)) throw new TypeError("Eval input must contain only finite numbers.");
-		return JSON.stringify(value);
+		return value;
 	}
 	if (typeof value !== "object") throw new TypeError("Eval input must be JSON-serializable.");
 	if (ancestors.has(value)) throw new TypeError("Eval input must not contain circular references.");
 
 	ancestors.add(value);
 	try {
-		if (Array.isArray(value)) return `[${Array.from(value, (item) => canonicalJson(item, ancestors)).join(",")}]`;
+		if (Array.isArray(value)) {
+			const result: JsonValue[] = [];
+			for (let index = 0; index < value.length; index += 1) {
+				if (!Object.hasOwn(value, index)) throw new TypeError("Eval input arrays must not be sparse.");
+				result.push(canonicalizeJson(value[index], ancestors));
+			}
+			return result;
+		}
 		const prototype = Object.getPrototypeOf(value);
 		if (prototype !== Object.prototype && prototype !== null) {
 			throw new TypeError("Eval input must contain only plain objects and arrays.");
 		}
-		return `{${Object.entries(value)
-			.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-			.map(([key, item]) => `${serializeString(key)}:${canonicalJson(item, ancestors)}`)
-			.join(",")}}`;
+		const entries: Array<[string, unknown]> = Object.entries(value);
+		return Object.fromEntries(
+			entries
+				.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+				.map(([key, item]): [string, JsonValue] => [key, canonicalizeJson(item, ancestors)]),
+		);
 	} finally {
 		ancestors.delete(value);
 	}
@@ -99,7 +100,9 @@ function deriveInputKey(input: unknown): string {
 		const id = input.id;
 		if (typeof id === "string" && id.trim()) return id.trim();
 	}
-	return createHash("sha256").update(canonicalJson(input, new WeakSet())).digest("hex");
+	const canonicalInput = JSON.stringify(canonicalizeJson(input, new WeakSet()));
+	if (canonicalInput === undefined) throw new TypeError("Eval input must be JSON-serializable.");
+	return createHash("sha256").update(canonicalInput).digest("hex");
 }
 
 export function deriveEvalGroupKey(input: unknown, repetition: number, seed: number): string {

@@ -18,13 +18,14 @@ describe("deriveEvalGroupKey", () => {
 		);
 		expect(deriveEvalGroupKey({ first: 1 }, 1, 42)).not.toBe(deriveEvalGroupKey({ first: 2 }, 1, 42));
 		expect(deriveEvalGroupKey({ first: 1 }, 1, 42)).not.toBe(deriveEvalGroupKey({ first: 1 }, 2, 42));
+		expect(deriveEvalGroupKey(["first", "second"], 1, 42)).not.toBe(deriveEvalGroupKey(["second", "first"], 1, 42));
 	});
 
 	it("rejects non-JSON and circular input", () => {
 		const circular: { self?: unknown } = {};
 		circular.self = circular;
 		expect(() => deriveEvalGroupKey(new Date(0), 1, 42)).toThrow("only plain objects and arrays");
-		expect(() => deriveEvalGroupKey(Array(1), 1, 42)).toThrow("must be JSON-serializable");
+		expect(() => deriveEvalGroupKey(Array(1), 1, 42)).toThrow("must not be sparse");
 		expect(() => deriveEvalGroupKey(circular, 1, 42)).toThrow("must not contain circular references");
 	});
 });
