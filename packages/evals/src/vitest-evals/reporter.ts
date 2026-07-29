@@ -11,11 +11,6 @@ function readFiniteNumber(value: unknown): number | undefined {
 	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function readStatus(state: string): "passed" | "failed" | "skipped" | "pending" {
-	if (state === "passed" || state === "failed" || state === "skipped") return state;
-	return "pending";
-}
-
 async function appendHarnessRunReport(test: TestCase): Promise<void> {
 	const artifactDirectory = process.env.PI_EVAL_ARTIFACT_DIR?.trim();
 	if (!artifactDirectory) return;
@@ -36,7 +31,7 @@ async function appendHarnessRunReport(test: TestCase): Promise<void> {
 			file: test.module.relativeModuleId,
 			name: test.name,
 			fullName: test.fullName,
-			status: readStatus(test.result().state),
+			status: test.result().state,
 		},
 		harness: harness.name,
 		usage: run.usage,
@@ -53,7 +48,7 @@ async function appendHarnessRunReport(test: TestCase): Promise<void> {
 	});
 }
 
-export function collectHarnessObservations(modules: ReadonlyArray<TestModule>): HarnessObservation[] {
+function collectHarnessObservations(modules: ReadonlyArray<TestModule>): HarnessObservation[] {
 	const observations: HarnessObservation[] = [];
 	for (const module of modules) {
 		for (const test of module.children.allTests()) {
@@ -81,14 +76,7 @@ export function collectHarnessObservations(modules: ReadonlyArray<TestModule>): 
 			else if (score !== undefined) observations.push({ ...observation, outcome: "scored", score });
 			else {
 				const state = test.result().state;
-				const outcome =
-					state === "skipped"
-						? "skipped"
-						: state === "passed"
-							? "unscored"
-							: state === "failed"
-								? "errored"
-								: "pending";
+				const outcome = state === "passed" ? "unscored" : state === "failed" ? "errored" : state;
 				observations.push({ ...observation, outcome });
 			}
 		}

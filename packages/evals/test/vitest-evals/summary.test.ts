@@ -2,11 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
 	formatHarnessComparisonReport,
 	type HarnessObservation,
-	type HarnessObservationOutcome,
 	summarizeHarnessComparisons,
 } from "../../src/vitest-evals/summary.ts";
 
-type ObservationResult = "passed" | "failed" | Exclude<HarnessObservationOutcome, "scored">;
+type ObservationResult = "passed" | "failed" | Exclude<HarnessObservation["outcome"], "scored">;
 
 function observation(
 	harness: string,

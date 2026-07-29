@@ -1,5 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
-import { attachHarnessRunToError, getHarnessRunFromError, type Harness, type JsonValue } from "vitest-evals/harness";
+import {
+	attachHarnessRunToError,
+	getHarnessRunFromError,
+	type Harness,
+	type HarnessRun,
+	type JsonValue,
+} from "vitest-evals/harness";
 
 export const EVAL_HARNESS_ITERATION_ARTIFACT = "vitestEvalsHarnessIteration";
 
@@ -137,19 +143,16 @@ function withIterationArtifact<TInput, TOutput extends JsonValue | undefined>(
 			const groupKey = deriveEvalGroupKey(input, plan.repetition, plan.seed);
 			const artifact: EvalHarnessIterationArtifact = { ...plan, groupKey };
 			context.setArtifact(EVAL_HARNESS_ITERATION_ARTIFACT, artifact);
-			try {
-				const run = await harness.run(input, context);
+			const attachIterationArtifact = <TRun extends HarnessRun>(run: TRun): TRun => {
 				run.artifacts = { ...context.artifacts, ...run.artifacts, [EVAL_HARNESS_ITERATION_ARTIFACT]: artifact };
 				return run;
+			};
+			try {
+				return attachIterationArtifact(await harness.run(input, context));
 			} catch (error) {
 				const partialRun = getHarnessRunFromError(error);
 				if (partialRun) {
-					partialRun.artifacts = {
-						...context.artifacts,
-						...partialRun.artifacts,
-						[EVAL_HARNESS_ITERATION_ARTIFACT]: artifact,
-					};
-					throw attachHarnessRunToError(error, partialRun);
+					throw attachHarnessRunToError(error, attachIterationArtifact(partialRun));
 				}
 				throw error;
 			}

@@ -1,4 +1,4 @@
-export type HarnessObservationOutcome = "scored" | "unscored" | "skipped" | "pending" | "errored";
+type HarnessObservationOutcome = "scored" | "unscored" | "skipped" | "pending" | "errored";
 
 type HarnessObservationBase = {
 	evalSet: string;
@@ -106,12 +106,6 @@ function mean(values: readonly number[]): number | null {
 
 function preciseDifference(left: number, right: number): number {
 	return Number((left - right).toPrecision(15));
-}
-
-function isScorableObservation(
-	observation: HarnessObservation,
-): observation is HarnessObservation & { outcome: "scored"; score: number } {
-	return observation.outcome === "scored";
 }
 
 function allPairs<T>(values: readonly T[]): Array<[T, T]> {
@@ -223,7 +217,7 @@ function summarizeMetric(
 	const firstValues: number[] = [];
 	const secondValues: number[] = [];
 	for (const { first, second } of pairs) {
-		if (!isScorableObservation(first) || !isScorableObservation(second)) continue;
+		if (first.outcome !== "scored" || second.outcome !== "scored") continue;
 		const firstValue = select(first);
 		const secondValue = select(second);
 		if (
@@ -258,7 +252,7 @@ function summarizeCorrectness(pairs: readonly ObservationPair[], totalPairs: num
 	let ties = 0;
 
 	for (const { first, second } of pairs) {
-		if (!isScorableObservation(first) || !isScorableObservation(second)) continue;
+		if (first.outcome !== "scored" || second.outcome !== "scored") continue;
 		eligiblePairs += 1;
 		const firstPassed = first.score >= 1;
 		const secondPassed = second.score >= 1;
@@ -299,33 +293,19 @@ function compareHarnesses(
 	};
 }
 
-function compareEvalSet(
-	evalSet: string,
-	data: EvalSetData,
-): {
-	report: HarnessEvalSetReport;
-	diagnostics: HarnessComparisonDiagnostic[];
-} {
-	const harnesses = orderedHarnesses(data);
-	const groups = orderedGroups(data);
-	return {
-		report: {
-			evalSet,
-			comparisons: allPairs(harnesses).map(([first, second]) => compareHarnesses(first, second, groups)),
-		},
-		diagnostics: collectDiagnostics(harnesses, groups),
-	};
-}
-
 export function summarizeHarnessComparisons(observations: readonly HarnessObservation[]): HarnessComparisonReport {
 	const evalSets: HarnessEvalSetReport[] = [];
 	const diagnostics: HarnessComparisonDiagnostic[] = [];
 	for (const [evalSet, data] of [...groupObservations(observations)].sort(([left], [right]) =>
 		left.localeCompare(right),
 	)) {
-		const comparison = compareEvalSet(evalSet, data);
-		evalSets.push(comparison.report);
-		diagnostics.push(...comparison.diagnostics);
+		const harnesses = orderedHarnesses(data);
+		const groups = orderedGroups(data);
+		evalSets.push({
+			evalSet,
+			comparisons: allPairs(harnesses).map(([first, second]) => compareHarnesses(first, second, groups)),
+		});
+		diagnostics.push(...collectDiagnostics(harnesses, groups));
 	}
 
 	return {

@@ -1,4 +1,3 @@
-import assert from "node:assert";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,7 +27,7 @@ import { PI_SESSION_SNAPSHOT_ARTIFACT } from "./vitest-evals/artifacts.ts";
 
 export type PiCodingAgentInput = string | Array<{ type: "prompt"; content: string } | { type: "reload" }>;
 
-export type PiCodingAgentModelSelection = {
+type PiCodingAgentModelSelection = {
 	provider: string;
 	id: string;
 };
@@ -164,11 +163,9 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 		signal?.addEventListener("abort", abort, { once: true });
 		try {
 			signal?.throwIfAborted();
-			assert.strictEqual(
-				evalSession.extensionRunner.getExtensionPaths().length,
-				0,
-				"Expected an isolated eval session to start without extensions",
-			);
+			if (evalSession.extensionRunner.getExtensionPaths().length !== 0) {
+				throw new Error("Expected an isolated eval session to start without extensions.");
+			}
 			const steps = typeof input === "string" ? [{ type: "prompt" as const, content: input }] : input;
 			let response: string | undefined;
 			for (const step of steps) {
