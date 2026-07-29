@@ -1,7 +1,9 @@
 import assert from "node:assert";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { performance } from "node:perf_hooks";
 import { contentText } from "@earendil-works/pi-ai";
 import {
 	type AgentSession,
@@ -15,29 +17,43 @@ import {
 import {
 	createHarness,
 	type Harness,
+	type HarnessContext,
 	type JsonValue,
 	normalizeRecord,
 	type SimpleHarnessResult,
 	type TranscriptEvent,
 	toJsonValue,
 } from "vitest-evals/harness";
+import { getCurrentEvalTest, recordEvalFileArtifact } from "./vitest-evals/artifacts.ts";
 
-type PiCodingAgentInput = string | Array<{ type: "prompt"; content: string } | { type: "reload" }>;
+export type PiCodingAgentInput = string | Array<{ type: "prompt"; content: string } | { type: "reload" }>;
+
+export type PiCodingAgentModelSelection = {
+	provider: string;
+	id: string;
+};
 
 type PiCodingAgentHarnessOptions = {
 	name?: string;
+	model?: PiCodingAgentModelSelection;
 	noTools?: CreateAgentSessionOptions["noTools"];
+	transformSystemPrompt?: (defaultPrompt: string) => string;
 };
 
 type PiCodingAgentHarnessWithOutput<TOutput extends JsonValue> = PiCodingAgentHarnessOptions & {
 	output: (args: { response: string; session: AgentSession }) => TOutput | Promise<TOutput>;
 };
 
-function getRequiredModelSelection(): { provider: string; model: string } {
-	const provider = process.env.PI_PROVIDER?.trim();
-	const model = process.env.PI_MODEL?.trim();
-	if (!provider || !model) throw new Error("PI_PROVIDER and PI_MODEL must both be set for eval runs.");
-	return { provider, model };
+export function resolveModelSelection(
+	explicitModel: PiCodingAgentModelSelection | undefined,
+	environment: { PI_PROVIDER?: string; PI_MODEL?: string } = process.env,
+): PiCodingAgentModelSelection {
+	const provider = (explicitModel?.provider ?? environment.PI_PROVIDER)?.trim();
+	const id = (explicitModel?.id ?? environment.PI_MODEL)?.trim();
+	if (!provider || !id) {
+		throw new Error("Select a harness model explicitly or set both PI_PROVIDER and PI_MODEL as defaults.");
+	}
+	return { provider, id };
 }
 
 function toTranscriptEvents(messages: AgentSession["messages"]): TranscriptEvent[] {
@@ -94,17 +110,23 @@ async function promptAgent(session: AgentSession, input: string, signal: AbortSi
 async function runPiCodingAgent<TOutput extends JsonValue>(
 	input: PiCodingAgentInput,
 	signal: AbortSignal | undefined,
+	setArtifact: HarnessContext["setArtifact"],
 	options: PiCodingAgentHarnessOptions | PiCodingAgentHarnessWithOutput<TOutput>,
 ): Promise<SimpleHarnessResult<string | TOutput>> {
+	const startedAt = performance.now();
+	const artifactDirectory = process.env.PI_EVAL_ARTIFACT_DIR?.trim();
+	const evalTest = artifactDirectory ? getCurrentEvalTest() : undefined;
 	signal?.throwIfAborted();
-	const selection = getRequiredModelSelection();
+	const selection = resolveModelSelection(options.model);
 	const modelRuntime = await ModelRuntime.create();
-	const model = modelRuntime.getModel(selection.provider, selection.model);
-	if (!model) throw new Error(`Eval model not found: ${selection.provider}/${selection.model}`);
+	const model = modelRuntime.getModel(selection.provider, selection.id);
+	if (!model) throw new Error(`Eval model not found: ${selection.provider}/${selection.id}`);
 
 	const root = await mkdtemp(join(tmpdir(), "pi-eval-"));
 	const cwd = join(root, "workspace");
 	const agentDir = join(root, "agent");
+	let transformedSystemPrompt: string | undefined;
+	let sessionManager: SessionManager | undefined;
 	let session: AgentSession | undefined;
 	let outcome: { success: true; result: SimpleHarnessResult<string | TOutput> } | { success: false; error: unknown };
 	try {
@@ -114,12 +136,17 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 			agentDir,
 			modelRuntime,
 			settingsManager: SettingsManager.inMemory(),
+			...(options.transformSystemPrompt
+				? { resourceLoaderOptions: { systemPromptOverride: () => transformedSystemPrompt } }
+				: {}),
 		});
 		signal?.throwIfAborted();
+		sessionManager = SessionManager.create(cwd, join(root, "sessions"));
+		setArtifact("runId", sessionManager.getSessionId());
 		session = (
 			await createAgentSessionFromServices({
 				services,
-				sessionManager: SessionManager.inMemory(cwd),
+				sessionManager,
 				model,
 				thinkingLevel: "off",
 				noTools: options.noTools,
@@ -127,7 +154,15 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 		).session;
 
 		const evalSession = session;
-		const abort = () => void evalSession.abort();
+		if (options.transformSystemPrompt) {
+			transformedSystemPrompt = options.transformSystemPrompt(evalSession.systemPrompt);
+			if (!transformedSystemPrompt.trim()) throw new Error("Transformed eval system prompt must not be empty.");
+			await evalSession.reload();
+		}
+		let abortPromise: Promise<void> | undefined;
+		const abort = () => {
+			abortPromise ??= evalSession.abort();
+		};
 		signal?.addEventListener("abort", abort, { once: true });
 		try {
 			signal?.throwIfAborted();
@@ -148,6 +183,9 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 			if (response === undefined) throw new Error("Pi eval input must include at least one prompt step.");
 			const output = "output" in options ? await options.output({ response, session: evalSession }) : response;
 			const stats = evalSession.getSessionStats();
+			const hasPricing = [model.cost, ...(model.cost.tiers ?? [])].some(
+				({ input, output, cacheRead, cacheWrite }) => input > 0 || output > 0 || cacheRead > 0 || cacheWrite > 0,
+			);
 			outcome = {
 				success: true,
 				result: {
@@ -160,17 +198,36 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 						outputTokens: stats.tokens.output,
 						totalTokens: stats.tokens.total,
 						toolCalls: stats.toolCalls,
+						metadata: {
+							cacheReadTokens: stats.tokens.cacheRead,
+							cacheWriteTokens: stats.tokens.cacheWrite,
+							...(hasPricing ? { estimatedCostUsd: stats.cost } : {}),
+						},
 					},
 				},
 			};
 		} finally {
 			signal?.removeEventListener("abort", abort);
+			if (abortPromise) await abortPromise;
 		}
 	} catch (error) {
 		outcome = { success: false, error };
 	}
 
 	const cleanupErrors: unknown[] = [];
+	if (sessionManager && artifactDirectory && evalTest) {
+		try {
+			const sessionPath = sessionManager.getSessionFile();
+			if (sessionPath && existsSync(sessionPath)) {
+				await recordEvalFileArtifact(evalTest, sessionManager.getSessionId(), {
+					name: "session",
+					path: sessionPath,
+				});
+			}
+		} catch (error) {
+			cleanupErrors.push(error);
+		}
+	}
 	try {
 		session?.dispose();
 	} catch (error) {
@@ -188,7 +245,10 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 	}
 	if (cleanupErrors.length === 1) throw cleanupErrors[0];
 	if (cleanupErrors.length > 1) throw new AggregateError(cleanupErrors, "Agent cleanup failed.");
-	return outcome.result;
+	return {
+		...outcome.result,
+		timings: { totalMs: performance.now() - startedAt },
+	};
 }
 
 export function createPiCodingAgentHarness<TOutput extends JsonValue>(
@@ -200,6 +260,6 @@ export function createPiCodingAgentHarness<TOutput extends JsonValue>(
 ) {
 	return createHarness<PiCodingAgentInput, string | TOutput>({
 		name: options.name ?? "pi-coding-agent",
-		run: ({ input, signal }) => runPiCodingAgent(input, signal, options),
+		run: ({ input, signal, setArtifact }) => runPiCodingAgent(input, signal, setArtifact, options),
 	});
 }
