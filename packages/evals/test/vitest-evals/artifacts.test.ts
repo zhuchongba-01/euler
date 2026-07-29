@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { expect, it } from "vitest";
 import {
 	persistEvalArtifactReferences,
-	recordEvalExtensionSourceArtifact,
 	recordEvalSessionArtifact,
+	recordEvalTypeScriptSourceArtifact,
 } from "../../src/vitest-evals/artifacts.ts";
 
 it("records session and extension source artifacts against the explicit test task", async ({ task }) => {
@@ -13,7 +13,7 @@ it("records session and extension source artifacts against the explicit test tas
 	await recordEvalSessionArtifact(task, {
 		artifacts: { runId, piSessionJsonl: '{"type":"session"}\n' },
 	});
-	await recordEvalExtensionSourceArtifact(task, runId, "export default function () {}\n");
+	await recordEvalTypeScriptSourceArtifact(task, runId, "hello.ts", "export default function () {}\n");
 
 	expect(task.artifacts).toContainEqual(
 		expect.objectContaining({
@@ -31,7 +31,7 @@ it("records session and extension source artifacts against the explicit test tas
 	);
 	expect(task.artifacts).toContainEqual(
 		expect.objectContaining({
-			type: "@earendil-works/pi-evals:extension-source",
+			type: "@earendil-works/pi-evals:source",
 			runId,
 			attachments: [
 				expect.objectContaining({
@@ -68,7 +68,7 @@ it("persists and selects attachments belonging to the reported run", async () =>
 					attachments: [],
 				},
 				{
-					type: "@earendil-works/pi-evals:extension-source",
+					type: "@earendil-works/pi-evals:source",
 					runId: "run-1",
 					attachments: [
 						{

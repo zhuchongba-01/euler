@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 import { createJudge, describeEval } from "vitest-evals";
 import { createPiCodingAgentHarness, type PiCodingAgentInput } from "./pi-harness.ts";
-import { recordEvalExtensionSourceArtifact, recordEvalSessionArtifact } from "./vitest-evals/artifacts.ts";
+import { recordEvalSessionArtifact, recordEvalTypeScriptSourceArtifact } from "./vitest-evals/artifacts.ts";
 import { evalHarnessTable } from "./vitest-evals/harness-table.ts";
 
 type ExtensionAuthoringOutput = {
@@ -129,7 +129,7 @@ describe.for(extensionHarnessTable)("$name", ({ harness }) => {
 				if (result.output.extensionSource !== null) {
 					const runId = result.artifacts?.runId;
 					if (typeof runId !== "string") throw new Error("Pi eval run did not record a run ID.");
-					await recordEvalExtensionSourceArtifact(task, runId, result.output.extensionSource);
+					await recordEvalTypeScriptSourceArtifact(task, runId, "hello.ts", result.output.extensionSource);
 				}
 				const expectsFullPrompt = harness.name === "default-system-prompt";
 				expect(result.output.systemPromptHasGuidelines).toBe(expectsFullPrompt);

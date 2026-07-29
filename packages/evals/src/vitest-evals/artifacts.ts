@@ -13,7 +13,7 @@ import type { HarnessRun } from "vitest-evals/harness";
 export const PI_SESSION_SNAPSHOT_ARTIFACT = "piSessionJsonl";
 
 const evalSessionArtifactKey = Symbol("pi-evals-session-artifact");
-const evalExtensionSourceArtifactKey = Symbol("pi-evals-extension-source-artifact");
+const evalSourceArtifactKey = Symbol("pi-evals-source-artifact");
 
 interface PiSessionAttachment extends TestAttachment {
 	name: "session.jsonl";
@@ -23,7 +23,7 @@ interface PiSessionAttachment extends TestAttachment {
 }
 
 interface TypeScriptSourceAttachment extends TestAttachment {
-	name: "hello.ts";
+	name: string;
 	contentType: "text/typescript";
 	body: string;
 	bodyEncoding: "utf-8";
@@ -35,8 +35,8 @@ interface PiSessionArtifact extends TestArtifactBase {
 	attachments: [PiSessionAttachment] | [];
 }
 
-interface ExtensionSourceArtifact extends TestArtifactBase {
-	type: "@earendil-works/pi-evals:extension-source";
+interface SourceArtifact extends TestArtifactBase {
+	type: "@earendil-works/pi-evals:source";
 	runId: string;
 	attachments: [TypeScriptSourceAttachment] | [];
 }
@@ -44,7 +44,7 @@ interface ExtensionSourceArtifact extends TestArtifactBase {
 declare module "vitest" {
 	interface TestArtifactRegistry {
 		[evalSessionArtifactKey]: PiSessionArtifact;
-		[evalExtensionSourceArtifactKey]: ExtensionSourceArtifact;
+		[evalSourceArtifactKey]: SourceArtifact;
 	}
 }
 
@@ -72,17 +72,18 @@ export async function recordEvalSessionArtifact(
 	});
 }
 
-export async function recordEvalExtensionSourceArtifact(
+export async function recordEvalTypeScriptSourceArtifact(
 	task: Readonly<RunnerTestCase>,
 	runId: string,
+	name: string,
 	source: string,
 ): Promise<void> {
 	await recordArtifact(task, {
-		type: "@earendil-works/pi-evals:extension-source",
+		type: "@earendil-works/pi-evals:source",
 		runId,
 		attachments: [
 			{
-				name: "hello.ts",
+				name,
 				contentType: "text/typescript",
 				body: source,
 				bodyEncoding: "utf-8",
@@ -100,7 +101,7 @@ export async function persistEvalArtifactReferences(
 	for (const artifact of artifacts) {
 		if (
 			(artifact.type !== "@earendil-works/pi-evals:session" &&
-				artifact.type !== "@earendil-works/pi-evals:extension-source") ||
+				artifact.type !== "@earendil-works/pi-evals:source") ||
 			artifact.runId !== runId
 		) {
 			continue;
