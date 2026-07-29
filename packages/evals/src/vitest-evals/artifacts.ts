@@ -9,7 +9,8 @@ import {
 	type TestAttachment,
 } from "vitest";
 import type { HarnessRun } from "vitest-evals/harness";
-import { PI_SESSION_JSONL_RUN_ARTIFACT } from "./artifact-names.ts";
+
+export const PI_SESSION_SNAPSHOT_ARTIFACT = "piSessionJsonl";
 
 const evalSessionArtifactKey = Symbol("pi-evals-session-artifact");
 const evalExtensionSourceArtifactKey = Symbol("pi-evals-extension-source-artifact");
@@ -45,7 +46,7 @@ export async function recordEvalSessionArtifact(
 	run: Pick<HarnessRun, "artifacts">,
 ): Promise<void> {
 	const runId = run.artifacts?.runId;
-	const session = run.artifacts?.[PI_SESSION_JSONL_RUN_ARTIFACT];
+	const session = run.artifacts?.[PI_SESSION_SNAPSHOT_ARTIFACT];
 	if (session === undefined) return;
 	if (typeof runId !== "string" || typeof session !== "string") {
 		throw new TypeError("Pi eval session artifact metadata is invalid.");

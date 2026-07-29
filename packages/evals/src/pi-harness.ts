@@ -24,7 +24,7 @@ import {
 	type TranscriptEvent,
 	toJsonValue,
 } from "vitest-evals/harness";
-import { PI_SESSION_JSONL_RUN_ARTIFACT } from "./vitest-evals/artifact-names.ts";
+import { PI_SESSION_SNAPSHOT_ARTIFACT } from "./vitest-evals/artifacts.ts";
 
 export type PiCodingAgentInput = string | Array<{ type: "prompt"; content: string } | { type: "reload" }>;
 
@@ -217,7 +217,7 @@ async function runPiCodingAgent<TOutput extends JsonValue>(
 		try {
 			const sessionPath = sessionManager.getSessionFile();
 			if (sessionPath && existsSync(sessionPath)) {
-				setArtifact(PI_SESSION_JSONL_RUN_ARTIFACT, await readFile(sessionPath, "utf8"));
+				setArtifact(PI_SESSION_SNAPSHOT_ARTIFACT, await readFile(sessionPath, "utf8"));
 			}
 		} catch (error) {
 			cleanupErrors.push(error);
