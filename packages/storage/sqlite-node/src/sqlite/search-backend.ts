@@ -1,9 +1,10 @@
 import type {
 	SessionMetadata,
-	SessionSearchBackend,
+	SessionSearch,
 	SessionSearchHit,
 	SessionSearchOptions,
 	SessionSearchRecord,
+	SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import { getFileSystemResultOrThrow } from "@earendil-works/pi-agent-core";
 import type { SqliteDatabase, SqliteDatabaseFactory, SqliteSessionRepoEnv } from "./types.ts";
@@ -40,8 +41,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
  * Storage-independent SQLite FTS search. Its database may be separate from,
  * or shared with, the canonical session backend.
  */
-export class SqliteSessionSearchBackend<TMetadata extends SessionMetadata = SessionMetadata>
-	implements SessionSearchBackend<TMetadata>
+export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>
+	implements SessionSearch<TMetadata>
 {
 	private readonly options: {
 		env: Pick<SqliteSessionRepoEnv, "absolutePath" | "createDir">;
@@ -107,6 +108,12 @@ export class SqliteSessionSearchBackend<TMetadata extends SessionMetadata = Sess
 			});
 		} finally {
 			await db.close();
+		}
+	}
+
+	async indexSession(metadata: TMetadata, entries: readonly SessionTreeEntry[]): Promise<void> {
+		for (const entry of entries) {
+			await this.upsert({ metadata, entry });
 		}
 	}
 

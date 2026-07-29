@@ -1,20 +1,19 @@
 import type {
 	Session,
-	SessionSearchBackendFactory,
+	SessionSearch,
 	SessionSearchOptions,
 	SessionStorage,
 	SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import {
 	createSessionId,
-	createSessionSearch,
 	getEntriesToFork,
 	getFileSystemResultOrThrow,
 	SessionError,
-	type SessionSearch,
+	toRepoSession,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
-import { SqliteSessionSearchBackend } from "./search-backend.ts";
+import { SqliteSessionSearch } from "./search-backend.ts";
 import { SqliteSessionStorage } from "./storage/index.ts";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type {
@@ -57,25 +56,18 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 		env: SqliteSessionRepoEnv;
 		sqlite: SqliteDatabaseFactory;
 		databasePath: string;
-		searchBackendFactory?: SessionSearchBackendFactory<SqliteSessionMetadata>;
+		search?: SessionSearch<SqliteSessionMetadata>;
 	}) {
 		this.env = options.env;
 		this.sqlite = options.sqlite;
 		this.databasePathInput = options.databasePath;
-		this.sessionSearch = createSessionSearch(
-			options.searchBackendFactory ?? {
-				create: () =>
-					new SqliteSessionSearchBackend({
-						env: this.env,
-						sqlite: this.sqlite,
-						databasePath: this.databasePathInput,
-					}),
-			},
-			{
-				open: (metadata) => this.open(metadata),
-				list: () => this.list(),
-			},
-		);
+		this.sessionSearch =
+			options.search ??
+			new SqliteSessionSearch({
+				env: this.env,
+				sqlite: this.sqlite,
+				databasePath: this.databasePathInput,
+			});
 	}
 
 	private async getDatabasePath(): Promise<string> {
@@ -120,7 +112,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 				parentSessionId: options.parentSessionId,
 				metadata: options.metadata,
 			});
-			return this.sessionSearch.createSession(storage);
+			return await toRepoSession(storage, this.sessionSearch);
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -135,7 +127,7 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 		}
 		const db = await this.openDatabase();
 		try {
-			return this.sessionSearch.createSession(await SqliteSessionStorage.open(db, metadata));
+			return await toRepoSession(await SqliteSessionStorage.open(db, metadata), this.sessionSearch);
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -207,9 +199,8 @@ export class SqliteSessionRepo implements SqliteSessionRepoApi {
 				metadata: options.metadata ?? sourceMetadata.metadata,
 			});
 			for (const entry of forkedEntries) await storage.appendEntry(entry);
-			const session = this.sessionSearch.createSession(storage);
-			await this.sessionSearch.indexSession(session);
-			return session;
+			await this.sessionSearch.indexSession(await storage.getMetadata(), forkedEntries);
+			return await toRepoSession(storage, this.sessionSearch);
 		} catch (error) {
 			await db.close();
 			throw error;

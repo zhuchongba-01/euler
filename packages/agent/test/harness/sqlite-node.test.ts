@@ -4,15 +4,18 @@ import {
 	createNodeSqliteFactory,
 	type SqliteSessionMetadata,
 	SqliteSessionRepo,
-	SqliteSessionSearchBackend,
+	SqliteSessionSearch,
 } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
 import { JsonlSessionRepo } from "../../src/harness/session/jsonl-repo.ts";
+import { MultiSessionSearch } from "../../src/harness/session/search-backend.ts";
 import type {
-	SessionSearchBackend,
+	JsonlSessionMetadata,
+	SessionSearch,
 	SessionSearchHit,
 	SessionSearchOptions,
 	SessionSearchRecord,
+	SessionTreeEntry,
 } from "../../src/harness/types.ts";
 import { createTempDir, createUserMessage } from "./session-test-utils.ts";
 
@@ -70,17 +73,15 @@ describe("SqliteSessionRepo with default SQLite FTS5 search", () => {
 
 describe("JsonlSessionRepo with SQLite search index", () => {
 	// This is not the intended production pairing; it exists to demonstrate that
-	// canonical session storage and search backends are swappable/composable.
-	it("writes JSONL session entries into the configured SQLite search backend", async () => {
+	// Canonical session storage and search are independently swappable/composable.
+	it("writes JSONL session entries into the configured SQLite search", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
 		const repo = new JsonlSessionRepo({
 			fs: env,
 			sessionsRoot: join(root, "sessions"),
-			searchBackendFactory: {
-				create: () => new SqliteSessionSearchBackend({ env, sqlite, databasePath: join(root, "search.sqlite") }),
-			},
+			search: new SqliteSessionSearch({ env, sqlite, databasePath: join(root, "search.sqlite") }),
 		});
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("Find the auth defect"));
@@ -91,15 +92,50 @@ describe("JsonlSessionRepo with SQLite search index", () => {
 	});
 });
 
-describe("SqliteSessionRepo with custom search backend", () => {
-	it("can swap out the default search backend", async () => {
+describe("JsonlSessionRepo with multiple search indexes", () => {
+	it("queries one search implementation and fans index writes out to both", async () => {
+		const root = createTempDir();
+		const env = new NodeExecutionEnv({ cwd: root });
+		const sqlite = createNodeSqliteFactory();
+		const primary = new SqliteSessionSearch<JsonlSessionMetadata>({
+			env,
+			sqlite,
+			databasePath: join(root, "primary-search.sqlite"),
+		});
+		const secondary = new SqliteSessionSearch<JsonlSessionMetadata>({
+			env,
+			sqlite,
+			databasePath: join(root, "secondary-search.sqlite"),
+		});
+		const repo = new JsonlSessionRepo({
+			fs: env,
+			sessionsRoot: join(root, "sessions"),
+			search: new MultiSessionSearch({ reader: primary, writers: [primary, secondary] }),
+		});
+		const session = await repo.create({ cwd: root, id: "jsonl-session" });
+		const entryId = await session.appendMessage(createUserMessage("indexed in both places"));
+
+		await expect(repo.search({ text: "both" })).resolves.toEqual([
+			expect.objectContaining({ entryId, metadata: expect.objectContaining({ id: "jsonl-session" }) }),
+		]);
+		await expect(secondary.search({ text: "both" })).resolves.toEqual([
+			expect.objectContaining({ entryId, metadata: expect.objectContaining({ id: "jsonl-session" }) }),
+		]);
+	});
+});
+
+describe("SqliteSessionRepo with custom search", () => {
+	it("can swap out the default search implementation", async () => {
 		const root = createTempDir();
 		const upserts: SessionSearchRecord<SqliteSessionMetadata>[] = [];
 		const removals: SqliteSessionMetadata[] = [];
 		const searches: SessionSearchOptions[] = [];
-		const backend: SessionSearchBackend<SqliteSessionMetadata> = {
+		const search: SessionSearch<SqliteSessionMetadata> = {
 			async upsert(record) {
 				upserts.push(record);
+			},
+			async indexSession(metadata, entries: readonly SessionTreeEntry[]) {
+				for (const entry of entries) upserts.push({ metadata, entry });
 			},
 			async removeSession(metadata) {
 				removals.push(metadata);
@@ -113,14 +149,18 @@ describe("SqliteSessionRepo with custom search backend", () => {
 			env: new NodeExecutionEnv({ cwd: root }),
 			sqlite: createNodeSqliteFactory(),
 			databasePath: join(root, "sessions.sqlite"),
-			searchBackendFactory: { create: () => backend },
+			search,
 		});
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const metadata = await session.getMetadata();
 		const entryId = await session.appendMessage(createUserMessage("indexed remotely"));
+		await session.getStorage().setLeafId(null);
 
 		expect(upserts).toContainEqual(
 			expect.objectContaining({ metadata, entry: expect.objectContaining({ id: entryId }) }),
+		);
+		expect(upserts).toContainEqual(
+			expect.objectContaining({ metadata, entry: expect.objectContaining({ type: "leaf", targetId: null }) }),
 		);
 		await expect(repo.search({ text: "indexed remotely" })).resolves.toEqual([]);
 		expect(searches).toEqual([{ text: "indexed remotely" }]);
