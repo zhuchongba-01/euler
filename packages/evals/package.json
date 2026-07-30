@@ -5,7 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"clean": "shx rm -rf .eval",
-		"eval": "node scripts/run-evals.mjs"
+		"eval": "node scripts/run-evals.mjs",
+		"test": "vitest run --config vitest.test.config.ts"
 	},
 	"devDependencies": {
 		"@earendil-works/pi-ai": "^0.83.0",
