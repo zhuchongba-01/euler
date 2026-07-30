@@ -120,8 +120,6 @@ const harnessTable = evalHarnessTable(
 	{
 		baseline: withoutTargetSkillHarness,
 		candidate: withTargetSkillHarness,
-	},
-	{
 		repetitions: 6,
 		seed: 42,
 	},

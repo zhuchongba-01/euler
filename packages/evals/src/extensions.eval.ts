@@ -97,14 +97,11 @@ const ExtensionAuthoringJudge = createJudge<PiCodingAgentInput, ExtensionAuthori
 	},
 );
 
-const extensionHarnessTable = evalHarnessTable(
-	"Pi extension authoring system prompt",
-	{
-		baseline: createExtensionAuthoringHarness("system-prompt-without-docs", excludeGuidelinesAndDocumentation),
-		candidate: createExtensionAuthoringHarness("default-system-prompt", prepareDefaultPromptOverride),
-	},
-	{ seed: 42 },
-);
+const extensionHarnessTable = evalHarnessTable("Pi extension authoring system prompt", {
+	baseline: createExtensionAuthoringHarness("system-prompt-without-docs", excludeGuidelinesAndDocumentation),
+	candidate: createExtensionAuthoringHarness("default-system-prompt", prepareDefaultPromptOverride),
+	seed: 42,
+});
 
 describe.for(extensionHarnessTable)("$name", ({ harness }) => {
 	describeEval(

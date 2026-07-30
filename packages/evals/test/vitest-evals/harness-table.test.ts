@@ -43,14 +43,12 @@ function createFakeHarness(name: string) {
 	});
 }
 
-const harnessTable = evalHarnessTable(
-	"local multi-harness eval",
-	{
-		baseline: createFakeHarness("withoutSkill"),
-		candidates: [createFakeHarness("withSkill")],
-	},
-	{ repetitions: 2, seed: 42 },
-);
+const harnessTable = evalHarnessTable("local multi-harness eval", {
+	baseline: createFakeHarness("withoutSkill"),
+	candidates: [createFakeHarness("withSkill")],
+	repetitions: 2,
+	seed: 42,
+});
 
 describe("evalHarnessTable", () => {
 	it("plans seeded repetitions in deterministic order", () => {
@@ -65,11 +63,11 @@ describe("evalHarnessTable", () => {
 	});
 
 	it("accepts a singular candidate", () => {
-		const rows = evalHarnessTable(
-			"singular candidate",
-			{ baseline: createFakeHarness("baseline"), candidate: createFakeHarness("candidate") },
-			{ seed: 42 },
-		);
+		const rows = evalHarnessTable("singular candidate", {
+			baseline: createFakeHarness("baseline"),
+			candidate: createFakeHarness("candidate"),
+			seed: 42,
+		});
 
 		expect(rows.map(({ name }) => name)).toEqual(["baseline", "candidate"]);
 	});

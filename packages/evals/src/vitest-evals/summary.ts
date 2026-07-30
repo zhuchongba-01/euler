@@ -370,8 +370,11 @@ function formatMetric(
 	if (metric.baselineMean === null || metric.candidateMean === null || metric.meanDelta === null) {
 		return formatReportLine(label, `${styleText("yellow", "unavailable")}${coverage}`);
 	}
-	const delta = colorDelta(metric.meanDelta, `delta ${formatDelta(metric.meanDelta)}`, false);
-	const values = styleText("gray", `(${formatValue(metric.candidateMean)}, ${formatValue(metric.baselineMean)})`);
+	const delta = colorDelta(metric.meanDelta, formatDelta(metric.meanDelta), false);
+	const values = styleText(
+		"gray",
+		`(candidate ${formatValue(metric.candidateMean)}, baseline ${formatValue(metric.baselineMean)})`,
+	);
 	return formatReportLine(label, `${delta} ${values}${coverage}`);
 }
 
@@ -394,10 +397,10 @@ export function formatHarnessComparisonReport(report: HarnessComparisonReport): 
 				lines.push(formatReportLine("Pass rate", styleText("yellow", "unavailable")));
 			} else {
 				const lift = correctness.lift * 100;
-				const delta = colorDelta(lift, `delta ${formatSigned(lift, 1)} pp`, true);
+				const delta = colorDelta(lift, `${formatSigned(lift, 1)} pp`, true);
 				const values = styleText(
 					"gray",
-					`(${formatPercentage(correctness.candidatePassRate)}, ${formatPercentage(correctness.baselinePassRate)})`,
+					`(candidate ${formatPercentage(correctness.candidatePassRate)}, baseline ${formatPercentage(correctness.baselinePassRate)})`,
 				);
 				lines.push(formatReportLine("Pass rate", `${delta} ${values}`));
 			}

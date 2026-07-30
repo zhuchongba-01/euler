@@ -226,8 +226,8 @@ describe("summarizeHarnessComparisons", () => {
 		expect(formatted).toContain("Eval Comparisons");
 		expect(formatted).toContain(" Baseline  without-tools");
 		expect(formatted).toContain("Candidate  with-tools (1/1 pairs)");
-		expect(formatted).toContain("Pass rate  delta +100.0 pp (100.0%, 0.0%)");
+		expect(formatted).toContain("Pass rate  +100.0 pp (candidate 100.0%, baseline 0.0%)");
 		expect(formatted).toContain("   Tokens  unavailable");
-		expect(formatted).toContain("  Latency  delta -4159.5ms (30694.2ms, 34853.7ms)");
+		expect(formatted).toContain("  Latency  -4159.5ms (candidate 30694.2ms, baseline 34853.7ms)");
 	});
 });

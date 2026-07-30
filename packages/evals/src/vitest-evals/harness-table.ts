@@ -29,24 +29,23 @@ export type EvalHarnessTableRow<TInput, TOutput extends JsonValue | undefined> =
 	plannedOrder: number;
 };
 
-export type EvalHarnessTableOptions = {
+export type EvalHarnessTablePairOptions<TInput, TOutput extends JsonValue | undefined> = {
+	baseline: Harness<TInput, TOutput>;
+	candidate: Harness<TInput, TOutput>;
 	repetitions?: number;
 	seed?: number;
 };
 
-export type EvalHarnessTablePair<TInput, TOutput extends JsonValue | undefined> = {
-	baseline: Harness<TInput, TOutput>;
-	candidate: Harness<TInput, TOutput>;
-};
-
-export type EvalHarnessTableCandidates<TInput, TOutput extends JsonValue | undefined> = {
+export type EvalHarnessTableCandidatesOptions<TInput, TOutput extends JsonValue | undefined> = {
 	baseline: Harness<TInput, TOutput>;
 	candidates: readonly Harness<TInput, TOutput>[];
+	repetitions?: number;
+	seed?: number;
 };
 
-type EvalHarnessTableComparison<TInput, TOutput extends JsonValue | undefined> =
-	| EvalHarnessTablePair<TInput, TOutput>
-	| EvalHarnessTableCandidates<TInput, TOutput>;
+export type EvalHarnessTableOptions<TInput, TOutput extends JsonValue | undefined> =
+	| EvalHarnessTablePairOptions<TInput, TOutput>
+	| EvalHarnessTableCandidatesOptions<TInput, TOutput>;
 
 type EvalHarnessIterationPlan = Omit<EvalHarnessIterationArtifact, "groupKey">;
 
@@ -180,27 +179,24 @@ function withIterationArtifact<TInput, TOutput extends JsonValue | undefined>(
 
 export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
 	evalSet: string,
-	comparison: EvalHarnessTablePair<TInput, TOutput>,
-	options: EvalHarnessTableOptions,
+	options: EvalHarnessTablePairOptions<TInput, TOutput>,
 ): EvalHarnessTableRow<TInput, TOutput>[];
 export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
 	evalSet: string,
-	comparison: EvalHarnessTableCandidates<TInput, TOutput>,
-	options: EvalHarnessTableOptions,
+	options: EvalHarnessTableCandidatesOptions<TInput, TOutput>,
 ): EvalHarnessTableRow<TInput, TOutput>[];
 export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
 	evalSet: string,
-	comparison: EvalHarnessTableComparison<TInput, TOutput>,
-	options: EvalHarnessTableOptions,
+	options: EvalHarnessTableOptions<TInput, TOutput>,
 ): EvalHarnessTableRow<TInput, TOutput>[] {
 	const repetitions = options.repetitions ?? 1;
 	const seed = options.seed ?? randomBytes(4).readUInt32LE();
-	const candidates = "candidate" in comparison ? [comparison.candidate] : comparison.candidates;
-	validateOptions(evalSet, comparison.baseline, candidates, repetitions, seed);
+	const candidates = "candidate" in options ? [options.candidate] : options.candidates;
+	validateOptions(evalSet, options.baseline, candidates, repetitions, seed);
 
 	const random = createSeededRandom(seed);
 	const rows: EvalHarnessTableRow<TInput, TOutput>[] = [];
-	const harnesses = [comparison.baseline, ...candidates];
+	const harnesses = [options.baseline, ...candidates];
 	let plannedOrder = 1;
 	for (let repetition = 1; repetition <= repetitions; repetition += 1) {
 		const randomizedHarnesses = [...harnesses];
@@ -216,7 +212,7 @@ export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
 				schemaVersion: 1,
 				evalSet,
 				harness: harness.name,
-				baseline: comparison.baseline.name,
+				baseline: options.baseline.name,
 				candidates: candidates.map(({ name }) => name),
 				repetition,
 				seed,
