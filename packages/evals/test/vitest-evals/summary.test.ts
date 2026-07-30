@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
 import {
 	formatHarnessComparisonReport,
@@ -218,12 +219,15 @@ describe("summarizeHarnessComparisons", () => {
 
 	it("formats lift and telemetry availability for the terminal report", () => {
 		const report = summarizeHarnessComparisons([
-			observation("without-tools", "create", "failed"),
-			observation("with-tools", "create", "passed"),
+			observation("without-tools", "create", "failed", { totalMs: 34853.7 }),
+			observation("with-tools", "create", "passed", { totalMs: 30694.2 }),
 		]);
 
-		expect(formatHarnessComparisonReport(report)).toContain("with-tools vs without-tools");
-		expect(formatHarnessComparisonReport(report)).toContain("lift +100.0 pp");
-		expect(formatHarnessComparisonReport(report)).toContain("Tokens       unavailable (0/1 pairs)");
+		const formatted = stripVTControlCharacters(formatHarnessComparisonReport(report));
+		expect(formatted).toContain("Eval Comparisons");
+		expect(formatted).toContain("Harnesses  with-tools, without-tools (1/1 pairs)");
+		expect(formatted).toContain("Pass rate  delta +100.0 pp (100.0%, 0.0%)");
+		expect(formatted).toContain("   Tokens  unavailable");
+		expect(formatted).toContain("  Latency  delta -4159.5ms (30694.2ms, 34853.7ms)");
 	});
 });

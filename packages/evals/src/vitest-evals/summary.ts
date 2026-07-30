@@ -1,3 +1,5 @@
+import { styleText } from "node:util";
+
 type HarnessObservationOutcome = "scored" | "unscored" | "skipped" | "pending" | "errored";
 
 type HarnessObservationBase = {
@@ -331,36 +333,70 @@ function formatSigned(value: number, fractionDigits: number): string {
 	return `${value >= 0 ? "+" : ""}${value.toFixed(fractionDigits)}`;
 }
 
+function formatCoverage(eligiblePairs: number, totalPairs: number): string {
+	return styleText("gray", `(${eligiblePairs}/${totalPairs} pairs)`);
+}
+
+function formatReportLine(label: string, value: string): string {
+	return `    ${styleText("gray", label.padStart(9))}  ${value}`;
+}
+
+function colorDelta(value: number, formatted: string, positiveIsBetter: boolean): string {
+	if (value === 0) return styleText("gray", formatted);
+	const improved = positiveIsBetter ? value > 0 : value < 0;
+	return styleText(improved ? "green" : "red", formatted);
+}
+
 function formatMetric(
 	label: string,
 	metric: PairedMetricSummary,
 	formatValue: (value: number) => string,
 	formatDelta: (value: number) => string,
+	comparisonPairs: number,
 ): string {
+	const coverage =
+		metric.eligiblePairs === 0 || metric.eligiblePairs === comparisonPairs
+			? ""
+			: ` ${formatCoverage(metric.eligiblePairs, metric.totalPairs)}`;
 	if (metric.firstMean === null || metric.secondMean === null || metric.meanDelta === null) {
-		return `      ${label.padEnd(13)}unavailable (${metric.eligiblePairs}/${metric.totalPairs} pairs)`;
+		return formatReportLine(label, `${styleText("yellow", "unavailable")}${coverage}`);
 	}
-	return `      ${label.padEnd(13)}${formatValue(metric.secondMean)} vs ${formatValue(metric.firstMean)}, delta ${formatDelta(metric.meanDelta)} (${metric.eligiblePairs}/${metric.totalPairs} pairs)`;
+	const delta = colorDelta(metric.meanDelta, `delta ${formatDelta(metric.meanDelta)}`, false);
+	const values = styleText("gray", `(${formatValue(metric.secondMean)}, ${formatValue(metric.firstMean)})`);
+	return formatReportLine(label, `${delta} ${values}${coverage}`);
 }
 
 export function formatHarnessComparisonReport(report: HarnessComparisonReport): string {
 	if (report.evalSets.every(({ comparisons }) => comparisons.length === 0)) return "";
-	const lines = ["Harness comparisons"];
+	const lines = [styleText("bold", "Eval Comparisons")];
 	for (const evalSet of report.evalSets) {
 		lines.push(`  ${evalSet.evalSet}`);
 		for (const comparison of evalSet.comparisons) {
 			const { correctness } = comparison;
-			const lift = correctness.lift === null ? "unavailable" : `${formatSigned(correctness.lift * 100, 1)} pp`;
-			lines.push(`    ${comparison.secondHarness} vs ${comparison.firstHarness}`);
 			lines.push(
-				`      ${"Pass rate".padEnd(13)}${formatPercentage(correctness.secondPassRate)} vs ${formatPercentage(correctness.firstPassRate)}, lift ${lift} (${correctness.eligiblePairs}/${correctness.totalPairs} pairs)`,
+				formatReportLine(
+					"Harnesses",
+					`${comparison.secondHarness}, ${comparison.firstHarness} ${formatCoverage(correctness.eligiblePairs, correctness.totalPairs)}`,
+				),
 			);
+			if (correctness.lift === null) {
+				lines.push(formatReportLine("Pass rate", styleText("yellow", "unavailable")));
+			} else {
+				const lift = correctness.lift * 100;
+				const delta = colorDelta(lift, `delta ${formatSigned(lift, 1)} pp`, true);
+				const values = styleText(
+					"gray",
+					`(${formatPercentage(correctness.secondPassRate)}, ${formatPercentage(correctness.firstPassRate)})`,
+				);
+				lines.push(formatReportLine("Pass rate", `${delta} ${values}`));
+			}
 			lines.push(
 				formatMetric(
 					"Tokens",
 					comparison.totalTokens,
 					(value) => value.toFixed(1),
 					(value) => formatSigned(value, 1),
+					correctness.eligiblePairs,
 				),
 			);
 			lines.push(
@@ -369,6 +405,7 @@ export function formatHarnessComparisonReport(report: HarnessComparisonReport): 
 					comparison.totalMs,
 					(value) => `${value.toFixed(1)}ms`,
 					(value) => `${formatSigned(value, 1)}ms`,
+					correctness.eligiblePairs,
 				),
 			);
 			lines.push(
@@ -377,12 +414,13 @@ export function formatHarnessComparisonReport(report: HarnessComparisonReport): 
 					comparison.estimatedCostUsd,
 					(value) => `$${value.toFixed(4)}`,
 					(value) => `${value >= 0 ? "+" : "-"}$${Math.abs(value).toFixed(4)}`,
+					correctness.eligiblePairs,
 				),
 			);
 		}
 	}
 	if (report.diagnostics.length > 0) {
-		lines.push("  Incomplete observations:");
+		lines.push(`  ${styleText("yellow", "Incomplete observations")}`);
 		for (const diagnostic of report.diagnostics) {
 			lines.push(
 				`    ${diagnostic.reason}: ${diagnostic.file}/${diagnostic.testName} repetition ${diagnostic.repetition}, harness ${diagnostic.harness}`,
