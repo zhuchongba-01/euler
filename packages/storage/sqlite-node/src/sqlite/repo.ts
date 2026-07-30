@@ -3,6 +3,7 @@ import {
 	createSessionId,
 	getEntriesToFork,
 	getFileSystemResultOrThrow,
+	indexSessionStorage,
 	SessionError,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
@@ -43,6 +44,7 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 	private readonly sqlite: SqliteDatabaseFactory;
 	private readonly databasePathInput: string;
 	readonly defaultSearch: SessionSearch<SqliteSessionMetadata>;
+	private readonly searchIndex: SqliteSessionSearch<SqliteSessionMetadata>;
 	private databasePath: string | undefined;
 
 	constructor(options: {
@@ -53,11 +55,12 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 		this.env = options.env;
 		this.sqlite = options.sqlite;
 		this.databasePathInput = options.databasePath;
-		this.defaultSearch = new SqliteSessionSearch({
+		this.searchIndex = new SqliteSessionSearch({
 			env: this.env,
 			sqlite: this.sqlite,
 			databasePath: this.databasePathInput,
 		});
+		this.defaultSearch = this.searchIndex;
 	}
 
 	private async getDatabasePath(): Promise<string> {
@@ -96,12 +99,13 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 		const db = await this.openDatabase();
 		try {
 			const id = options.id ?? createSessionId();
-			return await SqliteSessionStorage.create(db, await this.getDatabasePath(), {
+			const storage = await SqliteSessionStorage.create(db, await this.getDatabasePath(), {
 				cwd: options.cwd,
 				sessionId: id,
 				parentSessionId: options.parentSessionId,
 				metadata: options.metadata,
 			});
+			return indexSessionStorage(storage, this.searchIndex);
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -116,7 +120,7 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 		}
 		const db = await this.openDatabase();
 		try {
-			return await SqliteSessionStorage.open(db, metadata);
+			return indexSessionStorage(await SqliteSessionStorage.open(db, metadata), this.searchIndex);
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -157,6 +161,7 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 				const result = await db.prepare("DELETE FROM sessions WHERE id = ?").run(metadata.id);
 				if (result.changes === 0) throw new SessionError("not_found", `Session not found: ${metadata.id}`);
 			});
+			await this.searchIndex.deleteSession(metadata);
 		} finally {
 			await db.close();
 		}
@@ -183,7 +188,8 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 				metadata: options.metadata ?? sourceMetadata.metadata,
 			});
 			for (const entry of forkedEntries) await storage.appendEntry(entry);
-			return storage;
+			await this.searchIndex.replaceSession(await storage.getMetadata(), await storage.getEntries());
+			return indexSessionStorage(storage, this.searchIndex);
 		} catch (error) {
 			await db.close();
 			throw error;

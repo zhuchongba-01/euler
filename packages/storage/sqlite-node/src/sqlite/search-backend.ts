@@ -4,7 +4,6 @@ import type {
 	SessionSearchHit,
 	SessionSearchIndex,
 	SessionSearchOptions,
-	SessionSearchRecord,
 	SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import { getFileSystemResultOrThrow } from "@earendil-works/pi-agent-core";
@@ -45,7 +44,6 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
 export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>
 	implements SessionSearch<TMetadata>, SessionSearchIndex<TMetadata>
 {
-	readonly index: SessionSearchIndex<TMetadata> = this;
 	private readonly options: {
 		env: Pick<SqliteSessionStoreEnv, "absolutePath" | "createDir">;
 		sqlite: SqliteDatabaseFactory;
@@ -89,15 +87,15 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 		}
 	}
 
-	async upsert(record: SessionSearchRecord<TMetadata>): Promise<void> {
+	async upsertEntry(metadata: TMetadata, entry: SessionTreeEntry): Promise<void> {
 		const db = await this.openDatabase();
 		try {
-			const cwd = (record.metadata as { cwd?: unknown }).cwd;
-			const sessionId = record.metadata.id;
-			const entryId = record.entry.id;
-			const timestamp = record.entry.timestamp;
-			const metadataJson = JSON.stringify(record.metadata);
-			const searchText = JSON.stringify(record.entry);
+			const cwd = (metadata as { cwd?: unknown }).cwd;
+			const sessionId = metadata.id;
+			const entryId = entry.id;
+			const timestamp = entry.timestamp;
+			const metadataJson = JSON.stringify(metadata);
+			const searchText = JSON.stringify(entry);
 			await db.transaction(async () => {
 				await db
 					.prepare("DELETE FROM session_search_fts WHERE session_id = ? AND entry_id = ?")
@@ -114,13 +112,13 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 	}
 
 	async replaceSession(metadata: TMetadata, entries: readonly SessionTreeEntry[]): Promise<void> {
-		await this.removeSession(metadata);
+		await this.deleteSession(metadata);
 		for (const entry of entries) {
-			await this.upsert({ metadata, entry });
+			await this.upsertEntry(metadata, entry);
 		}
 	}
 
-	async removeSession(metadata: TMetadata): Promise<void> {
+	async deleteSession(metadata: TMetadata): Promise<void> {
 		const db = await this.openDatabase();
 		try {
 			await db.prepare("DELETE FROM session_search_fts WHERE session_id = ?").run(metadata.id);
