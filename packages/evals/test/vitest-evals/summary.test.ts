@@ -18,14 +18,13 @@ function observation(
 ): HarnessObservation {
 	const base = {
 		evalSet: "tool access",
-		groupKey: JSON.stringify([testName, 1, 42]),
+		groupKey: JSON.stringify([testName, 1]),
 		testName,
 		file: "src/tool-access.eval.ts",
 		harness,
 		baseline,
 		candidates,
 		repetition: 1,
-		seed: 42,
 		...metrics,
 	};
 	if (result === "passed" || result === "failed") {

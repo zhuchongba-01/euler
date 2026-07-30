@@ -121,7 +121,6 @@ const harnessTable = evalHarnessTable(
 		baseline: withoutTargetSkillHarness,
 		candidate: withTargetSkillHarness,
 		repetitions: 6,
-		seed: 42,
 	},
 );
 
@@ -141,14 +140,14 @@ suite invariants and infrastructure contracts. `expect.soft(...)` still fails th
 The Pi harness snapshots native session JSONL before deleting its temporary workspace. An eval-only `afterEach` hook
 registers that snapshot against the explicit Vitest test task before reporters run.
 
-Harness names must be stable and unique within an eval set. The grouping key combines repetition and seed with a
-non-empty string `input.id` when available, otherwise with a SHA-256 hash of strict canonical JSON input. Execution order
-is seeded and randomized independently of comparison direction. Use `candidate` for one treatment or `candidates` for
-multiple treatments. Each candidate is compared only with the declared baseline. For each matched input and repetition,
-the reporter computes pass-rate lift from each run's recorded average judge score, treating a score of at least `1` as
-passing. Lift is the candidate pass rate minus the baseline pass rate, in percentage points. Missing judge scores are
-reported as incomplete observations. Tokens, latency, and estimated cost remain separate candidate-minus-baseline paired
-deltas; missing telemetry remains unavailable.
+Harness names must be stable and unique within an eval set. The grouping key combines repetition with a non-empty string
+`input.id` when available, otherwise with a SHA-256 hash of strict canonical JSON input. Use `candidate` for one treatment
+or `candidates` for multiple treatments. Each candidate is compared only with the declared baseline. For each matched
+input and repetition, the reporter computes pass-rate lift from each run's recorded average judge score, treating a score
+of at least `1` as passing. Lift is the candidate pass rate minus the baseline pass rate, in percentage points. Missing
+judge scores are reported as incomplete observations. Tokens, latency, and estimated cost remain separate
+candidate-minus-baseline paired deltas; missing telemetry remains unavailable. If execution-order randomization becomes
+necessary, use Vitest's built-in sequence shuffling.
 
 See the [`skill-eval-harness`](https://github.com/adewale/skill-eval-harness/) guidance for comparative-eval methodology,
 repetition strategy, trustworthy judges, and telemetry interpretation.

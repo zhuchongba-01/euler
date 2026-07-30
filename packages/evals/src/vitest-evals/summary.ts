@@ -11,7 +11,6 @@ type HarnessObservationBase = {
 	baseline: string;
 	candidates: string[];
 	repetition: number;
-	seed: number;
 	totalTokens?: number;
 	totalMs?: number;
 	estimatedCostUsd?: number;
@@ -54,7 +53,6 @@ export type HarnessComparisonDiagnostic = {
 	testName: string;
 	file: string;
 	repetition: number;
-	seed: number;
 	harness: string;
 	reason: "missing-observation" | "duplicate-observation" | "harness-error" | "missing-score" | "unscorable-outcome";
 };
@@ -81,7 +79,6 @@ type ObservationGroup = {
 	testName: string;
 	file: string;
 	repetition: number;
-	seed: number;
 	observationsByHarness: Map<string, HarnessObservation[]>;
 };
 
@@ -135,7 +132,6 @@ function groupObservations(observations: readonly HarnessObservation[]): Map<str
 				testName: observation.testName,
 				file: observation.file,
 				repetition: observation.repetition,
-				seed: observation.seed,
 				observationsByHarness: new Map(),
 			}),
 		);
@@ -161,8 +157,7 @@ function orderedCandidates(evalSet: EvalSetData): HarnessDescriptor[] {
 
 function orderedGroups(evalSet: EvalSetData): ObservationGroup[] {
 	return [...evalSet.groupsByKey.values()].sort(
-		(left, right) =>
-			left.groupKey.localeCompare(right.groupKey) || left.repetition - right.repetition || left.seed - right.seed,
+		(left, right) => left.groupKey.localeCompare(right.groupKey) || left.repetition - right.repetition,
 	);
 }
 
@@ -190,7 +185,6 @@ function collectDiagnostics(
 				testName: group.testName,
 				file: group.file,
 				repetition: group.repetition,
-				seed: group.seed,
 				harness,
 				reason,
 			});
@@ -328,7 +322,6 @@ export function summarizeHarnessComparisons(observations: readonly HarnessObserv
 				left.file.localeCompare(right.file) ||
 				left.groupKey.localeCompare(right.groupKey) ||
 				left.repetition - right.repetition ||
-				left.seed - right.seed ||
 				left.harness.localeCompare(right.harness),
 		),
 	};

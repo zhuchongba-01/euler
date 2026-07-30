@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import {
 	attachHarnessRunToError,
 	getHarnessRunFromError,
@@ -17,30 +17,24 @@ export type EvalHarnessIterationArtifact = {
 	baseline: string;
 	candidates: string[];
 	repetition: number;
-	seed: number;
-	plannedOrder: number;
 };
 
 export type EvalHarnessTableRow<TInput, TOutput extends JsonValue | undefined> = {
 	harness: Harness<TInput, TOutput>;
 	name: string;
 	repetition: number;
-	seed: number;
-	plannedOrder: number;
 };
 
 export type EvalHarnessTablePairOptions<TInput, TOutput extends JsonValue | undefined> = {
 	baseline: Harness<TInput, TOutput>;
 	candidate: Harness<TInput, TOutput>;
 	repetitions?: number;
-	seed?: number;
 };
 
 export type EvalHarnessTableCandidatesOptions<TInput, TOutput extends JsonValue | undefined> = {
 	baseline: Harness<TInput, TOutput>;
 	candidates: readonly Harness<TInput, TOutput>[];
 	repetitions?: number;
-	seed?: number;
 };
 
 export type EvalHarnessTableOptions<TInput, TOutput extends JsonValue | undefined> =
@@ -53,7 +47,7 @@ export function parseEvalHarnessIterationArtifact(
 	value: JsonValue | undefined,
 ): EvalHarnessIterationArtifact | undefined {
 	if (value === null || value === undefined || typeof value !== "object" || Array.isArray(value)) return undefined;
-	const { schemaVersion, evalSet, groupKey, harness, baseline, candidates, repetition, seed, plannedOrder } = value;
+	const { schemaVersion, evalSet, groupKey, harness, baseline, candidates, repetition } = value;
 	if (
 		schemaVersion !== 1 ||
 		typeof evalSet !== "string" ||
@@ -62,24 +56,11 @@ export function parseEvalHarnessIterationArtifact(
 		typeof baseline !== "string" ||
 		!Array.isArray(candidates) ||
 		!candidates.every((name): name is string => typeof name === "string") ||
-		typeof repetition !== "number" ||
-		typeof seed !== "number" ||
-		typeof plannedOrder !== "number"
+		typeof repetition !== "number"
 	) {
 		return undefined;
 	}
-	return { schemaVersion, evalSet, groupKey, harness, baseline, candidates, repetition, seed, plannedOrder };
-}
-
-function createSeededRandom(seed: number): () => number {
-	let state = seed >>> 0;
-	return () => {
-		state += 0x6d2b79f5;
-		let value = state;
-		value = Math.imul(value ^ (value >>> 15), value | 1);
-		value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-		return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-	};
+	return { schemaVersion, evalSet, groupKey, harness, baseline, candidates, repetition };
 }
 
 function canonicalizeJson(value: unknown, ancestors: WeakSet<object>): JsonValue {
@@ -126,8 +107,8 @@ function deriveInputKey(input: unknown): string {
 	return createHash("sha256").update(canonicalInput).digest("hex");
 }
 
-export function deriveEvalGroupKey(input: unknown, repetition: number, seed: number): string {
-	return JSON.stringify([deriveInputKey(input), repetition, seed]);
+export function deriveEvalGroupKey(input: unknown, repetition: number): string {
+	return JSON.stringify([deriveInputKey(input), repetition]);
 }
 
 function validateOptions<TInput, TOutput extends JsonValue | undefined>(
@@ -135,7 +116,6 @@ function validateOptions<TInput, TOutput extends JsonValue | undefined>(
 	baseline: Harness<TInput, TOutput>,
 	candidates: readonly Harness<TInput, TOutput>[],
 	repetitions: number,
-	seed: number,
 ): void {
 	if (!evalSet.trim()) throw new TypeError("evalSet must not be empty.");
 	if (candidates.length === 0) throw new TypeError("At least one candidate harness is required.");
@@ -144,9 +124,6 @@ function validateOptions<TInput, TOutput extends JsonValue | undefined>(
 	if (names.size !== harnesses.length) throw new TypeError("Harness names must be unique within an eval set.");
 	if (!Number.isSafeInteger(repetitions) || repetitions < 1) {
 		throw new TypeError("repetitions must be a positive integer.");
-	}
-	if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff) {
-		throw new TypeError("seed must be an unsigned 32-bit integer.");
 	}
 }
 
@@ -157,7 +134,7 @@ function withIterationArtifact<TInput, TOutput extends JsonValue | undefined>(
 	return {
 		name: harness.name,
 		async run(input, context) {
-			const groupKey = deriveEvalGroupKey(input, plan.repetition, plan.seed);
+			const groupKey = deriveEvalGroupKey(input, plan.repetition);
 			const artifact: EvalHarnessIterationArtifact = { ...plan, groupKey };
 			context.setArtifact(EVAL_HARNESS_ITERATION_ARTIFACT, artifact);
 			const attachIterationArtifact = <TRun extends HarnessRun>(run: TRun): TRun => {
@@ -190,24 +167,13 @@ export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
 	options: EvalHarnessTableOptions<TInput, TOutput>,
 ): EvalHarnessTableRow<TInput, TOutput>[] {
 	const repetitions = options.repetitions ?? 1;
-	const seed = options.seed ?? randomBytes(4).readUInt32LE();
 	const candidates = "candidate" in options ? [options.candidate] : options.candidates;
-	validateOptions(evalSet, options.baseline, candidates, repetitions, seed);
+	validateOptions(evalSet, options.baseline, candidates, repetitions);
 
-	const random = createSeededRandom(seed);
 	const rows: EvalHarnessTableRow<TInput, TOutput>[] = [];
 	const harnesses = [options.baseline, ...candidates];
-	let plannedOrder = 1;
 	for (let repetition = 1; repetition <= repetitions; repetition += 1) {
-		const randomizedHarnesses = [...harnesses];
-		for (let index = randomizedHarnesses.length - 1; index > 0; index -= 1) {
-			const target = Math.floor(random() * (index + 1));
-			[randomizedHarnesses[index], randomizedHarnesses[target]] = [
-				randomizedHarnesses[target],
-				randomizedHarnesses[index],
-			];
-		}
-		for (const harness of randomizedHarnesses) {
+		for (const harness of harnesses) {
 			const plan: EvalHarnessIterationPlan = {
 				schemaVersion: 1,
 				evalSet,
@@ -215,17 +181,12 @@ export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
 				baseline: options.baseline.name,
 				candidates: candidates.map(({ name }) => name),
 				repetition,
-				seed,
-				plannedOrder,
 			};
 			rows.push({
 				harness: withIterationArtifact(harness, plan),
 				name: harness.name,
 				repetition,
-				seed,
-				plannedOrder,
 			});
-			plannedOrder += 1;
 		}
 	}
 	return rows;

@@ -68,7 +68,6 @@ function collectHarnessObservations(modules: ReadonlyArray<TestModule>): Harness
 				baseline: iteration.baseline,
 				candidates: iteration.candidates,
 				repetition: iteration.repetition,
-				seed: iteration.seed,
 				...(run.usage.totalTokens === undefined ? {} : { totalTokens: run.usage.totalTokens }),
 				...(run.timings?.totalMs === undefined ? {} : { totalMs: run.timings.totalMs }),
 				...(estimatedCostUsd === undefined ? {} : { estimatedCostUsd }),
