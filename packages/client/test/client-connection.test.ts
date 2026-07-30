@@ -96,6 +96,33 @@ describe("PiClient", () => {
 		expect(client.connectionState).toBe("connected");
 	});
 
+	test("reports subscriber failures without changing connection state", async () => {
+		const server = new MemoryByteServer();
+		const listenerErrors: Error[] = [];
+		server.onMessage((message) => {
+			if (message.type === "hello") {
+				server.send({
+					type: "hello",
+					version: PROTOCOL_VERSION,
+					connectionId: "connection-1",
+					snapshot: baseServerSnapshot,
+				});
+			}
+		});
+		const client = new PiClient({
+			token: "bearer-secret",
+			transportFactory: (handlers) => server.connect(handlers),
+			onListenerError: (error) => listenerErrors.push(error),
+		});
+		client.subscribe(() => {
+			throw new Error("consumer failure");
+		});
+
+		await expect(client.connect()).resolves.toEqual(baseServerSnapshot);
+		expect(listenerErrors).toEqual([expect.objectContaining({ message: "consumer failure" })]);
+		expect(client.connectionState).toBe("connected");
+	});
+
 	test("rejects a typed handshake authentication error", async () => {
 		const server = new MemoryByteServer();
 		server.onMessage(() => {

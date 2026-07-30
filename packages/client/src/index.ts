@@ -6,6 +6,7 @@ export type {
 	ConnectionState,
 	ConnectionStateChange,
 	CreateSessionOptions,
+	ListenerErrorHandler,
 	PiClientOptions,
 	Unsubscribe,
 } from "./types.ts";

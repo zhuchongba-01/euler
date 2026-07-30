@@ -34,3 +34,5 @@ Call `handlers.onData(chunk)` for inbound bytes, `handlers.onClose()` for an ord
 `PiClientOptions.maxFrameLength` bounds inbound and outbound CBOR payloads. Configure matching limits on the client and server. Transports should separately bound queued outbound bytes and preserve send order.
 
 Treat peers as untrusted. Use a secure transport where required and protect the protocol bearer token.
+
+Subscriber exceptions are isolated from protocol state. Set `onListenerError` in `PiClientOptions` to report them to application logging or diagnostics.
