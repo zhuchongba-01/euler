@@ -14,7 +14,8 @@ export type EvalHarnessIterationArtifact = {
 	evalSet: string;
 	groupKey: string;
 	harness: string;
-	harnesses: string[];
+	baseline: string;
+	candidates: string[];
 	repetition: number;
 	seed: number;
 	plannedOrder: number;
@@ -33,27 +34,42 @@ export type EvalHarnessTableOptions = {
 	seed?: number;
 };
 
+export type EvalHarnessTablePair<TInput, TOutput extends JsonValue | undefined> = {
+	baseline: Harness<TInput, TOutput>;
+	candidate: Harness<TInput, TOutput>;
+};
+
+export type EvalHarnessTableCandidates<TInput, TOutput extends JsonValue | undefined> = {
+	baseline: Harness<TInput, TOutput>;
+	candidates: readonly Harness<TInput, TOutput>[];
+};
+
+type EvalHarnessTableComparison<TInput, TOutput extends JsonValue | undefined> =
+	| EvalHarnessTablePair<TInput, TOutput>
+	| EvalHarnessTableCandidates<TInput, TOutput>;
+
 type EvalHarnessIterationPlan = Omit<EvalHarnessIterationArtifact, "groupKey">;
 
 export function parseEvalHarnessIterationArtifact(
 	value: JsonValue | undefined,
 ): EvalHarnessIterationArtifact | undefined {
 	if (value === null || value === undefined || typeof value !== "object" || Array.isArray(value)) return undefined;
-	const { schemaVersion, evalSet, groupKey, harness, harnesses, repetition, seed, plannedOrder } = value;
+	const { schemaVersion, evalSet, groupKey, harness, baseline, candidates, repetition, seed, plannedOrder } = value;
 	if (
 		schemaVersion !== 1 ||
 		typeof evalSet !== "string" ||
 		typeof groupKey !== "string" ||
 		typeof harness !== "string" ||
-		!Array.isArray(harnesses) ||
-		!harnesses.every((name): name is string => typeof name === "string") ||
+		typeof baseline !== "string" ||
+		!Array.isArray(candidates) ||
+		!candidates.every((name): name is string => typeof name === "string") ||
 		typeof repetition !== "number" ||
 		typeof seed !== "number" ||
 		typeof plannedOrder !== "number"
 	) {
 		return undefined;
 	}
-	return { schemaVersion, evalSet, groupKey, harness, harnesses, repetition, seed, plannedOrder };
+	return { schemaVersion, evalSet, groupKey, harness, baseline, candidates, repetition, seed, plannedOrder };
 }
 
 function createSeededRandom(seed: number): () => number {
@@ -117,12 +133,14 @@ export function deriveEvalGroupKey(input: unknown, repetition: number, seed: num
 
 function validateOptions<TInput, TOutput extends JsonValue | undefined>(
 	evalSet: string,
-	harnesses: readonly Harness<TInput, TOutput>[],
+	baseline: Harness<TInput, TOutput>,
+	candidates: readonly Harness<TInput, TOutput>[],
 	repetitions: number,
 	seed: number,
 ): void {
 	if (!evalSet.trim()) throw new TypeError("evalSet must not be empty.");
-	if (harnesses.length < 2) throw new TypeError("At least two harnesses are required.");
+	if (candidates.length === 0) throw new TypeError("At least one candidate harness is required.");
+	const harnesses = [baseline, ...candidates];
 	const names = new Set(harnesses.map((harness) => harness.name));
 	if (names.size !== harnesses.length) throw new TypeError("Harness names must be unique within an eval set.");
 	if (!Number.isSafeInteger(repetitions) || repetitions < 1) {
@@ -162,15 +180,27 @@ function withIterationArtifact<TInput, TOutput extends JsonValue | undefined>(
 
 export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
 	evalSet: string,
-	harnesses: readonly Harness<TInput, TOutput>[],
+	comparison: EvalHarnessTablePair<TInput, TOutput>,
+	options: EvalHarnessTableOptions,
+): EvalHarnessTableRow<TInput, TOutput>[];
+export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
+	evalSet: string,
+	comparison: EvalHarnessTableCandidates<TInput, TOutput>,
+	options: EvalHarnessTableOptions,
+): EvalHarnessTableRow<TInput, TOutput>[];
+export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
+	evalSet: string,
+	comparison: EvalHarnessTableComparison<TInput, TOutput>,
 	options: EvalHarnessTableOptions,
 ): EvalHarnessTableRow<TInput, TOutput>[] {
 	const repetitions = options.repetitions ?? 1;
 	const seed = options.seed ?? randomBytes(4).readUInt32LE();
-	validateOptions(evalSet, harnesses, repetitions, seed);
+	const candidates = "candidate" in comparison ? [comparison.candidate] : comparison.candidates;
+	validateOptions(evalSet, comparison.baseline, candidates, repetitions, seed);
 
 	const random = createSeededRandom(seed);
 	const rows: EvalHarnessTableRow<TInput, TOutput>[] = [];
+	const harnesses = [comparison.baseline, ...candidates];
 	let plannedOrder = 1;
 	for (let repetition = 1; repetition <= repetitions; repetition += 1) {
 		const randomizedHarnesses = [...harnesses];
@@ -186,7 +216,8 @@ export function evalHarnessTable<TInput, TOutput extends JsonValue | undefined>(
 				schemaVersion: 1,
 				evalSet,
 				harness: harness.name,
-				harnesses: harnesses.map(({ name }) => name),
+				baseline: comparison.baseline.name,
+				candidates: candidates.map(({ name }) => name),
 				repetition,
 				seed,
 				plannedOrder,

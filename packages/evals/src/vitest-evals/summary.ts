@@ -8,7 +8,8 @@ type HarnessObservationBase = {
 	testName: string;
 	file: string;
 	harness: string;
-	harnesses: string[];
+	baseline: string;
+	candidates: string[];
 	repetition: number;
 	seed: number;
 	totalTokens?: number;
@@ -22,25 +23,25 @@ export type HarnessObservation = HarnessObservationBase &
 export type PairedMetricSummary = {
 	totalPairs: number;
 	eligiblePairs: number;
-	firstMean: number | null;
-	secondMean: number | null;
+	baselineMean: number | null;
+	candidateMean: number | null;
 	meanDelta: number | null;
 };
 
 export type CorrectnessLiftSummary = {
 	totalPairs: number;
 	eligiblePairs: number;
-	firstPassRate: number | null;
-	secondPassRate: number | null;
+	baselinePassRate: number | null;
+	candidatePassRate: number | null;
 	lift: number | null;
-	firstWins: number;
-	secondWins: number;
+	baselineWins: number;
+	candidateWins: number;
 	ties: number;
 };
 
 export type HarnessPairComparison = {
-	firstHarness: string;
-	secondHarness: string;
+	baseline: string;
+	candidate: string;
 	correctness: CorrectnessLiftSummary;
 	totalTokens: PairedMetricSummary;
 	totalMs: PairedMetricSummary;
@@ -85,13 +86,14 @@ type ObservationGroup = {
 };
 
 type EvalSetData = {
-	harnessesByName: Map<string, HarnessDescriptor>;
+	baseline: HarnessDescriptor;
+	candidatesByName: Map<string, HarnessDescriptor>;
 	groupsByKey: Map<string, ObservationGroup>;
 };
 
 type ObservationPair = {
-	first: HarnessObservation;
-	second: HarnessObservation;
+	baseline: HarnessObservation;
+	candidate: HarnessObservation;
 };
 
 function getOrCreate<K, V extends object>(map: Map<K, V>, key: K, create: () => V): V {
@@ -110,27 +112,18 @@ function preciseDifference(left: number, right: number): number {
 	return Number((left - right).toPrecision(15));
 }
 
-function allPairs<T>(values: readonly T[]): Array<[T, T]> {
-	const pairs: Array<[T, T]> = [];
-	for (let first = 0; first < values.length; first += 1) {
-		for (let second = first + 1; second < values.length; second += 1) {
-			pairs.push([values[first], values[second]]);
-		}
-	}
-	return pairs;
-}
-
 function groupObservations(observations: readonly HarnessObservation[]): Map<string, EvalSetData> {
 	const evalSets = new Map<string, EvalSetData>();
 	for (const observation of observations) {
 		const evalSet = getOrCreate(evalSets, observation.evalSet, () => ({
-			harnessesByName: new Map(),
+			baseline: { name: observation.baseline, index: 0 },
+			candidatesByName: new Map(),
 			groupsByKey: new Map(),
 		}));
 
-		for (const [index, name] of observation.harnesses.entries()) {
-			const existing = evalSet.harnessesByName.get(name);
-			if (!existing || index < existing.index) evalSet.harnessesByName.set(name, { name, index });
+		for (const [index, name] of observation.candidates.entries()) {
+			const existing = evalSet.candidatesByName.get(name);
+			if (!existing || index < existing.index) evalSet.candidatesByName.set(name, { name, index });
 		}
 
 		const group = getOrCreate(
@@ -152,7 +145,16 @@ function groupObservations(observations: readonly HarnessObservation[]): Map<str
 }
 
 function orderedHarnesses(evalSet: EvalSetData): HarnessDescriptor[] {
-	return [...evalSet.harnessesByName.values()].sort(
+	return [
+		evalSet.baseline,
+		...[...evalSet.candidatesByName.values()].sort(
+			(left, right) => left.index - right.index || left.name.localeCompare(right.name),
+		),
+	];
+}
+
+function orderedCandidates(evalSet: EvalSetData): HarnessDescriptor[] {
+	return [...evalSet.candidatesByName.values()].sort(
 		(left, right) => left.index - right.index || left.name.localeCompare(right.name),
 	);
 }
@@ -199,14 +201,16 @@ function collectDiagnostics(
 
 function pairObservations(
 	groups: readonly ObservationGroup[],
-	firstHarness: string,
-	secondHarness: string,
+	baselineHarness: string,
+	candidateHarness: string,
 ): ObservationPair[] {
 	const pairs: ObservationPair[] = [];
 	for (const group of groups) {
-		const first = group.observationsByHarness.get(firstHarness) ?? [];
-		const second = group.observationsByHarness.get(secondHarness) ?? [];
-		if (first.length === 1 && second.length === 1) pairs.push({ first: first[0], second: second[0] });
+		const baseline = group.observationsByHarness.get(baselineHarness) ?? [];
+		const candidate = group.observationsByHarness.get(candidateHarness) ?? [];
+		if (baseline.length === 1 && candidate.length === 1) {
+			pairs.push({ baseline: baseline[0], candidate: candidate[0] });
+		}
 	}
 	return pairs;
 }
@@ -216,78 +220,82 @@ function summarizeMetric(
 	select: (observation: HarnessObservation) => number | undefined,
 	totalPairs: number,
 ): PairedMetricSummary {
-	const firstValues: number[] = [];
-	const secondValues: number[] = [];
-	for (const { first, second } of pairs) {
-		if (first.outcome !== "scored" || second.outcome !== "scored") continue;
-		const firstValue = select(first);
-		const secondValue = select(second);
+	const baselineValues: number[] = [];
+	const candidateValues: number[] = [];
+	for (const { baseline, candidate } of pairs) {
+		if (baseline.outcome !== "scored" || candidate.outcome !== "scored") continue;
+		const baselineValue = select(baseline);
+		const candidateValue = select(candidate);
 		if (
-			firstValue === undefined ||
-			secondValue === undefined ||
-			!Number.isFinite(firstValue) ||
-			!Number.isFinite(secondValue)
+			baselineValue === undefined ||
+			candidateValue === undefined ||
+			!Number.isFinite(baselineValue) ||
+			!Number.isFinite(candidateValue)
 		) {
 			continue;
 		}
-		firstValues.push(firstValue);
-		secondValues.push(secondValue);
+		baselineValues.push(baselineValue);
+		candidateValues.push(candidateValue);
 	}
 
-	const firstMean = mean(firstValues);
-	const secondMean = mean(secondValues);
+	const baselineMean = mean(baselineValues);
+	const candidateMean = mean(candidateValues);
 	return {
 		totalPairs,
-		eligiblePairs: firstValues.length,
-		firstMean,
-		secondMean,
-		meanDelta: firstMean === null || secondMean === null ? null : preciseDifference(secondMean, firstMean),
+		eligiblePairs: baselineValues.length,
+		baselineMean,
+		candidateMean,
+		meanDelta:
+			baselineMean === null || candidateMean === null ? null : preciseDifference(candidateMean, baselineMean),
 	};
 }
 
 function summarizeCorrectness(pairs: readonly ObservationPair[], totalPairs: number): CorrectnessLiftSummary {
 	let eligiblePairs = 0;
-	let firstPasses = 0;
-	let secondPasses = 0;
-	let firstWins = 0;
-	let secondWins = 0;
+	let baselinePasses = 0;
+	let candidatePasses = 0;
+	let baselineWins = 0;
+	let candidateWins = 0;
 	let ties = 0;
 
-	for (const { first, second } of pairs) {
-		if (first.outcome !== "scored" || second.outcome !== "scored") continue;
+	for (const { baseline, candidate } of pairs) {
+		if (baseline.outcome !== "scored" || candidate.outcome !== "scored") continue;
 		eligiblePairs += 1;
-		const firstPassed = first.score >= 1;
-		const secondPassed = second.score >= 1;
-		if (firstPassed) firstPasses += 1;
-		if (secondPassed) secondPasses += 1;
-		if (firstPassed === secondPassed) ties += 1;
-		else if (firstPassed) firstWins += 1;
-		else secondWins += 1;
+		const baselinePassed = baseline.score >= 1;
+		const candidatePassed = candidate.score >= 1;
+		if (baselinePassed) baselinePasses += 1;
+		if (candidatePassed) candidatePasses += 1;
+		if (baselinePassed === candidatePassed) ties += 1;
+		else if (baselinePassed) baselineWins += 1;
+		else candidateWins += 1;
 	}
 
-	const firstPassRate = eligiblePairs === 0 ? null : firstPasses / eligiblePairs;
-	const secondPassRate = eligiblePairs === 0 ? null : secondPasses / eligiblePairs;
+	const baselinePassRate = eligiblePairs === 0 ? null : baselinePasses / eligiblePairs;
+	const candidatePassRate = eligiblePairs === 0 ? null : candidatePasses / eligiblePairs;
 	return {
 		totalPairs,
 		eligiblePairs,
-		firstPassRate,
-		secondPassRate,
-		lift: firstPassRate === null || secondPassRate === null ? null : preciseDifference(secondPassRate, firstPassRate),
-		firstWins,
-		secondWins,
+		baselinePassRate,
+		candidatePassRate,
+		lift:
+			baselinePassRate === null || candidatePassRate === null
+				? null
+				: preciseDifference(candidatePassRate, baselinePassRate),
+		baselineWins,
+		candidateWins,
 		ties,
 	};
 }
 
 function compareHarnesses(
-	firstHarness: HarnessDescriptor,
-	secondHarness: HarnessDescriptor,
+	baseline: HarnessDescriptor,
+	candidate: HarnessDescriptor,
 	groups: readonly ObservationGroup[],
 ): HarnessPairComparison {
-	const pairs = pairObservations(groups, firstHarness.name, secondHarness.name);
+	const pairs = pairObservations(groups, baseline.name, candidate.name);
 	return {
-		firstHarness: firstHarness.name,
-		secondHarness: secondHarness.name,
+		baseline: baseline.name,
+		candidate: candidate.name,
 		correctness: summarizeCorrectness(pairs, groups.length),
 		totalTokens: summarizeMetric(pairs, ({ totalTokens }) => totalTokens, groups.length),
 		totalMs: summarizeMetric(pairs, ({ totalMs }) => totalMs, groups.length),
@@ -302,10 +310,11 @@ export function summarizeHarnessComparisons(observations: readonly HarnessObserv
 		left.localeCompare(right),
 	)) {
 		const harnesses = orderedHarnesses(data);
+		const candidates = orderedCandidates(data);
 		const groups = orderedGroups(data);
 		evalSets.push({
 			evalSet,
-			comparisons: allPairs(harnesses).map(([first, second]) => compareHarnesses(first, second, groups)),
+			comparisons: candidates.map((candidate) => compareHarnesses(data.baseline, candidate, groups)),
 		});
 		diagnostics.push(...collectDiagnostics(harnesses, groups));
 	}
@@ -358,11 +367,11 @@ function formatMetric(
 		metric.eligiblePairs === 0 || metric.eligiblePairs === comparisonPairs
 			? ""
 			: ` ${formatCoverage(metric.eligiblePairs, metric.totalPairs)}`;
-	if (metric.firstMean === null || metric.secondMean === null || metric.meanDelta === null) {
+	if (metric.baselineMean === null || metric.candidateMean === null || metric.meanDelta === null) {
 		return formatReportLine(label, `${styleText("yellow", "unavailable")}${coverage}`);
 	}
 	const delta = colorDelta(metric.meanDelta, `delta ${formatDelta(metric.meanDelta)}`, false);
-	const values = styleText("gray", `(${formatValue(metric.secondMean)}, ${formatValue(metric.firstMean)})`);
+	const values = styleText("gray", `(${formatValue(metric.candidateMean)}, ${formatValue(metric.baselineMean)})`);
 	return formatReportLine(label, `${delta} ${values}${coverage}`);
 }
 
@@ -371,12 +380,14 @@ export function formatHarnessComparisonReport(report: HarnessComparisonReport): 
 	const lines = [styleText("bold", "Eval Comparisons")];
 	for (const evalSet of report.evalSets) {
 		lines.push(`  ${evalSet.evalSet}`);
-		for (const comparison of evalSet.comparisons) {
+		for (const [index, comparison] of evalSet.comparisons.entries()) {
+			if (index > 0) lines.push("");
 			const { correctness } = comparison;
+			lines.push(formatReportLine("Baseline", comparison.baseline));
 			lines.push(
 				formatReportLine(
-					"Harnesses",
-					`${comparison.secondHarness}, ${comparison.firstHarness} ${formatCoverage(correctness.eligiblePairs, correctness.totalPairs)}`,
+					"Candidate",
+					`${comparison.candidate} ${formatCoverage(correctness.eligiblePairs, correctness.totalPairs)}`,
 				),
 			);
 			if (correctness.lift === null) {
@@ -386,7 +397,7 @@ export function formatHarnessComparisonReport(report: HarnessComparisonReport): 
 				const delta = colorDelta(lift, `delta ${formatSigned(lift, 1)} pp`, true);
 				const values = styleText(
 					"gray",
-					`(${formatPercentage(correctness.secondPassRate)}, ${formatPercentage(correctness.firstPassRate)})`,
+					`(${formatPercentage(correctness.candidatePassRate)}, ${formatPercentage(correctness.baselinePassRate)})`,
 				);
 				lines.push(formatReportLine("Pass rate", `${delta} ${values}`));
 			}

@@ -13,7 +13,8 @@ function observation(
 	testName: string,
 	result: ObservationResult,
 	metrics: Pick<HarnessObservation, "totalTokens" | "totalMs" | "estimatedCostUsd"> = {},
-	harnesses: string[] = ["without-tools", "with-tools"],
+	baseline = "without-tools",
+	candidates: string[] = ["with-tools"],
 ): HarnessObservation {
 	const base = {
 		evalSet: "tool access",
@@ -21,7 +22,8 @@ function observation(
 		testName,
 		file: "src/tool-access.eval.ts",
 		harness,
-		harnesses,
+		baseline,
+		candidates,
 		repetition: 1,
 		seed: 42,
 		...metrics,
@@ -52,37 +54,37 @@ describe("summarizeHarnessComparisons", () => {
 		expect(report.evalSets).toHaveLength(1);
 		expect(report.evalSets[0]?.comparisons).toEqual([
 			expect.objectContaining({
-				firstHarness: "without-tools",
-				secondHarness: "with-tools",
+				baseline: "without-tools",
+				candidate: "with-tools",
 				correctness: {
 					totalPairs: 2,
 					eligiblePairs: 2,
-					firstPassRate: 0.5,
-					secondPassRate: 1,
+					baselinePassRate: 0.5,
+					candidatePassRate: 1,
 					lift: 0.5,
-					firstWins: 0,
-					secondWins: 1,
+					baselineWins: 0,
+					candidateWins: 1,
 					ties: 1,
 				},
 				totalTokens: {
 					totalPairs: 2,
 					eligiblePairs: 2,
-					firstMean: 150,
-					secondMean: 150,
+					baselineMean: 150,
+					candidateMean: 150,
 					meanDelta: 0,
 				},
 				totalMs: {
 					totalPairs: 2,
 					eligiblePairs: 1,
-					firstMean: 1000,
-					secondMean: 800,
+					baselineMean: 1000,
+					candidateMean: 800,
 					meanDelta: -200,
 				},
 				estimatedCostUsd: {
 					totalPairs: 2,
 					eligiblePairs: 1,
-					firstMean: 0.01,
-					secondMean: 0.02,
+					baselineMean: 0.01,
+					candidateMean: 0.02,
 					meanDelta: 0.01,
 				},
 			}),
@@ -101,18 +103,18 @@ describe("summarizeHarnessComparisons", () => {
 		expect(comparison?.correctness).toEqual({
 			totalPairs: 2,
 			eligiblePairs: 1,
-			firstPassRate: 0,
-			secondPassRate: 1,
+			baselinePassRate: 0,
+			candidatePassRate: 1,
 			lift: 1,
-			firstWins: 0,
-			secondWins: 1,
+			baselineWins: 0,
+			candidateWins: 1,
 			ties: 0,
 		});
 		expect(comparison?.totalTokens).toEqual({
 			totalPairs: 2,
 			eligiblePairs: 0,
-			firstMean: null,
-			secondMean: null,
+			baselineMean: null,
+			candidateMean: null,
 			meanDelta: null,
 		});
 		expect(report.diagnostics).toContainEqual(
@@ -166,20 +168,17 @@ describe("summarizeHarnessComparisons", () => {
 		]);
 	});
 
-	it("creates every pair in declared harness order", () => {
-		const harnesses = ["first", "second", "third"];
+	it("compares each candidate with the declared baseline", () => {
+		const candidates = ["second", "third"];
 		const report = summarizeHarnessComparisons([
-			observation("first", "input", "passed", {}, harnesses),
-			observation("second", "input", "passed", {}, harnesses),
-			observation("third", "input", "passed", {}, harnesses),
+			observation("first", "input", "passed", {}, "first", candidates),
+			observation("second", "input", "passed", {}, "first", candidates),
+			observation("third", "input", "passed", {}, "first", candidates),
 		]);
 
-		expect(
-			report.evalSets[0]?.comparisons.map(({ firstHarness, secondHarness }) => [firstHarness, secondHarness]),
-		).toEqual([
+		expect(report.evalSets[0]?.comparisons.map(({ baseline, candidate }) => [baseline, candidate])).toEqual([
 			["first", "second"],
 			["first", "third"],
-			["second", "third"],
 		]);
 	});
 
@@ -198,15 +197,15 @@ describe("summarizeHarnessComparisons", () => {
 	});
 
 	it("reports duplicate and unscorable observations once across multiple harness pairs", () => {
-		const harnesses = ["first", "second", "third"];
+		const candidates = ["second", "third"];
 		const report = summarizeHarnessComparisons([
-			observation("first", "duplicate", "passed", {}, harnesses),
-			observation("first", "duplicate", "failed", {}, harnesses),
-			observation("second", "duplicate", "passed", {}, harnesses),
-			observation("third", "duplicate", "passed", {}, harnesses),
-			observation("first", "skipped", "skipped", {}, harnesses),
-			observation("second", "skipped", "passed", {}, harnesses),
-			observation("third", "skipped", "passed", {}, harnesses),
+			observation("first", "duplicate", "passed", {}, "first", candidates),
+			observation("first", "duplicate", "failed", {}, "first", candidates),
+			observation("second", "duplicate", "passed", {}, "first", candidates),
+			observation("third", "duplicate", "passed", {}, "first", candidates),
+			observation("first", "skipped", "skipped", {}, "first", candidates),
+			observation("second", "skipped", "passed", {}, "first", candidates),
+			observation("third", "skipped", "passed", {}, "first", candidates),
 		]);
 
 		expect(report.diagnostics.filter(({ reason }) => reason === "duplicate-observation")).toEqual([
@@ -225,7 +224,8 @@ describe("summarizeHarnessComparisons", () => {
 
 		const formatted = stripVTControlCharacters(formatHarnessComparisonReport(report));
 		expect(formatted).toContain("Eval Comparisons");
-		expect(formatted).toContain("Harnesses  with-tools, without-tools (1/1 pairs)");
+		expect(formatted).toContain(" Baseline  without-tools");
+		expect(formatted).toContain("Candidate  with-tools (1/1 pairs)");
 		expect(formatted).toContain("Pass rate  delta +100.0 pp (100.0%, 0.0%)");
 		expect(formatted).toContain("   Tokens  unavailable");
 		expect(formatted).toContain("  Latency  delta -4159.5ms (30694.2ms, 34853.7ms)");

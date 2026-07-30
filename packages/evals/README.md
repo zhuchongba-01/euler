@@ -117,7 +117,10 @@ const TargetTaskJudge = createJudge<string, string>("TargetTaskJudge", ({ output
 
 const harnessTable = evalHarnessTable(
 	"target skill effectiveness",
-	[withoutTargetSkillHarness, withTargetSkillHarness],
+	{
+		baseline: withoutTargetSkillHarness,
+		candidate: withTargetSkillHarness,
+	},
 	{
 		repetitions: 6,
 		seed: 42,
@@ -142,12 +145,12 @@ registers that snapshot against the explicit Vitest test task before reporters r
 
 Harness names must be stable and unique within an eval set. The grouping key combines repetition and seed with a
 non-empty string `input.id` when available, otherwise with a SHA-256 hash of strict canonical JSON input. Execution order
-is seeded and randomized, while harness declaration order determines comparison direction. For each matched input and
-repetition, the reporter computes pass-rate lift from each run's recorded average judge score, treating a score of at
-least `1` as passing. The lift is the later-declared harness's pass rate minus the earlier-declared harness's pass rate,
-in percentage points. Missing judge scores are reported as incomplete observations. Tokens, latency, and estimated cost
-remain separate paired deltas; missing telemetry remains unavailable. Sets
-with more than two harnesses report every pair.
+is seeded and randomized independently of comparison direction. Use `candidate` for one treatment or `candidates` for
+multiple treatments. Each candidate is compared only with the declared baseline. For each matched input and repetition,
+the reporter computes pass-rate lift from each run's recorded average judge score, treating a score of at least `1` as
+passing. Lift is the candidate pass rate minus the baseline pass rate, in percentage points. Missing judge scores are
+reported as incomplete observations. Tokens, latency, and estimated cost remain separate candidate-minus-baseline paired
+deltas; missing telemetry remains unavailable.
 
 See the [`skill-eval-harness`](https://github.com/adewale/skill-eval-harness/) guidance for comparative-eval methodology,
 repetition strategy, trustworthy judges, and telemetry interpretation.

@@ -65,7 +65,8 @@ function collectHarnessObservations(modules: ReadonlyArray<TestModule>): Harness
 				testName: test.name,
 				file: module.relativeModuleId,
 				harness: iteration.harness,
-				harnesses: iteration.harnesses,
+				baseline: iteration.baseline,
+				candidates: iteration.candidates,
 				repetition: iteration.repetition,
 				seed: iteration.seed,
 				...(run.usage.totalTokens === undefined ? {} : { totalTokens: run.usage.totalTokens }),
@@ -101,7 +102,7 @@ export default class EvalHarnessReporter implements Reporter {
 		reason: TestRunEndReason,
 	): void {
 		if (reason === "interrupted") {
-			this.vitest?.logger.log("\nHarness comparisons unavailable: test run interrupted.");
+			this.vitest?.logger.log("\nEval comparisons unavailable: test run interrupted.");
 			return;
 		}
 		const report = summarizeHarnessComparisons(collectHarnessObservations(modules));

@@ -45,7 +45,10 @@ function createFakeHarness(name: string) {
 
 const harnessTable = evalHarnessTable(
 	"local multi-harness eval",
-	[createFakeHarness("withoutSkill"), createFakeHarness("withSkill")],
+	{
+		baseline: createFakeHarness("withoutSkill"),
+		candidates: [createFakeHarness("withSkill")],
+	},
 	{ repetitions: 2, seed: 42 },
 );
 
@@ -59,6 +62,16 @@ describe("evalHarnessTable", () => {
 			{ name: "withSkill", repetition: 2, seed: 42, plannedOrder: 3 },
 			{ name: "withoutSkill", repetition: 2, seed: 42, plannedOrder: 4 },
 		]);
+	});
+
+	it("accepts a singular candidate", () => {
+		const rows = evalHarnessTable(
+			"singular candidate",
+			{ baseline: createFakeHarness("baseline"), candidate: createFakeHarness("candidate") },
+			{ seed: 42 },
+		);
+
+		expect(rows.map(({ name }) => name)).toEqual(["baseline", "candidate"]);
 	});
 
 	it("attaches iteration metadata to every wrapped harness run", async () => {
@@ -78,7 +91,8 @@ describe("evalHarnessTable", () => {
 				evalSet: "local multi-harness eval",
 				groupKey: deriveEvalGroupKey({ id: "first" }, row.repetition, 42),
 				harness: row.name,
-				harnesses: ["withoutSkill", "withSkill"],
+				baseline: "withoutSkill",
+				candidates: ["withSkill"],
 				repetition: row.repetition,
 				seed: 42,
 				plannedOrder: row.plannedOrder,
