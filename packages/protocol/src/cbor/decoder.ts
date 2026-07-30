@@ -5,7 +5,7 @@ import {
 	resolveOptions,
 	textDecoder,
 	UINT32_BASE,
-} from "./types.ts";
+} from "./options.ts";
 
 class CborReader {
 	private readonly bytes: Uint8Array;
