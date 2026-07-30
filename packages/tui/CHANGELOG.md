@@ -8,6 +8,8 @@
 
 ### Added
 
+- Exported the bundled `Marked` parser and token types.
+- Added width-aware source transforms to the `Markdown` component.
 - Added interface-compatible main-screen and alternate-screen TUI renderers with application-owned scrolling ([#7304](https://github.com/earendil-works/pi/issues/7304)).
 
 ## [0.83.0] - 2026-07-29
