@@ -1,5 +1,5 @@
-import { afterAll, describe, expect, it } from "vitest";
-import { createHarness, describeEval } from "vitest-evals";
+import { describe, expect, it } from "vitest";
+import { createHarness, type HarnessContext } from "vitest-evals/harness";
 import {
 	deriveEvalGroupKey,
 	EVAL_HARNESS_ITERATION_ARTIFACT,
@@ -30,13 +30,6 @@ describe("deriveEvalGroupKey", () => {
 	});
 });
 
-const observations: Array<{
-	harness: string;
-	inputId: string;
-	repetition: number;
-	plannedOrder: number;
-}> = [];
-
 function createFakeHarness(name: string) {
 	return createHarness<{ id: string }, { harness: string; inputId: string }>({
 		name,
@@ -56,43 +49,40 @@ const harnessTable = evalHarnessTable(
 	{ repetitions: 2, seed: 42 },
 );
 
-describe.for(harnessTable)("$name repetition $repetition", ({ harness, repetition: plannedRepetition }) => {
-	describeEval("local multi-harness eval", { harness }, (it) => {
-		it.for([{ id: "first" }, { id: "second" }])("$id", async ({ id }, { run }) => {
-			const result = await run({ id });
-			const runMetadata = parseEvalHarnessIterationArtifact(result.artifacts?.[EVAL_HARNESS_ITERATION_ARTIFACT]);
+describe("evalHarnessTable", () => {
+	it("plans seeded repetitions in deterministic order", () => {
+		expect(
+			harnessTable.map(({ name, repetition, seed, plannedOrder }) => ({ name, repetition, seed, plannedOrder })),
+		).toEqual([
+			{ name: "withoutSkill", repetition: 1, seed: 42, plannedOrder: 1 },
+			{ name: "withSkill", repetition: 1, seed: 42, plannedOrder: 2 },
+			{ name: "withSkill", repetition: 2, seed: 42, plannedOrder: 3 },
+			{ name: "withoutSkill", repetition: 2, seed: 42, plannedOrder: 4 },
+		]);
+	});
 
-			expect(result.output.inputId).toBe(id);
-			expect(runMetadata).toEqual({
+	it("attaches iteration metadata to every wrapped harness run", async () => {
+		for (const row of harnessTable) {
+			const artifacts: HarnessContext["artifacts"] = {};
+			const context: HarnessContext = {
+				artifacts,
+				setArtifact(name, value) {
+					artifacts[name] = value;
+				},
+			};
+			const result = await row.harness.run({ id: "first" }, context);
+
+			expect(result.output).toEqual({ harness: row.name, inputId: "first" });
+			expect(parseEvalHarnessIterationArtifact(result.artifacts?.[EVAL_HARNESS_ITERATION_ARTIFACT])).toEqual({
 				schemaVersion: 1,
 				evalSet: "local multi-harness eval",
-				groupKey: deriveEvalGroupKey({ id }, plannedRepetition, 42),
-				harness: result.output.harness,
+				groupKey: deriveEvalGroupKey({ id: "first" }, row.repetition, 42),
+				harness: row.name,
 				harnesses: ["withoutSkill", "withSkill"],
-				repetition: plannedRepetition,
+				repetition: row.repetition,
 				seed: 42,
-				plannedOrder: expect.any(Number),
+				plannedOrder: row.plannedOrder,
 			});
-			if (!runMetadata) throw new TypeError("Expected typed harness-iteration metadata.");
-			const { harness: harnessName, repetition, plannedOrder } = runMetadata;
-			observations.push({ harness: harnessName, inputId: id, repetition, plannedOrder });
-		});
-	});
-});
-
-afterAll(() => {
-	expect(observations).toHaveLength(8);
-	for (const inputId of ["first", "second"]) {
-		for (const repetition of [1, 2]) {
-			expect(
-				observations
-					.filter((observation) => observation.inputId === inputId && observation.repetition === repetition)
-					.map((observation) => observation.harness)
-					.sort(),
-			).toEqual(["withSkill", "withoutSkill"]);
 		}
-	}
-	expect(
-		[...new Set(observations.map((observation) => observation.plannedOrder))].sort((left, right) => left - right),
-	).toEqual([1, 2, 3, 4]);
+	});
 });
