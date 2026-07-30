@@ -1,13 +1,17 @@
-import type { SessionSearch, SessionStorage, SessionTreeEntry } from "@earendil-works/pi-agent-core";
+import type {
+	LeafEntry,
+	SessionEntryCursorOptions,
+	SessionSnapshot,
+	SessionStorage,
+	SessionTreeEntry,
+} from "@earendil-works/pi-agent-core";
 import {
 	createSessionId,
 	getEntriesToFork,
 	getFileSystemResultOrThrow,
-	indexSessionStorage,
 	SessionError,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
-import { SqliteSessionSearch } from "./search-backend.ts";
 import { SqliteSessionStorage } from "./storage/index.ts";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type {
@@ -43,8 +47,6 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 	private readonly env: SqliteSessionStoreEnv;
 	private readonly sqlite: SqliteDatabaseFactory;
 	private readonly databasePathInput: string;
-	readonly defaultSearch: SessionSearch<SqliteSessionMetadata>;
-	private readonly searchIndex: SqliteSessionSearch<SqliteSessionMetadata>;
 	private databasePath: string | undefined;
 
 	constructor(options: {
@@ -55,12 +57,6 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 		this.env = options.env;
 		this.sqlite = options.sqlite;
 		this.databasePathInput = options.databasePath;
-		this.searchIndex = new SqliteSessionSearch({
-			env: this.env,
-			sqlite: this.sqlite,
-			databasePath: this.databasePathInput,
-		});
-		this.defaultSearch = this.searchIndex;
 	}
 
 	private async getDatabasePath(): Promise<string> {
@@ -95,7 +91,7 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 		}
 	}
 
-	async create(options: SqliteSessionCreateOptions): Promise<SessionStorage<SqliteSessionMetadata>> {
+	async create(options: SqliteSessionCreateOptions): Promise<SqliteSessionMetadata> {
 		const db = await this.openDatabase();
 		try {
 			const id = options.id ?? createSessionId();
@@ -105,10 +101,9 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 				parentSessionId: options.parentSessionId,
 				metadata: options.metadata,
 			});
-			return indexSessionStorage(storage, this.searchIndex);
-		} catch (error) {
+			return await storage.getMetadata();
+		} finally {
 			await db.close();
-			throw error;
 		}
 	}
 
@@ -120,10 +115,23 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 		}
 		const db = await this.openDatabase();
 		try {
-			return indexSessionStorage(await SqliteSessionStorage.open(db, metadata), this.searchIndex);
+			return await SqliteSessionStorage.open(db, metadata);
 		} catch (error) {
 			await db.close();
 			throw error;
+		}
+	}
+
+	async load(metadata: SqliteSessionMetadata): Promise<SessionSnapshot<SqliteSessionMetadata>> {
+		const storage = await this.open(metadata);
+		try {
+			return {
+				metadata: await storage.getMetadata(),
+				leafId: await storage.getLeafId(),
+				entries: await storage.getEntries(),
+			};
+		} finally {
+			await cleanupSessionStorage(storage);
 		}
 	}
 
@@ -149,6 +157,42 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 		}
 	}
 
+	async getEntries(metadata: SqliteSessionMetadata, options?: SessionEntryCursorOptions): Promise<SessionTreeEntry[]> {
+		const storage = await this.open(metadata);
+		try {
+			return await storage.getEntries(options);
+		} finally {
+			await cleanupSessionStorage(storage);
+		}
+	}
+
+	async createEntryId(metadata: SqliteSessionMetadata): Promise<string> {
+		const storage = await this.open(metadata);
+		try {
+			return await storage.createEntryId();
+		} finally {
+			await cleanupSessionStorage(storage);
+		}
+	}
+
+	async appendEntry(metadata: SqliteSessionMetadata, entry: SessionTreeEntry): Promise<void> {
+		const storage = await this.open(metadata);
+		try {
+			await storage.appendEntry(entry);
+		} finally {
+			await cleanupSessionStorage(storage);
+		}
+	}
+
+	async setLeafId(metadata: SqliteSessionMetadata, leafId: string | null): Promise<LeafEntry> {
+		const storage = await this.open(metadata);
+		try {
+			return await storage.setLeafId(leafId);
+		} finally {
+			await cleanupSessionStorage(storage);
+		}
+	}
+
 	async delete(metadata: SqliteSessionMetadata): Promise<void> {
 		const db = await this.openDatabase();
 		try {
@@ -161,7 +205,6 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 				const result = await db.prepare("DELETE FROM sessions WHERE id = ?").run(metadata.id);
 				if (result.changes === 0) throw new SessionError("not_found", `Session not found: ${metadata.id}`);
 			});
-			await this.searchIndex.deleteSession(metadata);
 		} finally {
 			await db.close();
 		}
@@ -170,7 +213,7 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 	async fork(
 		sourceMetadata: SqliteSessionMetadata,
 		options: SqliteSessionCreateOptions & { entryId?: string; position?: "before" | "at"; id?: string },
-	): Promise<SessionStorage<SqliteSessionMetadata>> {
+	): Promise<SqliteSessionMetadata> {
 		const source = await this.open(sourceMetadata);
 		let forkedEntries: SessionTreeEntry[];
 		try {
@@ -188,11 +231,9 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 				metadata: options.metadata ?? sourceMetadata.metadata,
 			});
 			for (const entry of forkedEntries) await storage.appendEntry(entry);
-			await this.searchIndex.replaceSession(await storage.getMetadata(), await storage.getEntries());
-			return indexSessionStorage(storage, this.searchIndex);
-		} catch (error) {
+			return await storage.getMetadata();
+		} finally {
 			await db.close();
-			throw error;
 		}
 	}
 }

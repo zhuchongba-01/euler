@@ -9,6 +9,7 @@ import {
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
 import { JsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
 import { SessionRepository } from "../../src/harness/session/repo-utils.ts";
+import { ScanningSessionSearch } from "../../src/harness/session/search-backend.ts";
 import { IndexedSessionStore } from "../../src/harness/session/search-index.ts";
 import type {
 	JsonlSessionMetadata,
@@ -24,8 +25,10 @@ describe("JsonlSessionStore with scanning search", () => {
 	it("searches canonical session entries by scanning", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
+		const store = new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") });
 		const repo = new SessionRepository({
-			store: new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") }),
+			store,
+			search: new ScanningSessionSearch(store),
 		});
 		const included = await repo.create({ cwd: root, id: "included" });
 		const excluded = await repo.create({ cwd: `${root}/other`, id: "excluded" });
@@ -38,13 +41,20 @@ describe("JsonlSessionStore with scanning search", () => {
 	});
 });
 
-describe("SqliteSessionStore with default SQLite FTS5 search", () => {
-	it("uses SQLite FTS5 by default", async () => {
+describe("SqliteSessionStore with explicit SQLite FTS5 search", () => {
+	it("uses SQLite FTS5 when composed with its search backend", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
 		const databasePath = join(root, "sessions.sqlite");
-		const repo = new SessionRepository({ store: new SqliteSessionStore({ env, sqlite, databasePath }) });
+		const search = new SqliteSessionSearch<SqliteSessionMetadata>({ env, sqlite, databasePath });
+		const repo = new SessionRepository({
+			store: new IndexedSessionStore({
+				store: new SqliteSessionStore({ env, sqlite, databasePath }),
+				index: search,
+			}),
+			search,
+		});
 		const included = await repo.create({ cwd: root, id: "included" });
 		const excluded = await repo.create({ cwd: `${root}/other`, id: "excluded" });
 		const metadata = await included.getMetadata();
@@ -90,8 +100,8 @@ describe("JsonlSessionStore with SQLite search index", () => {
 			store: new IndexedSessionStore({
 				store: new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") }),
 				index: search,
-				defaultSearch: search,
 			}),
+			search,
 		});
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("Find the auth defect"));
@@ -135,8 +145,8 @@ describe("JsonlSessionStore with multiple search indexes", () => {
 			store: new IndexedSessionStore({
 				store: new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") }),
 				index,
-				defaultSearch: primary,
 			}),
+			search: primary,
 		});
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("indexed in both places"));
