@@ -6,7 +6,7 @@ import {
 	DEFAULT_MAX_CBOR_DEPTH,
 	decodeCbor,
 	encodeCbor,
-} from "../src/index.ts";
+} from "../../src/index.ts";
 
 function fromHex(hex: string): Uint8Array {
 	if (hex.length % 2 !== 0) throw new Error("Hex fixture must contain whole bytes");

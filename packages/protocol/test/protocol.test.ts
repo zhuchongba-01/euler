@@ -121,6 +121,19 @@ describe("protocol validation", () => {
 		expect(parseServerMessage(message)).toEqual(message);
 	});
 
+	test("rejects cyclic protocol values with a protocol validation error", () => {
+		const details: Record<string, unknown> = {};
+		details.self = details;
+		const message = {
+			type: "response",
+			id: "request-1",
+			ok: false,
+			error: { code: "invalid_request", message: "invalid", details },
+		};
+
+		expect(() => parseServerMessage(message)).toThrow(ProtocolValidationError);
+	});
+
 	test("validation errors do not retain rejected payloads", () => {
 		let thrown: unknown;
 		try {

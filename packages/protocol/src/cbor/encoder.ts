@@ -7,7 +7,7 @@ import {
 	textDecoder,
 	textEncoder,
 	UINT32_BASE,
-} from "./cbor-options.ts";
+} from "./types.ts";
 
 class CborWriter {
 	private buffer: Uint8Array;
