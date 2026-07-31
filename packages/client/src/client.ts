@@ -15,6 +15,7 @@ import {
 } from "@earendil-works/pi-protocol";
 import { Connection } from "./connection.ts";
 import { PiDisconnectedError, PiServerError, PiSessionDetachedError, toError } from "./errors.ts";
+import { createPromiseResolvers } from "./promise.ts";
 import { ClientState } from "./state.ts";
 import type {
 	ConnectionState,
@@ -191,7 +192,7 @@ export class PiClient {
 	#request<const TCommand extends Command>(command: TCommand): Promise<ResultForCommand<TCommand>> {
 		if (!this.connected) return Promise.reject(new PiDisconnectedError());
 		const id = `request-${++this.#requestSequence}`;
-		const { promise, resolve, reject } = Promise.withResolvers<CommandResult>();
+		const { promise, resolve, reject } = createPromiseResolvers<CommandResult>();
 		this.#pendingRequests.set(id, { command, resolve, reject });
 		let frame: Uint8Array;
 		try {

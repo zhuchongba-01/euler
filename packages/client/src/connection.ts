@@ -8,6 +8,7 @@ import {
 	type ServerSnapshot,
 } from "@earendil-works/pi-protocol";
 import { PiDisconnectedError, PiServerError, toDisconnectedError, toError } from "./errors.ts";
+import { createPromiseResolvers, type PromiseResolvers } from "./promise.ts";
 import type { ByteTransport, ByteTransportFactory, ByteTransportHandlers } from "./transport.ts";
 import type { ConnectionState, ConnectionStateChange } from "./types.ts";
 
@@ -21,11 +22,11 @@ type ActiveConnection = {
 
 type ConnectionLifecycle =
 	| { state: "disconnected" }
-	| ({ state: "connecting"; handshake: PromiseWithResolvers<ServerSnapshot> } & ActiveConnection)
+	| ({ state: "connecting"; handshake: PromiseResolvers<ServerSnapshot> } & ActiveConnection)
 	| ({
 			state: "connected";
 			transport: ByteTransport;
-			handshake: PromiseWithResolvers<ServerSnapshot> | undefined;
+			handshake: PromiseResolvers<ServerSnapshot> | undefined;
 	  } & ActiveConnection);
 
 interface ConnectionOptions {
@@ -68,7 +69,7 @@ export class Connection {
 			return Promise.reject(new PiDisconnectedError(`PiClient is already ${this.#lifecycle.state}`));
 		}
 		const id = ++this.#sequence;
-		const handshake = Promise.withResolvers<ServerSnapshot>();
+		const handshake = createPromiseResolvers<ServerSnapshot>();
 		this.#lifecycle = {
 			state: "connecting",
 			id,
