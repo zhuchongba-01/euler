@@ -30,7 +30,6 @@ type _ProtocolModelInputsFitAi = Assert<ProtocolModelInput extends AiModelInput 
 
 export interface AssistantTranscriptOptions {
 	id: string;
-	streaming?: boolean;
 }
 
 export interface UserTranscriptOptions {
@@ -44,7 +43,7 @@ export interface ToolCallMetadata {
 
 export interface ToolTranscriptOptions {
 	id: string;
-	call?: ToolCallMetadata;
+	call: ToolCallMetadata;
 }
 
 function nonNegativeInteger(value: number | undefined): number | undefined {
@@ -60,8 +59,32 @@ function timestamp(value: number): number {
 	return Number.isFinite(value) && value >= 0 ? Math.floor(value) : Date.now();
 }
 
-/** Convert arbitrary tool data into the protocol's serializable JSON subset. */
-export function toProtocolJsonValue(value: unknown, seen = new Set<object>()): JsonValue | undefined {
+/** Validate and copy a value from an execution boundary into the protocol's JSON-compatible subset. */
+export function toProtocolJsonValue(value: unknown, seen = new Set<object>()): JsonValue {
+	if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+	if (typeof value === "number") {
+		if (!Number.isFinite(value)) throw new TypeError("Protocol JSON numbers must be finite");
+		return value;
+	}
+	if (typeof value !== "object") throw new TypeError(`Unsupported protocol JSON value: ${typeof value}`);
+	if (seen.has(value)) throw new TypeError("Protocol JSON values must not contain circular references");
+	const prototype = Object.getPrototypeOf(value);
+	if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+		throw new TypeError("Protocol JSON objects must be plain objects");
+	}
+	seen.add(value);
+	try {
+		if (Array.isArray(value)) return value.map((entry) => toProtocolJsonValue(entry, seen));
+		const result: Record<string, JsonValue> = {};
+		for (const [key, entry] of Object.entries(value)) result[key] = toProtocolJsonValue(entry, seen);
+		return result;
+	} finally {
+		seen.delete(value);
+	}
+}
+
+/** Lossily sanitize diagnostic tool details that must not affect execution semantics. */
+export function sanitizeProtocolDetails(value: unknown, seen = new Set<object>()): JsonValue | undefined {
 	if (value === null || typeof value === "string" || typeof value === "boolean") return value;
 	if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
 	if (typeof value === "bigint") return value.toString();
@@ -71,10 +94,10 @@ export function toProtocolJsonValue(value: unknown, seen = new Set<object>()): J
 	if (seen.has(value)) return "[Circular]";
 	seen.add(value);
 	try {
-		if (Array.isArray(value)) return value.map((entry) => toProtocolJsonValue(entry, seen) ?? null);
+		if (Array.isArray(value)) return value.map((entry) => sanitizeProtocolDetails(entry, seen) ?? null);
 		const result: Record<string, JsonValue> = {};
 		for (const [key, entry] of Object.entries(value)) {
-			const normalized = toProtocolJsonValue(entry, seen);
+			const normalized = sanitizeProtocolDetails(entry, seen);
 			if (normalized !== undefined) result[key] = normalized;
 		}
 		return result;
@@ -161,7 +184,7 @@ function toProtocolAssistantContent(message: AssistantMessage): AssistantTranscr
 					type: "toolCall",
 					toolCallId: part.id || `tool-${message.timestamp}`,
 					toolName: part.name || "unknown",
-					input: toProtocolJsonValue(part.arguments) ?? null,
+					input: toProtocolJsonValue(part.arguments),
 				};
 			default: {
 				const exhaustive: never = part;
@@ -194,7 +217,7 @@ export function toProtocolAssistantMessage(
 	message: AssistantMessage,
 	options: AssistantTranscriptOptions,
 ): AssistantTranscriptItem {
-	const streaming = options.streaming ?? false;
+	const streaming = message.stopReason === "pending";
 	const stopReason = streaming ? undefined : toProtocolStopReason(message.stopReason);
 	const usage = toProtocolUsage(message.usage);
 	const result = {
@@ -230,14 +253,14 @@ export function toProtocolToolResultMessage(
 	message: ToolResultMessage,
 	options: ToolTranscriptOptions,
 ): ToolTranscriptItem {
-	const details = toProtocolJsonValue(message.details);
+	const details = sanitizeProtocolDetails(message.details);
 	const usage = toProtocolUsage(message.usage);
 	const result = {
 		id: options.id,
 		role: "tool",
 		toolCallId: message.toolCallId || `tool-${message.timestamp}`,
-		toolName: message.toolName || options.call?.toolName || "unknown",
-		input: options.call?.input ?? null,
+		toolName: options.call.toolName,
+		input: options.call.input,
 		content: toProtocolToolContent(message.content),
 		...(details === undefined ? {} : { details }),
 		status: message.isError ? "error" : "complete",

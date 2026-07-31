@@ -3,6 +3,7 @@ import { encodeServerMessage, PROTOCOL_VERSION } from "@earendil-works/pi-protoc
 import { describe, expect, test } from "vitest";
 import {
 	toProtocolAssistantMessage,
+	toProtocolJsonValue,
 	toProtocolModelMetadata,
 	toProtocolToolResultMessage,
 	toProtocolUserMessage,
@@ -21,7 +22,12 @@ const model = {
 	maxTokens: 10_000,
 } satisfies Model<Api>;
 
-function assertValidServerPayload(item: ReturnType<typeof toProtocolAssistantMessage>): void {
+type ProtocolTranscriptItem =
+	| ReturnType<typeof toProtocolAssistantMessage>
+	| ReturnType<typeof toProtocolUserMessage>
+	| ReturnType<typeof toProtocolToolResultMessage>;
+
+function assertValidServerPayload(item: ProtocolTranscriptItem): void {
 	expect(() =>
 		encodeServerMessage({
 			type: "hello",
@@ -53,9 +59,22 @@ function assertValidServerPayload(item: ReturnType<typeof toProtocolAssistantMes
 		encodeServerMessage({
 			type: "event",
 			event: {
-				type: "session_progress",
-				sessionId: "session-1",
-				progress: { type: "item_finished", item },
+				type: "session_snapshot",
+				snapshot: {
+					id: "session-1",
+					cwd: "/workspace",
+					createdAt: 1,
+					updatedAt: 1,
+					phase: "idle",
+					model: { provider: "test-provider", id: "model-1" },
+					thinkingLevel: "off",
+					attached: true,
+					locked: true,
+					revision: 1,
+					transcript: [item],
+					queuedSteer: [],
+					queuedSteerCount: 0,
+				},
 			},
 		}),
 	).not.toThrow();
@@ -132,14 +151,59 @@ describe("pi-ai protocol bridge", () => {
 			timestamp: 2,
 		} satisfies ToolResultMessage;
 
-		expect(toProtocolUserMessage(user, { id: "user-1" })).toMatchObject({
+		const userResult = toProtocolUserMessage(user, { id: "user-1" });
+		expect(userResult).toMatchObject({
 			id: "user-1",
 			content: [{ type: "text", text: "hello" }],
 		});
-		expect(toProtocolToolResultMessage(tool, { id: "tool-1" })).toMatchObject({
+		assertValidServerPayload(userResult);
+
+		const toolResult = toProtocolToolResultMessage(tool, {
 			id: "tool-1",
+			call: { toolName: "read", input: { path: "README.md" } },
+		});
+		expect(toolResult).toMatchObject({
+			id: "tool-1",
+			toolName: "read",
+			input: { path: "README.md" },
 			details: { self: "[Circular]" },
 			status: "complete",
 		});
+		assertValidServerPayload(toolResult);
+	});
+
+	test("derives streaming status from a pending stop reason", () => {
+		const message = {
+			role: "assistant",
+			content: [{ type: "text", text: "partial" }],
+			api: "test-api",
+			provider: "test-provider",
+			model: "model-1",
+			usage: {
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+				totalTokens: 0,
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+			},
+			stopReason: "pending",
+			timestamp: 123,
+		} satisfies AssistantMessage;
+
+		const result = toProtocolAssistantMessage(message, { id: "message-pending" });
+		expect(result).toMatchObject({ status: "streaming" });
+		expect(result).not.toHaveProperty("stopReason");
+		assertValidServerPayload(result);
+	});
+
+	test("rejects lossy tool input conversions", () => {
+		const circular: Record<string, unknown> = {};
+		circular.self = circular;
+
+		expect(() => toProtocolJsonValue(Number.POSITIVE_INFINITY)).toThrow(TypeError);
+		expect(() => toProtocolJsonValue(1n)).toThrow(TypeError);
+		expect(() => toProtocolJsonValue(undefined)).toThrow(TypeError);
+		expect(() => toProtocolJsonValue(circular)).toThrow(TypeError);
 	});
 });
