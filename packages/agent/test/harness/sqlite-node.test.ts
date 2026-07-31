@@ -5,17 +5,22 @@ import {
 	createSqliteSessionRepository,
 	createSqliteSessionSearch,
 	createSqliteSessionStore,
+	type SqliteSessionCreateOptions,
+	type SqliteSessionListOptions,
 	type SqliteSessionMetadata,
 } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
 import { createJsonlSessionRepository, createJsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
 import { createSessionRepository } from "../../src/harness/session/repo-utils.ts";
 import type {
+	JsonlSessionCreateOptions,
+	JsonlSessionListOptions,
 	JsonlSessionMetadata,
 	SessionSearch,
 	SessionSearchHit,
 	SessionSearchIndex,
 	SessionSearchOptions,
+	SessionStore,
 	SessionTreeEntry,
 } from "../../src/harness/types.ts";
 import { createTempDir, createUserMessage } from "./session-test-utils.ts";
@@ -132,7 +137,7 @@ describe("JsonlSessionStore with SQLite search index", () => {
 				await search.replaceSession(metadata, (await canonical.load(metadata)).entries);
 				return metadata;
 			},
-		} satisfies ReturnType<typeof createJsonlSessionStore>;
+		} satisfies SessionStore<JsonlSessionMetadata, JsonlSessionCreateOptions, JsonlSessionListOptions>;
 		const repo = createSessionRepository({ store, search });
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("Find the auth defect"));
@@ -193,7 +198,7 @@ describe("JsonlSessionStore with multiple search indexes", () => {
 				await secondary.replaceSession(metadata, entries);
 				return metadata;
 			},
-		} satisfies ReturnType<typeof createJsonlSessionStore>;
+		} satisfies SessionStore<JsonlSessionMetadata, JsonlSessionCreateOptions, JsonlSessionListOptions>;
 		const repo = createSessionRepository({ store, search: primary });
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("indexed in both places"));
@@ -262,7 +267,7 @@ describe("SqliteSessionStore with custom search", () => {
 				await index.replaceSession(metadata, (await canonical.load(metadata)).entries);
 				return metadata;
 			},
-		} satisfies ReturnType<typeof createSqliteSessionStore>;
+		} satisfies SessionStore<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions>;
 		const repo = createSessionRepository({ store, search });
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const metadata = await session.getMetadata();
