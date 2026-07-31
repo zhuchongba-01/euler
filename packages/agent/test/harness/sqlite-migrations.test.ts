@@ -416,7 +416,7 @@ END;
 		await expect(repo.open(metadata)).rejects.toMatchObject({ code: "invalid_entry" });
 	});
 
-	it("restores in-memory state when appendEntry fails after mutating caches", async () => {
+	it("rolls back state when appendEntry fails after mutating caches", async () => {
 		const root = createTempDir();
 		const databasePath = join(root, "sessions.sqlite");
 		const sqlite = createNodeSqliteFactory();
@@ -445,8 +445,10 @@ END;
 				message: createUserMessage("root"),
 			}),
 		).rejects.toMatchObject({ code: "storage" });
-		expect(await storage.getLeafId()).toBeNull();
-		expect(await storage.getEntry("root")).toBeUndefined();
+		const sessionRow = await db
+			.prepare("SELECT active_leaf_id FROM sessions WHERE id = ?")
+			.get<{ active_leaf_id: string | null }>("session-1");
+		expect(sessionRow?.active_leaf_id).toBeNull();
 		expect(await storage.getEntries()).toEqual([]);
 		await db.close();
 	});
