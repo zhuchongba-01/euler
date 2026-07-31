@@ -7,5 +7,6 @@ lazily owns one shared database connection and implements `AsyncDisposable`.
 
 ```ts
 await using store = createSqliteSessionStore(options);
-const repository = createSessionRepository({ store });
+const search = createSqliteSessionSearch({ ...options, mode: "canonical" });
+const repository = createSessionRepository({ store, search });
 ```

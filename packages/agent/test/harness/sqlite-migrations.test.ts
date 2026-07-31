@@ -298,15 +298,14 @@ END;
 			store: createSqliteSessionStore({ env, sqlite: createNodeSqliteFactory(), databasePath }),
 		});
 		const session = await repo.create({ cwd: root, id: "session-1" });
-		await session.appendMessage(createUserMessage("one"));
-		await session.appendMessage(createAssistantMessage("two"));
-		await session.appendMessage(createUserMessage("three"));
+		const ids = [
+			await session.appendMessage(createUserMessage("one")),
+			await session.appendMessage(createAssistantMessage("two")),
+			await session.appendMessage(createUserMessage("three")),
+		];
 
-		expect((await session.getEntries({ limit: 2 })).map((entry) => entry.type)).toEqual(["message", "message"]);
-		expect((await session.getEntries({ afterEntrySeq: 2, limit: 2 })).map((entry) => entry.type)).toEqual([
-			"message",
-			"message",
-		]);
+		expect((await session.getEntries({ limit: 2 })).map((entry) => entry.id)).toEqual(ids.slice(0, 2));
+		expect((await session.getEntries({ afterEntrySeq: 1, limit: 2 })).map((entry) => entry.id)).toEqual(ids.slice(1));
 	});
 
 	it("closes the database when create fails after openDatabase succeeds", async () => {
