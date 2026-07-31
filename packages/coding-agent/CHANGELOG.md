@@ -13,6 +13,7 @@
 - Fixed malformed resource arrays in package manifests crashing session startup ([#7187](https://github.com/earendil-works/pi/issues/7187)).
 - Fixed the DOOM overlay example downloading its shareware WAD from a dead URL.
 - Fixed `setToolsExpanded(false)` to be a no-op when tool output is already collapsed, avoiding redundant `Tool output: collapsed` startup notices from extensions ([#7292](https://github.com/earendil-works/pi/issues/7292)).
+- Fixed long-running sessions using stale credentials after another process updates `auth.json` ([#7319](https://github.com/earendil-works/pi/issues/7319)).
 
 ## [0.83.0] - 2026-07-29
 
