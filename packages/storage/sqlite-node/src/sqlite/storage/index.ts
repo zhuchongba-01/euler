@@ -238,24 +238,23 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 		);
 	}
 
-	async readHead(): Promise<{ leafId: string | null; entryCount: number }> {
+	async readHead(): Promise<{ leafId: string | null }> {
 		const row = await this.db
 			.prepare(
 				`SELECT
 					s.active_leaf_id,
-					(SELECT COUNT(*) FROM session_entries AS e WHERE e.session_id = s.id) AS entry_count,
 					(s.active_leaf_id IS NULL OR EXISTS (
 						SELECT 1 FROM session_entries AS e WHERE e.session_id = s.id AND e.id = s.active_leaf_id
 					)) AS active_leaf_exists
 				FROM sessions AS s
 				WHERE s.id = ?`,
 			)
-			.get<{ active_leaf_id: string | null; entry_count: number; active_leaf_exists: number }>(this.metadata.id);
+			.get<{ active_leaf_id: string | null; active_leaf_exists: number }>(this.metadata.id);
 		if (!row) throw new SessionError("not_found", `Session not found: ${this.metadata.id}`);
 		if (row.active_leaf_exists === 0) {
 			throw new SessionError("invalid_session", `Entry ${row.active_leaf_id} not found`);
 		}
-		return { leafId: row.active_leaf_id, entryCount: row.entry_count };
+		return { leafId: row.active_leaf_id };
 	}
 
 	async appendEntry(entry: SessionTreeEntry, options: { transaction?: boolean } = {}): Promise<void> {
