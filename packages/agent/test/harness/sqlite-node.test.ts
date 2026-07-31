@@ -8,7 +8,7 @@ import {
 } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
 import { JsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
-import { SessionRepository } from "../../src/harness/session/repo-utils.ts";
+import { SessionRepo } from "../../src/harness/session/repo-utils.ts";
 import { ScanningSessionSearch } from "../../src/harness/session/search-backend.ts";
 import { IndexedSessionStore } from "../../src/harness/session/search-index.ts";
 import type {
@@ -26,7 +26,7 @@ describe("JsonlSessionStore with scanning search", () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		const store = new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") });
-		const repo = new SessionRepository({
+		const repo = new SessionRepo({
 			store,
 			search: new ScanningSessionSearch(store),
 		});
@@ -48,7 +48,7 @@ describe("SqliteSessionStore with explicit SQLite FTS5 search", () => {
 		const sqlite = createNodeSqliteFactory();
 		const databasePath = join(root, "sessions.sqlite");
 		const search = new SqliteSessionSearch<SqliteSessionMetadata>({ env, sqlite, databasePath });
-		const repo = new SessionRepository({
+		const repo = new SessionRepo({
 			store: new IndexedSessionStore({
 				store: new SqliteSessionStore({ env, sqlite, databasePath }),
 				index: search,
@@ -96,7 +96,7 @@ describe("JsonlSessionStore with SQLite search index", () => {
 			sqlite,
 			databasePath: join(root, "search.sqlite"),
 		});
-		const repo = new SessionRepository({
+		const repo = new SessionRepo({
 			store: new IndexedSessionStore({
 				store: new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") }),
 				index: search,
@@ -141,7 +141,7 @@ describe("JsonlSessionStore with multiple search indexes", () => {
 				await secondary.deleteSession(metadata);
 			},
 		};
-		const repo = new SessionRepository({
+		const repo = new SessionRepo({
 			store: new IndexedSessionStore({
 				store: new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") }),
 				index,
@@ -183,7 +183,7 @@ describe("SqliteSessionStore with custom search", () => {
 				return [];
 			},
 		};
-		const repo = new SessionRepository({
+		const repo = new SessionRepo({
 			store: new IndexedSessionStore({
 				store: new SqliteSessionStore({
 					env: new NodeExecutionEnv({ cwd: root }),
