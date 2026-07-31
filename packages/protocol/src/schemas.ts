@@ -87,7 +87,7 @@ export const ImageContentSchema = StrictObject({
 	mimeType: Type.String({ minLength: 1 }),
 });
 export const ToolCallContentSchema = StrictObject({
-	type: Type.Literal("tool_call"),
+	type: Type.Literal("toolCall"),
 	toolCallId: IdSchema,
 	toolName: IdSchema,
 	input: JsonValueSchema,
@@ -140,7 +140,7 @@ export const AssistantTranscriptItemSchema = StrictObject({
 		Type.Union([
 			Type.Literal("stop"),
 			Type.Literal("length"),
-			Type.Literal("tool_use"),
+			Type.Literal("toolUse"),
 			Type.Literal("error"),
 			Type.Literal("aborted"),
 		]),
@@ -181,7 +181,7 @@ export const TranscriptProgressSchema = Type.Union([
 		type: Type.Literal("assistant_delta"),
 		messageId: IdSchema,
 		contentIndex: Type.Integer({ minimum: 0 }),
-		kind: Type.Union([Type.Literal("text"), Type.Literal("thinking"), Type.Literal("tool_call")]),
+		kind: Type.Union([Type.Literal("text"), Type.Literal("thinking"), Type.Literal("toolCall")]),
 		delta: Type.String(),
 	}),
 	StrictObject({
