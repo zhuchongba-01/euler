@@ -2,17 +2,18 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
 	createNodeSqliteFactory,
+	createSqliteSessionRepo,
 	type SqliteSessionMetadata,
 	SqliteSessionSearch,
 	SqliteSessionStore,
+	type SqliteSessionStoreApi,
 } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
-import { JsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
+import { createJsonlSessionRepo, JsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
 import { SessionRepo } from "../../src/harness/session/repo-utils.ts";
-import { ScanningSessionSearch } from "../../src/harness/session/search-backend.ts";
-import { IndexedSessionStore } from "../../src/harness/session/search-index.ts";
 import type {
 	JsonlSessionMetadata,
+	JsonlSessionStoreApi,
 	SessionSearch,
 	SessionSearchHit,
 	SessionSearchIndex,
@@ -25,11 +26,7 @@ describe("JsonlSessionStore with scanning search", () => {
 	it("searches canonical session entries by scanning", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
-		const store = new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") });
-		const repo = new SessionRepo({
-			store,
-			search: new ScanningSessionSearch(store),
-		});
+		const repo = createJsonlSessionRepo({ fs: env, sessionsRoot: join(root, "sessions") });
 		const included = await repo.create({ cwd: root, id: "included" });
 		const excluded = await repo.create({ cwd: `${root}/other`, id: "excluded" });
 		const entryId = await included.appendMessage(createUserMessage("Find the auth defect"));
@@ -47,14 +44,7 @@ describe("SqliteSessionStore with explicit SQLite FTS5 search", () => {
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
 		const databasePath = join(root, "sessions.sqlite");
-		const search = new SqliteSessionSearch<SqliteSessionMetadata>({ env, sqlite, databasePath });
-		const repo = new SessionRepo({
-			store: new IndexedSessionStore({
-				store: new SqliteSessionStore({ env, sqlite, databasePath }),
-				index: search,
-			}),
-			search,
-		});
+		const repo = createSqliteSessionRepo({ env, sqlite, databasePath });
 		const included = await repo.create({ cwd: root, id: "included" });
 		const excluded = await repo.create({ cwd: `${root}/other`, id: "excluded" });
 		const metadata = await included.getMetadata();
@@ -96,13 +86,37 @@ describe("JsonlSessionStore with SQLite search index", () => {
 			sqlite,
 			databasePath: join(root, "search.sqlite"),
 		});
-		const repo = new SessionRepo({
-			store: new IndexedSessionStore({
-				store: new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") }),
-				index: search,
-			}),
-			search,
-		});
+		const canonical = new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") });
+		const store = {
+			load: (metadata) => canonical.load(metadata),
+			list: (options) => canonical.list(options),
+			getEntries: (metadata, options) => canonical.getEntries(metadata, options),
+			createEntryId: (metadata) => canonical.createEntryId(metadata),
+			async create(options) {
+				const metadata = await canonical.create(options);
+				await search.replaceSession(metadata, []);
+				return metadata;
+			},
+			async appendEntry(metadata, entry) {
+				await canonical.appendEntry(metadata, entry);
+				await search.upsertEntry(metadata, entry);
+			},
+			async setLeafId(metadata, leafId) {
+				const entry = await canonical.setLeafId(metadata, leafId);
+				await search.upsertEntry(metadata, entry);
+				return entry;
+			},
+			async delete(metadata) {
+				await canonical.delete(metadata);
+				await search.deleteSession(metadata);
+			},
+			async fork(source, options) {
+				const metadata = await canonical.fork(source, options);
+				await search.replaceSession(metadata, (await canonical.load(metadata)).entries);
+				return metadata;
+			},
+		} satisfies JsonlSessionStoreApi;
+		const repo = new SessionRepo({ store, search });
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("Find the auth defect"));
 
@@ -127,27 +141,43 @@ describe("JsonlSessionStore with multiple search indexes", () => {
 			sqlite,
 			databasePath: join(root, "secondary-search.sqlite"),
 		});
-		const index: SessionSearchIndex<JsonlSessionMetadata> = {
-			async upsertEntry(metadata, entry) {
+		const canonical = new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") });
+		const store = {
+			load: (metadata) => canonical.load(metadata),
+			list: (options) => canonical.list(options),
+			getEntries: (metadata, options) => canonical.getEntries(metadata, options),
+			createEntryId: (metadata) => canonical.createEntryId(metadata),
+			async create(options) {
+				const metadata = await canonical.create(options);
+				await primary.replaceSession(metadata, []);
+				await secondary.replaceSession(metadata, []);
+				return metadata;
+			},
+			async appendEntry(metadata, entry) {
+				await canonical.appendEntry(metadata, entry);
 				await primary.upsertEntry(metadata, entry);
 				await secondary.upsertEntry(metadata, entry);
 			},
-			async replaceSession(metadata, entries) {
-				await primary.replaceSession(metadata, entries);
-				await secondary.replaceSession(metadata, entries);
+			async setLeafId(metadata, leafId) {
+				const entry = await canonical.setLeafId(metadata, leafId);
+				await primary.upsertEntry(metadata, entry);
+				await secondary.upsertEntry(metadata, entry);
+				return entry;
 			},
-			async deleteSession(metadata) {
+			async delete(metadata) {
+				await canonical.delete(metadata);
 				await primary.deleteSession(metadata);
 				await secondary.deleteSession(metadata);
 			},
-		};
-		const repo = new SessionRepo({
-			store: new IndexedSessionStore({
-				store: new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") }),
-				index,
-			}),
-			search: primary,
-		});
+			async fork(source, options) {
+				const metadata = await canonical.fork(source, options);
+				const entries = (await canonical.load(metadata)).entries;
+				await primary.replaceSession(metadata, entries);
+				await secondary.replaceSession(metadata, entries);
+				return metadata;
+			},
+		} satisfies JsonlSessionStoreApi;
+		const repo = new SessionRepo({ store, search: primary });
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("indexed in both places"));
 
@@ -183,21 +213,44 @@ describe("SqliteSessionStore with custom search", () => {
 				return [];
 			},
 		};
-		const repo = new SessionRepo({
-			store: new IndexedSessionStore({
-				store: new SqliteSessionStore({
-					env: new NodeExecutionEnv({ cwd: root }),
-					sqlite: createNodeSqliteFactory(),
-					databasePath: join(root, "sessions.sqlite"),
-				}),
-				index,
-			}),
-			search,
-		});
+		const env = new NodeExecutionEnv({ cwd: root });
+		const sqlite = createNodeSqliteFactory();
+		const databasePath = join(root, "sessions.sqlite");
+		const canonical = new SqliteSessionStore({ env, sqlite, databasePath });
+		const store = {
+			load: (metadata) => canonical.load(metadata),
+			list: (options) => canonical.list(options),
+			getEntries: (metadata, options) => canonical.getEntries(metadata, options),
+			createEntryId: (metadata) => canonical.createEntryId(metadata),
+			async create(options) {
+				const metadata = await canonical.create(options);
+				await index.replaceSession(metadata, []);
+				return metadata;
+			},
+			async appendEntry(metadata, entry) {
+				await canonical.appendEntry(metadata, entry);
+				await index.upsertEntry(metadata, entry);
+			},
+			async setLeafId(metadata, leafId) {
+				const entry = await canonical.setLeafId(metadata, leafId);
+				await index.upsertEntry(metadata, entry);
+				return entry;
+			},
+			async delete(metadata) {
+				await canonical.delete(metadata);
+				await index.deleteSession(metadata);
+			},
+			async fork(source, options) {
+				const metadata = await canonical.fork(source, options);
+				await index.replaceSession(metadata, (await canonical.load(metadata)).entries);
+				return metadata;
+			},
+		} satisfies SqliteSessionStoreApi;
+		const repo = new SessionRepo({ store, search });
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const metadata = await session.getMetadata();
 		const entryId = await session.appendMessage(createUserMessage("indexed remotely"));
-		await session.setLeafId(null);
+		await session.moveTo(null);
 
 		expect(upserts).toContainEqual(
 			expect.objectContaining({ metadata, entry: expect.objectContaining({ id: entryId }) }),

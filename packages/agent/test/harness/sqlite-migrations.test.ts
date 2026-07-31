@@ -143,7 +143,7 @@ describe("SQLite migrations", () => {
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const rootId = await session.appendMessage(createUserMessage("root"));
 		const childId = await session.appendMessage(createAssistantMessage("child"));
-		await session.setLeafId(rootId);
+		await session.moveTo(rootId);
 
 		const db = await sqlite.open(databasePath);
 		try {
@@ -179,7 +179,7 @@ describe("SQLite migrations", () => {
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const rootId = await session.appendMessage(createUserMessage("root"));
 		const firstChildId = await session.appendMessage(createAssistantMessage("first child"));
-		await session.setLeafId(rootId);
+		await session.moveTo(rootId);
 		const secondChildId = await session.appendMessage(createAssistantMessage("second child"));
 
 		const db = await sqlite.open(databasePath);
@@ -210,7 +210,7 @@ describe("SQLite migrations", () => {
 		const rootId = await session.appendMessage(createUserMessage("root"));
 		await session.appendMessage(createAssistantMessage("first child"));
 		await session.appendSessionName("  Reopened Session  ");
-		await session.setLeafId(rootId);
+		await session.moveTo(rootId);
 		await session.appendMessage(createAssistantMessage("branched child"));
 
 		const reopened = await repo.open(await session.getMetadata());

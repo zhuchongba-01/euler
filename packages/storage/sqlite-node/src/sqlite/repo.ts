@@ -10,8 +10,10 @@ import {
 	getEntriesToFork,
 	getFileSystemResultOrThrow,
 	SessionError,
+	SessionRepo,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
+import { SqliteSessionSearch } from "./search-backend.ts";
 import { SqliteSessionStorage } from "./storage/index.ts";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type {
@@ -43,17 +45,19 @@ async function cleanupSessionStorage(storage: SessionStorage): Promise<void> {
 	if (typeof maybeClosable.cleanup === "function") await maybeClosable.cleanup();
 }
 
+export type SqliteSessionStoreOptions = {
+	env: SqliteSessionStoreEnv;
+	sqlite: SqliteDatabaseFactory;
+	databasePath: string;
+};
+
 export class SqliteSessionStore implements SqliteSessionStoreApi {
 	private readonly env: SqliteSessionStoreEnv;
 	private readonly sqlite: SqliteDatabaseFactory;
 	private readonly databasePathInput: string;
 	private databasePath: string | undefined;
 
-	constructor(options: {
-		env: SqliteSessionStoreEnv;
-		sqlite: SqliteDatabaseFactory;
-		databasePath: string;
-	}) {
+	constructor(options: SqliteSessionStoreOptions) {
 		this.env = options.env;
 		this.sqlite = options.sqlite;
 		this.databasePathInput = options.databasePath;
@@ -236,4 +240,15 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 			await db.close();
 		}
 	}
+}
+
+export function createSqliteSessionStore(options: SqliteSessionStoreOptions): SqliteSessionStore {
+	return new SqliteSessionStore(options);
+}
+
+export function createSqliteSessionRepo(
+	options: SqliteSessionStoreOptions,
+): SessionRepo<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions> {
+	const store = createSqliteSessionStore(options);
+	return new SessionRepo({ store, search: new SqliteSessionSearch<SqliteSessionMetadata>(options) });
 }

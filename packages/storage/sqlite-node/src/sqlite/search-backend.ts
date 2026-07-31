@@ -7,6 +7,7 @@ import type {
 	SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import { getFileSystemResultOrThrow } from "@earendil-works/pi-agent-core";
+import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type { SqliteDatabase, SqliteDatabaseFactory, SqliteSessionStoreEnv } from "./types.ts";
 
 function getParentPath(path: string): string {
@@ -23,7 +24,39 @@ async function configureSqliteDatabase(db: SqliteDatabase): Promise<void> {
 	await db.exec("PRAGMA busy_timeout=5000");
 }
 
-async function ensureSearchSchema(db: SqliteDatabase): Promise<void> {
+type SearchSchemaMode = "standalone" | "canonical";
+
+async function tableExists(db: SqliteDatabase, name: string): Promise<boolean> {
+	return !!(await db
+		.prepare("SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1")
+		.get<{ found: number }>(name));
+}
+
+async function ensureSearchSchema(db: SqliteDatabase): Promise<SearchSchemaMode> {
+	if (await tableExists(db, "session_entries")) {
+		const ftsExists = await tableExists(db, "session_search_fts");
+		await db.exec(`
+CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
+  payload,
+  content = 'session_entries',
+  content_rowid = 'rowid',
+  tokenize = 'trigram remove_diacritics 1'
+);
+CREATE TRIGGER IF NOT EXISTS session_search_fts_ai AFTER INSERT ON session_entries BEGIN
+  INSERT INTO session_search_fts(rowid, payload) VALUES (new.rowid, new.payload);
+END;
+CREATE TRIGGER IF NOT EXISTS session_search_fts_ad AFTER DELETE ON session_entries BEGIN
+  INSERT INTO session_search_fts(session_search_fts, rowid, payload) VALUES('delete', old.rowid, old.payload);
+END;
+CREATE TRIGGER IF NOT EXISTS session_search_fts_au AFTER UPDATE OF payload ON session_entries BEGIN
+  INSERT INTO session_search_fts(session_search_fts, rowid, payload) VALUES('delete', old.rowid, old.payload);
+  INSERT INTO session_search_fts(rowid, payload) VALUES (new.rowid, new.payload);
+END;
+`);
+		if (!ftsExists) await db.exec("INSERT INTO session_search_fts(session_search_fts) VALUES('rebuild')");
+		return "canonical";
+	}
+
 	await db.exec(`
 CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
   session_id UNINDEXED,
@@ -35,6 +68,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
   tokenize = 'trigram remove_diacritics 1'
 );
 `);
+	return "standalone";
 }
 
 /**
@@ -69,7 +103,7 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 		return this.databasePath;
 	}
 
-	private async openDatabase(): Promise<SqliteDatabase> {
+	private async openDatabase(): Promise<{ db: SqliteDatabase; schemaMode: SearchSchemaMode }> {
 		const path = await this.getDatabasePath();
 		const directory = getParentPath(path);
 		getFileSystemResultOrThrow(
@@ -79,8 +113,8 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 		const db = await this.options.sqlite.open(path);
 		try {
 			await configureSqliteDatabase(db);
-			await ensureSearchSchema(db);
-			return db;
+			const schemaMode = await ensureSearchSchema(db);
+			return { db, schemaMode };
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -88,8 +122,9 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 	}
 
 	async upsertEntry(metadata: TMetadata, entry: SessionTreeEntry): Promise<void> {
-		const db = await this.openDatabase();
+		const { db, schemaMode } = await this.openDatabase();
 		try {
+			if (schemaMode === "canonical") return;
 			const cwd = (metadata as { cwd?: unknown }).cwd;
 			const sessionId = metadata.id;
 			const entryId = entry.id;
@@ -112,15 +147,38 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 	}
 
 	async replaceSession(metadata: TMetadata, entries: readonly SessionTreeEntry[]): Promise<void> {
-		await this.deleteSession(metadata);
-		for (const entry of entries) {
-			await this.upsertEntry(metadata, entry);
+		const { db, schemaMode } = await this.openDatabase();
+		try {
+			if (schemaMode === "canonical") return;
+			const cwd = (metadata as { cwd?: unknown }).cwd;
+			const sessionId = metadata.id;
+			const metadataJson = JSON.stringify(metadata);
+			await db.transaction(async () => {
+				await db.prepare("DELETE FROM session_search_fts WHERE session_id = ?").run(sessionId);
+				for (const entry of entries) {
+					await db
+						.prepare(
+							"INSERT INTO session_search_fts (session_id, entry_id, timestamp, cwd, metadata_json, search_text) VALUES (?, ?, ?, ?, ?, ?)",
+						)
+						.run(
+							sessionId,
+							entry.id,
+							entry.timestamp,
+							typeof cwd === "string" ? cwd : null,
+							metadataJson,
+							JSON.stringify(entry),
+						);
+				}
+			});
+		} finally {
+			await db.close();
 		}
 	}
 
 	async deleteSession(metadata: TMetadata): Promise<void> {
-		const db = await this.openDatabase();
+		const { db, schemaMode } = await this.openDatabase();
 		try {
+			if (schemaMode === "canonical") return;
 			await db.prepare("DELETE FROM session_search_fts WHERE session_id = ?").run(metadata.id);
 		} finally {
 			await db.close();
@@ -130,9 +188,27 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 	async search(options: SessionSearchOptions): Promise<SessionSearchHit<TMetadata>[]> {
 		const text = options.text.trim();
 		if (!text) return [];
-		const db = await this.openDatabase();
+		const { db, schemaMode } = await this.openDatabase();
 		try {
 			const query = `"${text.replaceAll('"', '""')}"`;
+			if (schemaMode === "canonical") {
+				const rows = await db
+					.prepare(
+						"SELECT s.id, s.created_at, s.metadata, s.cwd, s.parent_session_id, s.active_leaf_id, se.id AS entry_id, se.timestamp, bm25(session_search_fts) AS score FROM session_search_fts JOIN session_entries se ON se.rowid = session_search_fts.rowid JOIN sessions s ON s.id = se.session_id WHERE session_search_fts MATCH ? AND (? IS NULL OR s.cwd = ?) ORDER BY score",
+					)
+					.all<SessionRow & { entry_id: string; timestamp: string; score: number }>(
+						query,
+						options.cwd ?? null,
+						options.cwd ?? null,
+					);
+				const path = await this.getDatabasePath();
+				return rows.map((row) => ({
+					metadata: rowToMetadata(row, path) as unknown as TMetadata,
+					entryId: row.entry_id,
+					timestamp: row.timestamp,
+					score: row.score,
+				}));
+			}
 			const rows = await db
 				.prepare(
 					"SELECT metadata_json, entry_id, timestamp, bm25(session_search_fts) AS score FROM session_search_fts WHERE session_search_fts MATCH ? AND (? IS NULL OR cwd = ?) ORDER BY score",
