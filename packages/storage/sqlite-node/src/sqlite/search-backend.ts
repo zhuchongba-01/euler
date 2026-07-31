@@ -128,6 +128,15 @@ class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>
 		}
 	}
 
+	async reset(): Promise<void> {
+		const db = await this.openDatabase();
+		try {
+			if (this.mode === "standalone") await db.prepare("DELETE FROM session_search_fts").run();
+		} finally {
+			await db.close();
+		}
+	}
+
 	async upsertEntry(metadata: TMetadata, entry: SessionTreeEntry): Promise<void> {
 		const db = await this.openDatabase();
 		try {

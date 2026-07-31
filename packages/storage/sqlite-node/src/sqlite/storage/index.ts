@@ -1,10 +1,5 @@
-import type {
-	LeafEntry,
-	SessionEntryCursorOptions,
-	SessionStorage,
-	SessionTreeEntry,
-} from "@earendil-works/pi-agent-core";
-import { SessionError } from "@earendil-works/pi-agent-core";
+import type { LeafEntry, SessionEntryCursorOptions, SessionTreeEntry } from "@earendil-works/pi-agent-core";
+import { SessionError, toError } from "@earendil-works/pi-agent-core";
 import { uuidv7 } from "@earendil-works/pi-ai";
 import type { SqliteDatabase, SqliteSessionMetadata } from "../types.ts";
 import { getMaterializedBranchPathOrCompaction } from "./branch-entries.ts";
@@ -23,7 +18,7 @@ import {
 } from "./session-materialized.ts";
 import { advanceSequence, getNextSequence } from "./session-sequences.ts";
 import { rowToMetadata, type SessionRow } from "./sessions.ts";
-import { generateEntryId, invalidSession, leafIdAfterEntry } from "./shared.ts";
+import { generateEntryId, invalidEntry, invalidSession, leafIdAfterEntry } from "./shared.ts";
 
 async function decodeEntryRows(entryRows: SessionEntryRow[]): Promise<{
 	entries: SessionTreeEntry[];
@@ -36,8 +31,8 @@ async function decodeEntryRows(entryRows: SessionEntryRow[]): Promise<{
 			const entry = decodeEntry(entryRow);
 			entries.push(entry);
 			leafId = leafIdAfterEntry(entry);
-		} catch {
-			// Keep JSONL-like permissive resume behavior: skip malformed entries.
+		} catch (error) {
+			throw invalidEntry(`failed to decode entry ${entryRow.id}`, toError(error));
 		}
 	}
 	return { entries, leafId };
@@ -81,7 +76,7 @@ async function hasExistingChild(db: SqliteDatabase, sessionId: string, parentId:
 	return row !== undefined;
 }
 
-async function loadSqliteStorage(
+async function loadSqliteSession(
 	db: SqliteDatabase,
 	sessionId: string,
 ): Promise<{
@@ -113,7 +108,7 @@ async function loadSqliteStorage(
 	};
 }
 
-export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadata> {
+export class SqliteSessionConnection {
 	private readonly db: SqliteDatabase;
 	private readonly metadata: SqliteSessionMetadata;
 	private byId: Map<string, SessionTreeEntry>;
@@ -199,9 +194,9 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 		this.activeBranchId = activeBranchId;
 	}
 
-	static async open(db: SqliteDatabase, metadata: SqliteSessionMetadata): Promise<SqliteSessionStorage> {
-		const loaded = await loadSqliteStorage(db, metadata.id);
-		return new SqliteSessionStorage(
+	static async open(db: SqliteDatabase, metadata: SqliteSessionMetadata): Promise<SqliteSessionConnection> {
+		const loaded = await loadSqliteSession(db, metadata.id);
+		return new SqliteSessionConnection(
 			db,
 			rowToMetadata(loaded.row, metadata.path),
 			null,
@@ -220,7 +215,7 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 			parentSessionId?: string;
 			metadata?: Record<string, unknown>;
 		},
-	): Promise<SqliteSessionStorage> {
+	): Promise<SqliteSessionConnection> {
 		const createdAt = new Date().toISOString();
 		await db
 			.prepare(
@@ -238,7 +233,7 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 		await db
 			.prepare("INSERT INTO session_materialized (session_id, payload) VALUES (?, ?)")
 			.run(...materializedStateValues(options.sessionId, createEmptyMaterializedState()));
-		return new SqliteSessionStorage(
+		return new SqliteSessionConnection(
 			db,
 			{
 				id: options.sessionId,
@@ -289,7 +284,7 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 		return uuidv7();
 	}
 
-	async appendEntry(entry: SessionTreeEntry): Promise<void> {
+	async appendEntry(entry: SessionTreeEntry, options: { transaction?: boolean } = {}): Promise<void> {
 		const encoded = encodeEntry(entry);
 		const previousMaterializedState: SessionMaterializedState = {
 			...this.materializedState,
@@ -302,7 +297,7 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 		const previousActiveBranchId = this.activeBranchId;
 		try {
 			applyEntryToMaterializedState(this.materializedState, entry);
-			await this.db.transaction(async () => {
+			const write = async () => {
 				const parentHadExistingChild = await hasExistingChild(this.db, this.metadata.id, entry.parentId);
 				const nextSeq = await getNextSequence(this.db, this.metadata.id);
 				await this.db
@@ -334,7 +329,9 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 					}
 					await this.appendToActiveBranch(entry.id, entry.parentId);
 				}
-			});
+			};
+			if (options.transaction === false) await write();
+			else await this.db.transaction(write);
 		} catch (error) {
 			this.materializedState = previousMaterializedState;
 			this.labelsById = previousMaterializedState.labelsById;
@@ -342,7 +339,7 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 			this.currentLeafId = previousLeafId;
 			this.activeBranchId = previousActiveBranchId;
 			if (error instanceof SessionError) throw error;
-			throw new SessionError("storage", `Failed to append SQLite session entry ${entry.id}`);
+			throw new SessionError("storage", `Failed to append SQLite session entry ${entry.id}`, toError(error));
 		}
 	}
 
@@ -359,8 +356,8 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 			const entry = decodeEntry(row);
 			this.byId.set(entry.id, entry);
 			return entry;
-		} catch {
-			return undefined;
+		} catch (error) {
+			throw invalidEntry(`failed to decode entry ${row.id}`, toError(error));
 		}
 	}
 
@@ -378,8 +375,8 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 				const entry = decodeEntry(row) as Extract<SessionTreeEntry, { type: TType }>;
 				this.byId.set(entry.id, entry);
 				entries.push(entry);
-			} catch {
-				// Keep JSONL-like permissive resume behavior: skip malformed entries.
+			} catch (error) {
+				throw invalidEntry(`failed to decode entry ${row.id}`, toError(error));
 			}
 		}
 		return entries;
@@ -442,9 +439,5 @@ export class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadat
 			this.byId.set(entry.id, entry);
 		}
 		return entries;
-	}
-
-	async cleanup(): Promise<void> {
-		await this.db.close();
 	}
 }

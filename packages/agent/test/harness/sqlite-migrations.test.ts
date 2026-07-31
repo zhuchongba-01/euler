@@ -10,11 +10,11 @@ import {
 	type SqliteDatabaseFactory,
 	type SqliteRunResult,
 	type SqliteSessionMetadata,
-	SqliteSessionStorage,
 	type SqliteStatement,
 } from "../../../storage/sqlite-node/src/index.ts";
+import { SqliteSessionConnection } from "../../../storage/sqlite-node/src/sqlite/storage/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
-import { createSessionRepository } from "../../src/harness/session/repo-utils.ts";
+import { createSessionRepository } from "../../src/harness/session/repository.ts";
 import { createAssistantMessage, createUserMessage } from "./session-test-utils.ts";
 
 function createTempDir(): string {
@@ -96,7 +96,8 @@ describe("SQLite migrations", () => {
 		const databasePath = join(root, "sessions.sqlite");
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
-		const repo = createSessionRepository({ store: createSqliteSessionStore({ env, sqlite, databasePath }) });
+		const store = createSqliteSessionStore({ env, sqlite, databasePath });
+		const repo = createSessionRepository({ store });
 		await repo.create({ cwd: root, id: "session-1" });
 
 		const db = await sqlite.open(databasePath);
@@ -160,12 +161,53 @@ describe("SQLite migrations", () => {
 		expect((await overridden.getMetadata()).metadata).toEqual({ profile: "writer" });
 	});
 
+	it("rolls back the entire fork when copying an entry fails", async () => {
+		const root = createTempDir();
+		const databasePath = join(root, "sessions.sqlite");
+		const env = new NodeExecutionEnv({ cwd: root });
+		const sqlite = createNodeSqliteFactory();
+		const store = createSqliteSessionStore({ env, sqlite, databasePath });
+		const repo = createSessionRepository({ store });
+		const source = await repo.create({ cwd: root, id: "source" });
+		await source.appendMessage(createUserMessage("one"));
+		await source.appendMessage(createAssistantMessage("two"));
+
+		const db = await sqlite.open(databasePath);
+		try {
+			await db.exec(`
+CREATE TRIGGER fail_fork_entry BEFORE INSERT ON session_entries
+WHEN new.session_id = 'fork' AND new.entry_seq = 2
+BEGIN
+  SELECT RAISE(ABORT, 'fail fork');
+END;
+`);
+		} finally {
+			await db.close();
+		}
+
+		await expect(repo.fork(await source.getMetadata(), { cwd: root, id: "fork" })).rejects.toMatchObject({
+			code: "storage",
+		});
+		const inspection = await sqlite.open(databasePath);
+		try {
+			expect(
+				await inspection.prepare("SELECT id FROM sessions WHERE id = ?").get<{ id: string }>("fork"),
+			).toBeUndefined();
+			expect(
+				await inspection.prepare("SELECT id FROM session_entries WHERE session_id = ?").all<{ id: string }>("fork"),
+			).toEqual([]);
+		} finally {
+			await inspection.close();
+		}
+	});
+
 	it("materializes active leaf id in sessions transactionally", async () => {
 		const root = createTempDir();
 		const databasePath = join(root, "sessions.sqlite");
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
-		const repo = createSessionRepository({ store: createSqliteSessionStore({ env, sqlite, databasePath }) });
+		const store = createSqliteSessionStore({ env, sqlite, databasePath });
+		const repo = createSessionRepository({ store });
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const rootId = await session.appendMessage(createUserMessage("root"));
 		const childId = await session.appendMessage(createAssistantMessage("child"));
@@ -201,7 +243,8 @@ describe("SQLite migrations", () => {
 		const databasePath = join(root, "sessions.sqlite");
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
-		const repo = createSessionRepository({ store: createSqliteSessionStore({ env, sqlite, databasePath }) });
+		const store = createSqliteSessionStore({ env, sqlite, databasePath });
+		const repo = createSessionRepository({ store });
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const rootId = await session.appendMessage(createUserMessage("root"));
 		const firstChildId = await session.appendMessage(createAssistantMessage("first child"));
@@ -255,15 +298,14 @@ describe("SQLite migrations", () => {
 			store: createSqliteSessionStore({ env, sqlite: createNodeSqliteFactory(), databasePath }),
 		});
 		const session = await repo.create({ cwd: root, id: "session-1" });
-		await session.appendMessage(createUserMessage("one"));
-		await session.appendMessage(createAssistantMessage("two"));
-		await session.appendMessage(createUserMessage("three"));
+		const ids = [
+			await session.appendMessage(createUserMessage("one")),
+			await session.appendMessage(createAssistantMessage("two")),
+			await session.appendMessage(createUserMessage("three")),
+		];
 
-		expect((await session.getEntries({ limit: 2 })).map((entry) => entry.type)).toEqual(["message", "message"]);
-		expect((await session.getEntries({ afterEntrySeq: 2, limit: 2 })).map((entry) => entry.type)).toEqual([
-			"message",
-			"message",
-		]);
+		expect((await session.getEntries({ limit: 2 })).map((entry) => entry.id)).toEqual(ids.slice(0, 2));
+		expect((await session.getEntries({ afterEntrySeq: 1, limit: 2 })).map((entry) => entry.id)).toEqual(ids.slice(1));
 	});
 
 	it("closes the database when create fails after openDatabase succeeds", async () => {
@@ -280,11 +322,12 @@ describe("SQLite migrations", () => {
 			open: async () => db,
 		};
 		const env = new NodeExecutionEnv({ cwd: root });
-		const repo = createSessionRepository({
-			store: createSqliteSessionStore({ env, sqlite, databasePath: join(root, "sessions.sqlite") }),
-		});
+		const store = createSqliteSessionStore({ env, sqlite, databasePath: join(root, "sessions.sqlite") });
+		const repo = createSessionRepository({ store });
 
 		await expect(repo.create({ cwd: root, id: "session-1" })).rejects.toThrow("insert failed");
+		expect(db.closeCount).toBe(0);
+		await store[Symbol.asyncDispose]();
 		expect(db.closeCount).toBe(1);
 	});
 
@@ -300,9 +343,8 @@ describe("SQLite migrations", () => {
 			open: async () => db,
 		};
 		const env = new NodeExecutionEnv({ cwd: root });
-		const repo = createSessionRepository({
-			store: createSqliteSessionStore({ env, sqlite, databasePath: join(root, "sessions.sqlite") }),
-		});
+		const store = createSqliteSessionStore({ env, sqlite, databasePath: join(root, "sessions.sqlite") });
+		const repo = createSessionRepository({ store });
 		const metadata: SqliteSessionMetadata = {
 			id: "missing",
 			createdAt: new Date().toISOString(),
@@ -312,22 +354,66 @@ describe("SQLite migrations", () => {
 		writeFileSync(metadata.path, "");
 
 		await expect(repo.open(metadata)).rejects.toThrow("Session not found: missing");
+		expect(db.closeCount).toBe(0);
+		await store[Symbol.asyncDispose]();
 		expect(db.closeCount).toBe(1);
 	});
 
-	it("closes the source storage after fork reads its entries", async () => {
+	it("retains one connection for repeated session operations", async () => {
 		const root = createTempDir();
 		const databasePath = join(root, "sessions.sqlite");
 		const env = new NodeExecutionEnv({ cwd: root });
 		const { sqlite, counts } = createCloseCountingSqliteFactory();
-		const repo = createSessionRepository({ store: createSqliteSessionStore({ env, sqlite, databasePath }) });
+		const store = createSqliteSessionStore({ env, sqlite, databasePath });
+		const repo = createSessionRepository({ store });
+
+		const session = await repo.create({ cwd: root, id: "session-1" });
+		for (let i = 0; i < 10; i++) await session.appendMessage(createUserMessage(`message ${i}`));
+		await session.getEntries();
+		expect(counts).toEqual({ opens: 1, closes: 0 });
+		await store[Symbol.asyncDispose]();
+		expect(counts).toEqual({ opens: 1, closes: 1 });
+		await store[Symbol.asyncDispose]();
+		expect(counts).toEqual({ opens: 1, closes: 1 });
+	});
+
+	it("shares one connection across source and fork until the store is disposed", async () => {
+		const root = createTempDir();
+		const databasePath = join(root, "sessions.sqlite");
+		const env = new NodeExecutionEnv({ cwd: root });
+		const { sqlite, counts } = createCloseCountingSqliteFactory();
+		const store = createSqliteSessionStore({ env, sqlite, databasePath });
+		const repo = createSessionRepository({ store });
 		const source = await repo.create({ cwd: root, id: "session-1" });
 
-		counts.opens = 0;
-		counts.closes = 0;
-		await repo.fork(await source.getMetadata(), { cwd: root, id: "session-2" });
+		const fork = await repo.fork(await source.getMetadata(), { cwd: root, id: "session-2" });
+		await fork.appendMessage(createUserMessage("fork"));
+		expect(counts).toEqual({ opens: 1, closes: 0 });
+		await store[Symbol.asyncDispose]();
+		expect(counts).toEqual({ opens: 1, closes: 1 });
+	});
 
-		expect(counts).toEqual({ opens: 2, closes: 2 });
+	it("fails loudly when a stored entry cannot be decoded", async () => {
+		const root = createTempDir();
+		const databasePath = join(root, "sessions.sqlite");
+		const env = new NodeExecutionEnv({ cwd: root });
+		const sqlite = createNodeSqliteFactory();
+		const store = createSqliteSessionStore({ env, sqlite, databasePath });
+		const repo = createSessionRepository({ store });
+		const session = await repo.create({ cwd: root, id: "session-1" });
+		const entryId = await session.appendMessage(createUserMessage("message"));
+		const metadata = await session.getMetadata();
+
+		const db = await sqlite.open(databasePath);
+		try {
+			await db
+				.prepare("UPDATE session_entries SET payload = ? WHERE session_id = ? AND id = ?")
+				.run("not json", metadata.id, entryId);
+		} finally {
+			await db.close();
+		}
+
+		await expect(repo.open(metadata)).rejects.toMatchObject({ code: "invalid_entry" });
 	});
 
 	it("restores in-memory state when appendEntry fails after mutating caches", async () => {
@@ -336,7 +422,7 @@ describe("SQLite migrations", () => {
 		const sqlite = createNodeSqliteFactory();
 		const db = await sqlite.open(databasePath);
 		await applyMigrations(db);
-		const storage = await SqliteSessionStorage.create(db, databasePath, {
+		const storage = await SqliteSessionConnection.create(db, databasePath, {
 			cwd: root,
 			sessionId: "session-1",
 		});
@@ -370,7 +456,8 @@ describe("SQLite migrations", () => {
 		const databasePath = join(root, "sessions.sqlite");
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
-		const repo = createSessionRepository({ store: createSqliteSessionStore({ env, sqlite, databasePath }) });
+		const store = createSqliteSessionStore({ env, sqlite, databasePath });
+		const repo = createSessionRepository({ store });
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const userId = await session.appendMessage(createUserMessage("one"));
 		await session.appendThinkingLevelChange("high");
