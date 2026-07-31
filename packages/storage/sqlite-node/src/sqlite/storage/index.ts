@@ -153,9 +153,9 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 		activeBranchId: string | null,
 	): Promise<string> {
 		let branchId = activeBranchId;
+		// Reuse the staged active branch when available. Otherwise materialize
+		// the parent path once, then add only the new tip entry below.
 		if (!branchId) branchId = await this.materializeBranch(parentId);
-		// After a branch is materialized/resynced, subsequent linear appends only add the
-		// new tip entry. We do not rebuild the full branch on every append.
 		const entryRow = await this.db
 			.prepare("SELECT entry_seq FROM session_entries WHERE session_id = ? AND id = ?")
 			.get<{ entry_seq: number }>(this.metadata.id, entryId);
