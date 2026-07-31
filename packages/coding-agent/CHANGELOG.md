@@ -5,9 +5,9 @@
 ### Added
 
 - Added chainable `pi.registerMarkdownTransformer()` hooks for display-only transformation of user and assistant Markdown.
-- Added `--alt` to run interactive mode with the alternate-screen TUI ([#7304](https://github.com/earendil-works/pi/issues/7304)).
-- Added a sticky editor, status, widget, and footer dock to `--alt` mode while keeping the transcript independently scrollable.
-- Added a transient draggable transcript scrollbar to `--alt` mode.
+- Added an experimental fullscreen UI mode, selectable through `--ui-mode fullscreen` or `/settings` ([#7304](https://github.com/earendil-works/pi/issues/7304)).
+- Added a sticky editor, status, widget, and footer dock to fullscreen mode while keeping the transcript independently scrollable.
+- Added a transient draggable transcript scrollbar to fullscreen mode.
 
 ### Fixed
 
