@@ -747,6 +747,8 @@ export class InteractiveMode {
 				follow: "end",
 				primary: true,
 				overscroll: "chain",
+				scrollbar: "auto",
+				scrollbarStyle: (text) => theme.bg("selectedBg", text),
 			});
 			const dock = new TuiLayouts.VStack([
 				{ component: this.pendingMessagesContainer, shrink: 1, minSize: 0 },
@@ -2458,6 +2460,9 @@ export class InteractiveMode {
 			}
 			if (newEditor.setPaddingX !== undefined) {
 				newEditor.setPaddingX(this.defaultEditor.getPaddingX());
+			}
+			if (newEditor.setAutocompleteMaxVisible !== undefined) {
+				newEditor.setAutocompleteMaxVisible(this.defaultEditor.getAutocompleteMaxVisible());
 			}
 
 			// Set autocomplete if supported

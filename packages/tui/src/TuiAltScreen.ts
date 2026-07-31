@@ -1,6 +1,14 @@
+import { AltScreenFlashContainer } from "./components/alt-screen-flash.ts";
 import { ScrollView } from "./components/scroll-view.ts";
 import { getKeybindings } from "./keybindings.ts";
-import { getScrollViewBox, getScrollViewsAt, type LayoutFrame, renderLayoutFrame } from "./layout.ts";
+import {
+	getScrollbarGeometry,
+	getScrollViewBox,
+	getScrollViewsAt,
+	type LayoutFrame,
+	renderLayoutFrame,
+	type ScrollbarGeometry,
+} from "./layout.ts";
 import type { Terminal } from "./terminal.ts";
 import {
 	deleteAllKittyImages,
@@ -10,7 +18,7 @@ import {
 	setCapabilities,
 	type TerminalCapabilities,
 } from "./terminal-image.ts";
-import { type Component, CURSOR_MARKER, TuiBase, VIEWPORT_TUI, type ViewportTUI } from "./tui.ts";
+import { type Component, CURSOR_MARKER, compositeTuiLine, TuiBase, VIEWPORT_TUI, type ViewportTUI } from "./tui.ts";
 import {
 	extractAnsiCode,
 	getGraphemeCellRange,
@@ -24,8 +32,10 @@ const ENTER_ALT_SCREEN = "\x1b[?1049h";
 const EXIT_ALT_SCREEN = "\x1b[?1049l";
 const DISABLE_AUTOWRAP = "\x1b[?7l";
 const ENABLE_AUTOWRAP = "\x1b[?7h";
-const ENABLE_MOUSE = "\x1b[?1000h\x1b[?1002h\x1b[?1006h";
-const DISABLE_MOUSE = "\x1b[?1006l\x1b[?1002l\x1b[?1000l";
+const ENABLE_MOUSE = "\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1004h\x1b[?1006h";
+const DISABLE_MOUSE = "\x1b[?1006l\x1b[?1004l\x1b[?1003l\x1b[?1002l\x1b[?1000l";
+const FOCUS_IN = "\x1b[I";
+const FOCUS_OUT = "\x1b[O";
 const BEGIN_SYNCHRONIZED_OUTPUT = "\x1b[?2026h";
 const END_SYNCHRONIZED_OUTPUT = "\x1b[?2026l";
 const OSC133_ZONE_PREFIX = /^(?:\x1b\]133;[ABC](?:\x07|\x1b\\))+/;
@@ -49,6 +59,16 @@ interface WheelEvent {
 	y: number;
 }
 
+interface ScrollbarDrag {
+	scrollView: ScrollView;
+	grabOffset: number;
+}
+
+interface ScrollbarTarget {
+	scrollView: ScrollView;
+	geometry: ScrollbarGeometry;
+}
+
 export interface TuiAltScreenOptions {
 	/** Number of logical lines moved for each mouse-wheel event. */
 	wheelScrollLines?: number;
@@ -69,6 +89,7 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 	private currentLayout: LayoutFrame | undefined;
 	private readonly implicitDocument: Component;
 	private readonly implicitScrollView: ScrollView;
+	private readonly flashes: AltScreenFlashContainer;
 	private altScreenActive = false;
 	private imageProtocol: ImageProtocol = null;
 	private savedCapabilities?: TerminalCapabilities;
@@ -77,6 +98,9 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 	private selectionDragPointer?: { x: number; y: number };
 	private selectionAutoScrollDirection: -1 | 0 | 1 = 0;
 	private selectionAutoScrollTimer?: NodeJS.Timeout;
+	private selectionPressActive = false;
+	private scrollbarDrag?: ScrollbarDrag;
+	private scrollbarHover?: ScrollView;
 	private pressedUrl?: string;
 	private selectionDragged = false;
 	private readonly wheelScrollLines: number;
@@ -97,7 +121,8 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 			},
 		};
 		this.implicitScrollView = new ScrollView(this.implicitDocument, { follow: "end", primary: true });
-		this.wheelScrollLines = Math.max(1, Math.floor(options.wheelScrollLines ?? 3));
+		this.flashes = new AltScreenFlashContainer(() => this.requestRender());
+		this.wheelScrollLines = Math.max(1, Math.floor(options.wheelScrollLines ?? 1));
 		this.mouseEnabled = options.mouse ?? true;
 		this.openUrl = options.openUrl;
 		this.addInputListener((data) => this.handleViewportInput(data));
@@ -137,6 +162,10 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 
 	protected override beforeTerminalStart(): void {
 		this.stopSelectionAutoScroll();
+		this.selectionPressActive = false;
+		this.stopScrollbarHover();
+		this.stopScrollbarDrag();
+		this.flashes.dispose();
 		this.altScreenActive = true;
 		const capabilities = getCapabilities();
 		this.imageProtocol = capabilities.images;
@@ -158,6 +187,10 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 
 	protected override beforeTerminalStop(): void {
 		this.stopSelectionAutoScroll();
+		this.selectionPressActive = false;
+		this.stopScrollbarHover();
+		this.stopScrollbarDrag();
+		this.flashes.dispose();
 		if (!this.altScreenActive) return;
 		this.terminal.write(
 			`${BEGIN_SYNCHRONIZED_OUTPUT}${this.deleteKittyImages()}${this.mouseEnabled ? DISABLE_MOUSE : ""}${ENABLE_AUTOWRAP}${END_SYNCHRONIZED_OUTPUT}`,
@@ -211,7 +244,29 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 		this.requestRender();
 	}
 
+	/** Show a transient message in the alternate-screen flash stack. */
+	flash(message: string, durationMs?: number): void {
+		this.flashes.flash(message, durationMs);
+	}
+
 	private handleViewportInput(data: string): { consume?: boolean } | undefined {
+		if (data === FOCUS_OUT) {
+			const hadActiveSelection = this.selectionPressActive;
+			this.selectionPressActive = false;
+			this.stopSelectionAutoScroll();
+			this.stopScrollbarHover();
+			this.stopScrollbarDrag();
+			this.pressedUrl = undefined;
+			this.selectionDragged = false;
+			if (hadActiveSelection) {
+				this.selectionAnchor = undefined;
+				this.selectionFocus = undefined;
+			}
+			this.requestRender();
+			return { consume: true };
+		}
+		if (data === FOCUS_IN) return { consume: true };
+
 		const wheelEvent = this.parseWheelEvent(data);
 		if (wheelEvent) {
 			this.routeWheel(wheelEvent);
@@ -219,7 +274,9 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 		}
 		const mouseEvent = this.parseSgrMouseEvent(data);
 		if (mouseEvent) {
-			this.handleSelectionMouseEvent(mouseEvent);
+			const handled = this.handleScrollbarMouseEvent(mouseEvent);
+			if (!this.scrollbarDrag) this.updateScrollbarHover(mouseEvent.x, mouseEvent.y);
+			if (!handled) this.handleSelectionMouseEvent(mouseEvent);
 			return { consume: true };
 		}
 		if (this.isMouseSequence(data)) return { consume: true };
@@ -281,6 +338,7 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 		}
 		const primary = this.getPrimaryScrollView();
 		if (remaining !== 0 && !seen.has(primary)) primary.scrollBy(remaining);
+		this.updateScrollbarHover(event.x, event.y);
 		this.requestRender();
 	}
 
@@ -293,6 +351,82 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 			y: Number.parseInt(match[3], 10) - 1,
 			release: match[4] === "m",
 		};
+	}
+
+	private getScrollbarTargetAt(x: number, y: number): ScrollbarTarget | undefined {
+		if (this.hasOverlay() || !this.currentLayout) return undefined;
+		for (const scrollView of getScrollViewsAt(this.currentLayout, x, y)) {
+			const box = getScrollViewBox(this.currentLayout, scrollView);
+			const geometry = box ? getScrollbarGeometry(box) : undefined;
+			if (
+				geometry &&
+				x === geometry.column &&
+				y >= geometry.thumbTop &&
+				y < geometry.thumbTop + geometry.thumbHeight
+			) {
+				return { scrollView, geometry };
+			}
+		}
+		return undefined;
+	}
+
+	private setScrollbarHover(scrollView: ScrollView | undefined): void {
+		if (scrollView === this.scrollbarHover) return;
+		this.scrollbarHover?.setScrollbarActive(false);
+		this.scrollbarHover = scrollView;
+		this.scrollbarHover?.setScrollbarActive(true);
+	}
+
+	private updateScrollbarHover(x: number, y: number): void {
+		this.setScrollbarHover(this.getScrollbarTargetAt(x, y)?.scrollView);
+	}
+
+	private stopScrollbarHover(): void {
+		this.setScrollbarHover(undefined);
+	}
+
+	private handleScrollbarMouseEvent(event: SgrMouseEvent): boolean {
+		if (this.scrollbarDrag) {
+			if (event.release) {
+				this.stopScrollbarDrag();
+				return true;
+			}
+			const box = this.currentLayout
+				? getScrollViewBox(this.currentLayout, this.scrollbarDrag.scrollView)
+				: undefined;
+			const geometry = box ? getScrollbarGeometry(box) : undefined;
+			if (geometry) {
+				const maxThumbOffset = geometry.trackHeight - geometry.thumbHeight;
+				const thumbOffset = Math.max(
+					0,
+					Math.min(maxThumbOffset, event.y - geometry.trackTop - this.scrollbarDrag.grabOffset),
+				);
+				const scrollTop =
+					maxThumbOffset === 0 ? 0 : Math.round((thumbOffset / maxThumbOffset) * geometry.maxScrollTop);
+				this.scrollbarDrag.scrollView.scrollTo(scrollTop);
+			}
+			return true;
+		}
+
+		if (event.release || (event.button & 32) !== 0 || (event.button & 3) !== 0) return false;
+		const target = this.getScrollbarTargetAt(event.x, event.y);
+		if (!target) return false;
+		this.stopSelectionAutoScroll();
+		this.selectionPressActive = false;
+		this.selectionAnchor = undefined;
+		this.selectionFocus = undefined;
+		this.pressedUrl = undefined;
+		this.selectionDragged = false;
+		this.setScrollbarHover(target.scrollView);
+		this.scrollbarDrag = {
+			scrollView: target.scrollView,
+			grabOffset: event.y - target.geometry.thumbTop,
+		};
+		return true;
+	}
+
+	private stopScrollbarDrag(): void {
+		this.scrollbarDrag = undefined;
 	}
 
 	private getScrollSelectionPoint(scrollView: ScrollView, x: number, y: number): SelectionPoint | undefined {
@@ -386,6 +520,8 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 		const anchorScrollView = this.selectionAnchor?.scrollView;
 		const point = this.getSelectionPoint(event, anchorScrollView);
 		if (event.release) {
+			if (!this.selectionPressActive) return;
+			this.selectionPressActive = false;
 			this.stopSelectionAutoScroll();
 			if (!this.selectionAnchor) return;
 			this.selectionFocus = point;
@@ -413,7 +549,7 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 			return;
 		}
 		if ((event.button & 32) !== 0) {
-			if (!this.selectionAnchor) return;
+			if (!this.selectionPressActive || !this.selectionAnchor) return;
 			this.selectionDragged = true;
 			this.pressedUrl = undefined;
 			this.selectionFocus = point;
@@ -422,6 +558,7 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 			return;
 		}
 		this.stopSelectionAutoScroll();
+		this.selectionPressActive = true;
 		const scrollView =
 			!this.hasOverlay() && this.currentLayout
 				? getScrollViewsAt(this.currentLayout, event.x, event.y)[0]
@@ -496,6 +633,7 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 		const text = lines.join("\n");
 		if (text.length === 0) return;
 		this.terminal.write(`\x1b]52;c;${Buffer.from(text).toString("base64")}\x07`);
+		this.flash("Copied!");
 	}
 
 	private applySelectionHighlight(text: string): string {
@@ -568,6 +706,20 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 		return /^\x1b\[<\d+;\d+;\d+[Mm]$/.test(data) || (data.length === 6 && data.startsWith("\x1b[M"));
 	}
 
+	private compositeFlashes(screen: string[], width: number, height: number): string[] {
+		const flashLines = this.flashes.render(width).slice(-height);
+		if (flashLines.length === 0) return screen;
+		const result = [...screen];
+		while (result.length < height) result.push("");
+		for (let row = 0; row < flashLines.length; row++) {
+			const line = flashLines[row]!;
+			const flashWidth = visibleWidth(line);
+			if (flashWidth === 0) continue;
+			result[row] = compositeTuiLine(result[row] ?? "", line, width - flashWidth, flashWidth, width);
+		}
+		return result;
+	}
+
 	protected override doRender(): void {
 		if (this.stopped || !this.altScreenActive) return;
 		const width = Math.max(1, this.terminal.columns);
@@ -578,6 +730,7 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 		screen = this.compositeOverlays(screen, width, height);
 		if (screen.length > height) screen = screen.slice(screen.length - height);
 		screen = this.applySelection(screen, nextLayout);
+		screen = this.compositeFlashes(screen, width, height);
 
 		const cursorPos = this.extractCursorPosition(screen, height);
 		screen = this.applyLineResets(screen).map((line) => {
