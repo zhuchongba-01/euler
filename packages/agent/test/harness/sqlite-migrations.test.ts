@@ -393,7 +393,30 @@ END;
 		expect(counts).toEqual({ opens: 1, closes: 1 });
 	});
 
-	it("fails loudly when a stored entry cannot be decoded", async () => {
+	it("rejects a missing active leaf when opened", async () => {
+		const root = createTempDir();
+		const databasePath = join(root, "sessions.sqlite");
+		const env = new NodeExecutionEnv({ cwd: root });
+		const sqlite = createNodeSqliteFactory();
+		const store = createSqliteSessionStore({ env, sqlite, databasePath });
+		const repo = createSessionRepository({ store });
+		const session = await repo.create({ cwd: root, id: "session-1" });
+		const metadata = await session.getMetadata();
+
+		const db = await sqlite.open(databasePath);
+		try {
+			await db.prepare("UPDATE sessions SET active_leaf_id = ? WHERE id = ?").run("missing", metadata.id);
+		} finally {
+			await db.close();
+		}
+
+		await expect(repo.open(metadata)).rejects.toMatchObject({
+			code: "invalid_session",
+			message: "Entry missing not found",
+		});
+	});
+
+	it("fails loudly when a stored entry is read and cannot be decoded", async () => {
 		const root = createTempDir();
 		const databasePath = join(root, "sessions.sqlite");
 		const env = new NodeExecutionEnv({ cwd: root });
@@ -413,7 +436,8 @@ END;
 			await db.close();
 		}
 
-		await expect(repo.open(metadata)).rejects.toMatchObject({ code: "invalid_entry" });
+		const reopened = await repo.open(metadata);
+		await expect(reopened.getEntries()).rejects.toMatchObject({ code: "invalid_entry" });
 	});
 
 	it("rolls back state when appendEntry fails after mutating caches", async () => {
@@ -449,7 +473,7 @@ END;
 			.prepare("SELECT active_leaf_id FROM sessions WHERE id = ?")
 			.get<{ active_leaf_id: string | null }>("session-1");
 		expect(sessionRow?.active_leaf_id).toBeNull();
-		expect(await storage.getEntries()).toEqual([]);
+		expect(await storage.readEntries()).toEqual([]);
 		await db.close();
 	});
 
