@@ -2,4 +2,4 @@
 
 Node sqlite storage backend for `@earendil-works/pi-agent-core` sessions. Provides the
 `node:sqlite` adapter (`SqliteDatabase` implementation) and the SQLite session
-store/storage implementation (`SqliteSessionStore`, migrations, materialized views).
+store/storage implementation (`createSqliteSessionStore`, migrations, materialized views).

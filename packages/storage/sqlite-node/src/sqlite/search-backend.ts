@@ -7,6 +7,7 @@ import type {
 	SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import { getFileSystemResultOrThrow } from "@earendil-works/pi-agent-core";
+import { applyMigrations } from "./migrations.ts";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type { SqliteDatabase, SqliteDatabaseFactory, SqliteSessionStoreEnv } from "./types.ts";
 
@@ -24,7 +25,15 @@ async function configureSqliteDatabase(db: SqliteDatabase): Promise<void> {
 	await db.exec("PRAGMA busy_timeout=5000");
 }
 
-type SearchSchemaMode = "standalone" | "canonical";
+export type SqliteSessionSearchMode = "standalone" | "canonical";
+
+export interface SqliteSessionSearchOptions {
+	env: Pick<SqliteSessionStoreEnv, "absolutePath" | "createDir">;
+	sqlite: SqliteDatabaseFactory;
+	databasePath: string;
+	/** Defaults to a standalone index. Canonical mode shares and initializes a session-store database. */
+	mode?: SqliteSessionSearchMode;
+}
 
 async function tableExists(db: SqliteDatabase, name: string): Promise<boolean> {
 	return !!(await db
@@ -32,8 +41,8 @@ async function tableExists(db: SqliteDatabase, name: string): Promise<boolean> {
 		.get<{ found: number }>(name));
 }
 
-async function ensureSearchSchema(db: SqliteDatabase): Promise<SearchSchemaMode> {
-	if (await tableExists(db, "session_entries")) {
+async function ensureSearchSchema(db: SqliteDatabase, mode: SqliteSessionSearchMode): Promise<void> {
+	if (mode === "canonical") {
 		const ftsExists = await tableExists(db, "session_search_fts");
 		await db.exec(`
 CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
@@ -54,7 +63,7 @@ CREATE TRIGGER IF NOT EXISTS session_search_fts_au AFTER UPDATE OF payload ON se
 END;
 `);
 		if (!ftsExists) await db.exec("INSERT INTO session_search_fts(session_search_fts) VALUES('rebuild')");
-		return "canonical";
+		return;
 	}
 
 	await db.exec(`
@@ -68,14 +77,13 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
   tokenize = 'trigram remove_diacritics 1'
 );
 `);
-	return "standalone";
 }
 
 /**
  * Storage-independent SQLite FTS search. Its database may be separate from,
  * or shared with, the canonical session backend.
  */
-export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>
+class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>
 	implements SessionSearch<TMetadata>, SessionSearchIndex<TMetadata>
 {
 	private readonly options: {
@@ -83,14 +91,12 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 		sqlite: SqliteDatabaseFactory;
 		databasePath: string;
 	};
+	private readonly mode: SqliteSessionSearchMode;
 	private databasePath: string | undefined;
 
-	constructor(options: {
-		env: Pick<SqliteSessionStoreEnv, "absolutePath" | "createDir">;
-		sqlite: SqliteDatabaseFactory;
-		databasePath: string;
-	}) {
+	constructor(options: SqliteSessionSearchOptions) {
 		this.options = options;
+		this.mode = options.mode ?? "standalone";
 	}
 
 	private async getDatabasePath(): Promise<string> {
@@ -103,7 +109,7 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 		return this.databasePath;
 	}
 
-	private async openDatabase(): Promise<{ db: SqliteDatabase; schemaMode: SearchSchemaMode }> {
+	private async openDatabase(): Promise<SqliteDatabase> {
 		const path = await this.getDatabasePath();
 		const directory = getParentPath(path);
 		getFileSystemResultOrThrow(
@@ -113,8 +119,9 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 		const db = await this.options.sqlite.open(path);
 		try {
 			await configureSqliteDatabase(db);
-			const schemaMode = await ensureSearchSchema(db);
-			return { db, schemaMode };
+			if (this.mode === "canonical") await applyMigrations(db);
+			await ensureSearchSchema(db, this.mode);
+			return db;
 		} catch (error) {
 			await db.close();
 			throw error;
@@ -122,9 +129,9 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 	}
 
 	async upsertEntry(metadata: TMetadata, entry: SessionTreeEntry): Promise<void> {
-		const { db, schemaMode } = await this.openDatabase();
+		const db = await this.openDatabase();
 		try {
-			if (schemaMode === "canonical") return;
+			if (this.mode === "canonical") return;
 			const cwd = (metadata as { cwd?: unknown }).cwd;
 			const sessionId = metadata.id;
 			const entryId = entry.id;
@@ -147,9 +154,9 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 	}
 
 	async replaceSession(metadata: TMetadata, entries: readonly SessionTreeEntry[]): Promise<void> {
-		const { db, schemaMode } = await this.openDatabase();
+		const db = await this.openDatabase();
 		try {
-			if (schemaMode === "canonical") return;
+			if (this.mode === "canonical") return;
 			const cwd = (metadata as { cwd?: unknown }).cwd;
 			const sessionId = metadata.id;
 			const metadataJson = JSON.stringify(metadata);
@@ -176,9 +183,9 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 	}
 
 	async deleteSession(metadata: TMetadata): Promise<void> {
-		const { db, schemaMode } = await this.openDatabase();
+		const db = await this.openDatabase();
 		try {
-			if (schemaMode === "canonical") return;
+			if (this.mode === "canonical") return;
 			await db.prepare("DELETE FROM session_search_fts WHERE session_id = ?").run(metadata.id);
 		} finally {
 			await db.close();
@@ -188,10 +195,10 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 	async search(options: SessionSearchOptions): Promise<SessionSearchHit<TMetadata>[]> {
 		const text = options.text.trim();
 		if (!text) return [];
-		const { db, schemaMode } = await this.openDatabase();
+		const db = await this.openDatabase();
 		try {
 			const query = `"${text.replaceAll('"', '""')}"`;
-			if (schemaMode === "canonical") {
+			if (this.mode === "canonical") {
 				const rows = await db
 					.prepare(
 						"SELECT s.id, s.created_at, s.metadata, s.cwd, s.parent_session_id, s.active_leaf_id, se.id AS entry_id, se.timestamp, bm25(session_search_fts) AS score FROM session_search_fts JOIN session_entries se ON se.rowid = session_search_fts.rowid JOIN sessions s ON s.id = se.session_id WHERE session_search_fts MATCH ? AND (? IS NULL OR s.cwd = ?) ORDER BY score",
@@ -228,4 +235,10 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 			await db.close();
 		}
 	}
+}
+
+export function createSqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>(
+	options: SqliteSessionSearchOptions,
+): SessionSearch<TMetadata> & SessionSearchIndex<TMetadata> {
+	return new SqliteSessionSearch<TMetadata>(options);
 }

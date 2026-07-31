@@ -7,13 +7,15 @@ import type {
 } from "@earendil-works/pi-agent-core";
 import {
 	createSessionId,
+	createSessionRepository,
 	getEntriesToFork,
 	getFileSystemResultOrThrow,
 	SessionError,
-	SessionRepo,
+	type SessionRepository,
+	type SessionStore,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
-import { SqliteSessionSearch } from "./search-backend.ts";
+import { createSqliteSessionSearch } from "./search-backend.ts";
 import { SqliteSessionStorage } from "./storage/index.ts";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type {
@@ -22,7 +24,6 @@ import type {
 	SqliteSessionCreateOptions,
 	SqliteSessionListOptions,
 	SqliteSessionMetadata,
-	SqliteSessionStoreApi,
 	SqliteSessionStoreEnv,
 } from "./types.ts";
 
@@ -51,7 +52,9 @@ export type SqliteSessionStoreOptions = {
 	databasePath: string;
 };
 
-export class SqliteSessionStore implements SqliteSessionStoreApi {
+class SqliteSessionStore
+	implements SessionStore<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions>
+{
 	private readonly env: SqliteSessionStoreEnv;
 	private readonly sqlite: SqliteDatabaseFactory;
 	private readonly databasePathInput: string;
@@ -242,13 +245,18 @@ export class SqliteSessionStore implements SqliteSessionStoreApi {
 	}
 }
 
-export function createSqliteSessionStore(options: SqliteSessionStoreOptions): SqliteSessionStore {
+export function createSqliteSessionStore(
+	options: SqliteSessionStoreOptions,
+): SessionStore<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions> {
 	return new SqliteSessionStore(options);
 }
 
-export function createSqliteSessionRepo(
+export function createSqliteSessionRepository(
 	options: SqliteSessionStoreOptions,
-): SessionRepo<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions> {
+): SessionRepository<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions> {
 	const store = createSqliteSessionStore(options);
-	return new SessionRepo({ store, search: new SqliteSessionSearch<SqliteSessionMetadata>(options) });
+	return createSessionRepository({
+		store,
+		search: createSqliteSessionSearch<SqliteSessionMetadata>({ ...options, mode: "canonical" }),
+	});
 }
