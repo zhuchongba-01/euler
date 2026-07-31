@@ -11,12 +11,13 @@ import { getModel } from "@earendil-works/pi-ai/compat";
 import { describe, expect, it } from "vitest";
 import { AgentHarness } from "../../src/harness/agent-harness.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
-import { InMemorySessionStorage } from "../../src/harness/session/memory-storage.ts";
+import { createInMemorySessionStore } from "../../src/harness/session/memory-store.ts";
 import { Session } from "../../src/harness/session/session.ts";
 import type { AgentHarnessTool, PromptTemplate, Skill } from "../../src/harness/types.ts";
 import type { AgentMessage, AgentTool } from "../../src/types.ts";
 import { calculateTool, createCalculateToolWithUsage } from "../utils/calculate.ts";
 import { getCurrentTimeTool } from "../utils/get-current-time.ts";
+import { createInMemorySession } from "./session-test-utils.ts";
 
 interface AppSkill extends Skill {
 	source: "project" | "user";
@@ -89,28 +90,37 @@ function createAssistantMessage(text: string): AgentMessage {
 	};
 }
 
-class BlockingSessionStorage extends InMemorySessionStorage {
-	readonly allWritesStarted = deferred();
-	readonly releaseWrites = deferred();
-	private readonly expectedWrites: number;
-	private writesStarted = 0;
-
-	constructor(expectedWrites: number) {
-		super();
-		this.expectedWrites = expectedWrites;
-	}
-
-	override async appendEntry(entry: Parameters<InMemorySessionStorage["appendEntry"]>[0]): Promise<void> {
-		this.writesStarted++;
-		if (this.writesStarted === this.expectedWrites) this.allWritesStarted.resolve();
-		await this.releaseWrites.promise;
-		await super.appendEntry(entry);
-	}
+async function createBlockingSession(expectedWrites: number): Promise<{
+	session: Session;
+	allWritesStarted: ReturnType<typeof deferred>;
+	releaseWrites: ReturnType<typeof deferred>;
+	getEntries(): ReturnType<Session["getEntries"]>;
+}> {
+	const source = createInMemorySessionStore();
+	const snapshot = await source.create({});
+	const allWritesStarted = deferred();
+	const releaseWrites = deferred();
+	let writesStarted = 0;
+	const blockingStore = {
+		async appendEntry(metadata: typeof snapshot.metadata, entry: (typeof snapshot.entries)[number]) {
+			writesStarted++;
+			if (writesStarted === expectedWrites) allWritesStarted.resolve();
+			await releaseWrites.promise;
+			await source.appendEntry(metadata, entry);
+		},
+	};
+	const session = new Session(blockingStore, snapshot);
+	return {
+		session,
+		allWritesStarted,
+		releaseWrites,
+		getEntries: () => session.getEntries(),
+	};
 }
 
 describe("AgentHarness", () => {
-	it("constructs directly and exposes queue modes", () => {
-		const session = new Session(new InMemorySessionStorage());
+	it("constructs directly and exposes queue modes", async () => {
+		const session = await createInMemorySession();
 		const initialModel = getModel("anthropic", "claude-sonnet-4-5");
 		const harness = new AgentHarness({
 			models,
@@ -146,7 +156,7 @@ describe("AgentHarness", () => {
 		]);
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 		});
 		const prompt = harness.prompt("hello");
@@ -190,7 +200,7 @@ describe("AgentHarness", () => {
 		]);
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 		});
 		harness.on("before_agent_start", async () => {
@@ -227,7 +237,7 @@ describe("AgentHarness", () => {
 				return fauxAssistantMessage("summary produced after shutdown");
 			},
 		]);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		await session.appendMessage(createUserMessage("one"));
 		await session.appendMessage(createAssistantMessage("two"));
 		const harness = new AgentHarness({ models, session, model: registration.getModel() });
@@ -261,7 +271,7 @@ describe("AgentHarness", () => {
 				return fauxAssistantMessage("summary produced after shutdown");
 			},
 		]);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		const targetId = await session.appendMessage(createUserMessage("first branch"));
 		await session.appendMessage(createAssistantMessage("first reply"));
 		await session.appendMessage(createUserMessage("abandoned work"));
@@ -285,14 +295,14 @@ describe("AgentHarness", () => {
 	});
 
 	it("does not treat concurrent mutations as active operations", async () => {
-		const storage = new BlockingSessionStorage(1);
+		const blocking = await createBlockingSession(1);
 		const harness = new AgentHarness({
 			models,
-			session: new Session(storage),
+			session: blocking.session,
 			model: getModel("anthropic", "claude-sonnet-4-5"),
 		});
 		const mutation = harness.appendMessage(createUserMessage("concurrent"));
-		await storage.allWritesStarted.promise;
+		await blocking.allWritesStarted.promise;
 
 		const firstSettlement = await Promise.race([
 			harness.waitForIdle().then(() => "idle" as const),
@@ -300,15 +310,15 @@ describe("AgentHarness", () => {
 		]);
 
 		expect(firstSettlement).toBe("idle");
-		storage.releaseWrites.resolve();
+		blocking.releaseWrites.resolve();
 		await mutation;
 	});
 
 	it("awaits concurrent idle session mutations before shutdown resolves", async () => {
-		const storage = new BlockingSessionStorage(3);
+		const blocking = await createBlockingSession(1);
 		const harness = new AgentHarness({
 			models,
-			session: new Session(storage),
+			session: blocking.session,
 			model: getModel("anthropic", "claude-sonnet-4-5"),
 		});
 		const nextModel = getModel("anthropic", "claude-haiku-4-5");
@@ -317,7 +327,7 @@ describe("AgentHarness", () => {
 			harness.setModel(nextModel),
 			harness.setThinkingLevel("high"),
 		];
-		await storage.allWritesStarted.promise;
+		await blocking.allWritesStarted.promise;
 
 		const shutdown = harness.shutdown();
 		const firstSettlement = await Promise.race([
@@ -326,13 +336,13 @@ describe("AgentHarness", () => {
 		]);
 
 		expect(firstSettlement).toBe("writes-pending");
-		storage.releaseWrites.resolve();
+		blocking.releaseWrites.resolve();
 		await Promise.all([...mutations, shutdown]);
-		expect(await storage.getEntries()).toHaveLength(3);
+		expect(await blocking.getEntries()).toHaveLength(3);
 	});
 
 	it("shuts down an idle harness without modifying its durable session", async () => {
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		await session.appendMessage(createUserMessage("existing"));
 		const harness = new AgentHarness({
 			models,
@@ -368,7 +378,7 @@ describe("AgentHarness", () => {
 		]);
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 			steeringMode: "one-at-a-time",
 		});
@@ -400,7 +410,7 @@ describe("AgentHarness", () => {
 				return fauxAssistantMessage("ok");
 			},
 		]);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		const harness = new AgentHarness({
 			models,
 			session,
@@ -443,7 +453,7 @@ describe("AgentHarness", () => {
 		]);
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 		});
 		const queueUpdates: Array<{ steer: number; followUp: number; nextTurn: number }> = [];
@@ -495,7 +505,7 @@ describe("AgentHarness", () => {
 		]);
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 			followUpMode: "one-at-a-time",
 		});
@@ -521,7 +531,7 @@ describe("AgentHarness", () => {
 	it("settles thrown hook failures with persisted assistant error messages", async () => {
 		const registration = newFaux();
 		registration.setResponses([() => fauxAssistantMessage("should not be used")]);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		const harness = new AgentHarness({
 			models,
 			session,
@@ -582,7 +592,7 @@ describe("AgentHarness", () => {
 		]);
 		const harness = new AgentHarness<undefined, Skill, PromptTemplate, AgentTool>({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 			thinkingLevel: "off",
 			resources: {
@@ -615,7 +625,7 @@ describe("AgentHarness", () => {
 	it("orders pending listener session writes after agent-emitted messages", async () => {
 		const registration = newFaux();
 		registration.setResponses([() => fauxAssistantMessage("ok")]);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		const harness = new AgentHarness({
 			models,
 			session,
@@ -648,7 +658,7 @@ describe("AgentHarness", () => {
 		const barrier = deferred();
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 		});
 		let listenerFinished = false;
@@ -681,7 +691,7 @@ describe("AgentHarness", () => {
 					stopReason: "toolUse",
 				}),
 		]);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		const toolUsage = createUsage(1, 2, 3, 4);
 		const patchedToolUsage = createUsage(5, 6, 7, 8);
 		const calculateToolWithUsage = createCalculateToolWithUsage(toolUsage);
@@ -748,7 +758,7 @@ describe("AgentHarness", () => {
 		};
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 			tools: [contextTool],
 			toolContext,
@@ -785,7 +795,7 @@ describe("AgentHarness", () => {
 		let generation = 0;
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 			tools: [contextTool],
 			toolContext: async (): Promise<ToolContext> => ({ generation: ++generation }),
@@ -799,7 +809,7 @@ describe("AgentHarness", () => {
 	it("persists generated compaction usage", async () => {
 		const registration = newFaux();
 		registration.setResponses([fauxAssistantMessage("## Goal\nTest summary")]);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		await session.appendMessage(createUserMessage("one"));
 		await session.appendMessage(createAssistantMessage("two"));
 		const harness = new AgentHarness({
@@ -818,7 +828,7 @@ describe("AgentHarness", () => {
 	it("persists hook-provided compaction usage", async () => {
 		const registration = newFaux();
 		const usage = createUsage(5, 6, 7, 8);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		await session.appendMessage(createUserMessage("one"));
 		await session.appendMessage(createAssistantMessage("two"));
 		const harness = new AgentHarness({
@@ -856,7 +866,7 @@ describe("AgentHarness", () => {
 					return fauxAssistantMessage("## Goal\nRecovered summary");
 				},
 			]);
-			const session = new Session(new InMemorySessionStorage());
+			const session = await createInMemorySession();
 			await session.appendMessage(createUserMessage("one"));
 			await session.appendMessage(createAssistantMessage("two"));
 			const harness = new AgentHarness({
@@ -896,7 +906,7 @@ describe("AgentHarness", () => {
 					return fauxAssistantMessage("", { stopReason: "error", errorMessage: "insufficient_quota" });
 				},
 			]);
-			const session = new Session(new InMemorySessionStorage());
+			const session = await createInMemorySession();
 			await session.appendMessage(createUserMessage("one"));
 			await session.appendMessage(createAssistantMessage("two"));
 			const harness = new AgentHarness({
@@ -931,7 +941,7 @@ describe("AgentHarness", () => {
 					return fauxAssistantMessage("", { stopReason: "error", errorMessage: "terminated" });
 				}),
 			);
-			const session = new Session(new InMemorySessionStorage());
+			const session = await createInMemorySession();
 			await session.appendMessage(createUserMessage("one"));
 			await session.appendMessage(createAssistantMessage("two"));
 			const harness = new AgentHarness({
@@ -978,7 +988,7 @@ describe("AgentHarness", () => {
 					return fauxAssistantMessage("## Goal\nRecovered branch summary");
 				},
 			]);
-			const session = new Session(new InMemorySessionStorage());
+			const session = await createInMemorySession();
 			const targetId = await session.appendMessage(createUserMessage("first branch"));
 			await session.appendMessage(createAssistantMessage("first reply"));
 			await session.appendMessage(createUserMessage("abandoned work"));
@@ -1015,7 +1025,7 @@ describe("AgentHarness", () => {
 	it("persists generated branch summary usage", async () => {
 		const registration = newFaux();
 		registration.setResponses([fauxAssistantMessage("## Goal\nBranch summary")]);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		const targetId = await session.appendMessage(createUserMessage("first branch"));
 		await session.appendMessage(createAssistantMessage("first reply"));
 		await session.appendMessage(createUserMessage("abandoned work"));
@@ -1034,7 +1044,7 @@ describe("AgentHarness", () => {
 	it("persists hook-provided branch summary usage", async () => {
 		const registration = newFaux();
 		const usage = createUsage(13, 14, 15, 16);
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		const targetId = await session.appendMessage(createUserMessage("first branch"));
 		await session.appendMessage(createAssistantMessage("first reply"));
 		await session.appendMessage(createUserMessage("abandoned work"));
@@ -1054,7 +1064,7 @@ describe("AgentHarness", () => {
 	});
 
 	it("preserves app tool types for getters and update events", async () => {
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		const model = getModel("anthropic", "claude-sonnet-4-5");
 		type AppTool = AgentTool<typeof calculateTool.parameters, undefined> & { source: "builtin" | "extension" };
 		const inspectTool: AppTool = { ...calculateTool, name: "inspect", source: "builtin" };
@@ -1123,8 +1133,8 @@ describe("AgentHarness", () => {
 		expect((await session.buildContext()).activeToolNames).toEqual(["search"]);
 	});
 
-	it("validates constructor tool names", () => {
-		const session = new Session(new InMemorySessionStorage());
+	it("validates constructor tool names", async () => {
+		const session = await createInMemorySession();
 		const model = getModel("anthropic", "claude-sonnet-4-5");
 		expect(
 			() => new AgentHarness({ session, models, model, tools: [calculateTool], activeToolNames: ["missing"] }),
@@ -1152,7 +1162,7 @@ describe("AgentHarness", () => {
 	});
 
 	it("preserves app resource types for getters and update events", async () => {
-		const session = new Session(new InMemorySessionStorage());
+		const session = await createInMemorySession();
 		const model = getModel("anthropic", "claude-sonnet-4-5");
 		const harness = new AgentHarness<undefined, AppSkill, AppPromptTemplate, AgentTool>({
 			session,

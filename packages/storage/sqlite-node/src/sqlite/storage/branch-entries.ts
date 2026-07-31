@@ -1,4 +1,5 @@
 import type { SessionTreeEntry } from "@earendil-works/pi-agent-core";
+import { toError } from "@earendil-works/pi-agent-core";
 import type { SqliteDatabase } from "../types.ts";
 import { decodeEntry, type SessionEntryRow } from "./session-entries.ts";
 import { invalidSession } from "./shared.ts";
@@ -49,8 +50,8 @@ export async function getMaterializedBranchPathOrCompaction(
 			if (entry.type !== "leaf") {
 				entries.push(entry);
 			}
-		} catch {
-			throw invalidSession(`invalid entry row for branch entry ${branchRow.entry_id}`);
+		} catch (error) {
+			throw invalidSession(`invalid entry row for branch entry ${branchRow.entry_id}`, toError(error));
 		}
 	}
 	return entries;
