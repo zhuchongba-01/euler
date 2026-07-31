@@ -15,6 +15,7 @@
 - Added alternate-screen `VStack`, `HStack`, and nested `ScrollView` layouts with constrained sizing, sticky regions, and pointer-targeted scrolling.
 - Added edge auto-scrolling for alternate-screen drag selection across off-screen scroll-view content.
 - Added transient proportional scrollbars with mouse dragging and Home/End document navigation to alternate-screen `ScrollView`s.
+- Added page scrolling and OSC 133 semantic prompt navigation to the alternate-screen viewport.
 
 ## [0.83.0] - 2026-07-29
 

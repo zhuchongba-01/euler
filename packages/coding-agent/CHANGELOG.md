@@ -8,6 +8,7 @@
 - Added an experimental fullscreen UI mode, selectable through `--ui-mode fullscreen` or `/settings` ([#7304](https://github.com/earendil-works/pi/issues/7304)).
 - Added a sticky editor, status, widget, and footer dock to fullscreen mode while keeping the transcript independently scrollable.
 - Added a transient draggable transcript scrollbar to fullscreen mode.
+- Added page scrolling and marked-message navigation shortcuts to fullscreen mode.
 
 ### Fixed
 
