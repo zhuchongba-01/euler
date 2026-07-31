@@ -6,6 +6,7 @@
 
 - Fixed terminal width accounting for Indic conjunct grapheme clusters ([#6124](https://github.com/earendil-works/pi/issues/6124) by [@petrroll](https://github.com/petrroll)).
 - Fixed phantom alternate-screen text selection from unmatched mouse events when changing terminal pane focus.
+- Fixed spaces in searchable settings queries changing the selected value instead of filtering multi-word labels.
 
 ### Added
 
