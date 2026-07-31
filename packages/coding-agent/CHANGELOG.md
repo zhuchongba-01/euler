@@ -10,6 +10,7 @@
 - Added a draggable transcript scrollbar to fullscreen mode with configurable `auto`, `always`, and `hidden` modes through `/settings`; `always` reserves the rightmost column.
 - Added page scrolling and marked-message navigation shortcuts to fullscreen mode.
 - Added an optional `scrollbarThumb` theme color for fullscreen scrollbar thumbs, falling back to `selectedBg`.
+- Added a remote session coordinator and transient transcript projection for building client/server interfaces on `@earendil-works/pi-client`.
 
 ### Fixed
 
