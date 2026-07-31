@@ -1,14 +1,8 @@
-import type {
-	CommandResult,
-	ServerEvent,
-	ServerSnapshot,
-	SessionSnapshot,
-	SessionSummary,
-} from "@earendil-works/pi-protocol";
-import { notifyListeners } from "./listeners.ts";
+import type { CommandResult, ServerEvent, ServerSnapshot, SessionSnapshot } from "@earendil-works/pi-protocol";
+import { toError } from "./errors.ts";
 import type { ListenerErrorHandler, Unsubscribe } from "./types.ts";
 
-export class ClientStateStore {
+export class ClientState {
 	readonly #sessionSnapshots = new Map<string, SessionSnapshot>();
 	readonly #attachedSessionIds = new Set<string>();
 	readonly #snapshotListeners = new Set<(snapshot: ServerSnapshot) => void>();
@@ -24,10 +18,6 @@ export class ClientStateStore {
 
 	get snapshot(): ServerSnapshot | undefined {
 		return this.#snapshot;
-	}
-
-	get sessions(): readonly SessionSummary[] {
-		return this.#snapshot?.sessions ?? [];
 	}
 
 	reset(): void {
@@ -94,9 +84,9 @@ export class ClientStateStore {
 			this.#sessionSnapshots.delete(event.sessionId);
 			this.#attachedSessionIds.delete(event.sessionId);
 		}
-		notifyListeners(this.#eventListeners, event, this.#onListenerError);
+		this.#notify(this.#eventListeners, event);
 		const sessionId = getEventSessionId(event);
-		if (sessionId) notifyListeners(this.#sessionEventListeners.get(sessionId), event, this.#onListenerError);
+		if (sessionId) this.#notify(this.#sessionEventListeners.get(sessionId), event);
 	}
 
 	applyServerSnapshot(snapshot: ServerSnapshot): void {
@@ -104,7 +94,7 @@ export class ClientStateStore {
 		this.#snapshot = snapshot;
 		this.#attachedSessionIds.clear();
 		for (const session of snapshot.sessions) if (session.attached) this.#attachedSessionIds.add(session.id);
-		notifyListeners(this.#snapshotListeners, snapshot, this.#onListenerError);
+		this.#notify(this.#snapshotListeners, snapshot);
 	}
 
 	#applySessionSnapshot(snapshot: SessionSnapshot, force = false): void {
@@ -113,7 +103,26 @@ export class ClientStateStore {
 		this.#sessionSnapshots.set(snapshot.id, snapshot);
 		if (snapshot.attached) this.#attachedSessionIds.add(snapshot.id);
 		else this.#attachedSessionIds.delete(snapshot.id);
-		notifyListeners(this.#sessionSnapshotListeners.get(snapshot.id), snapshot, this.#onListenerError);
+		this.#notify(this.#sessionSnapshotListeners.get(snapshot.id), snapshot);
+	}
+
+	#notify<T>(listeners: Iterable<(value: T) => void> | undefined, value: T): void {
+		for (const listener of listeners ?? []) {
+			try {
+				listener(value);
+			} catch (error) {
+				this.#reportListenerError(error);
+			}
+		}
+	}
+
+	#reportListenerError(error: unknown): void {
+		if (!this.#onListenerError) return;
+		try {
+			this.#onListenerError(toError(error));
+		} catch {
+			// Diagnostics cannot affect client state.
+		}
 	}
 }
 

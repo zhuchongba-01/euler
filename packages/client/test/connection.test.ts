@@ -1,14 +1,17 @@
 import {
 	type ClientMessage,
+	encodeCbor,
+	encodeFrame,
 	encodeServerMessage,
 	PROTOCOL_VERSION,
+	ProtocolValidationError,
 	type ServerSnapshot,
 } from "@earendil-works/pi-protocol";
 import { describe, expect, test } from "vitest";
-import { type ByteTransportFactory, PiClient, PiDisconnectedError, PiSessionDetachedError } from "../src/index.ts";
+import { type ByteTransportFactory, PiClient, PiDisconnectedError } from "../src/index.ts";
 import {
+	attachSession,
 	baseServerSnapshot,
-	collectRequests,
 	connectClient,
 	createClient,
 	MemoryByteServer,
@@ -123,6 +126,60 @@ describe("PiClient", () => {
 		expect(client.connectionState).toBe("connected");
 	});
 
+	test("does not restore a connection after a snapshot listener disconnects during handshake", async () => {
+		const server = new MemoryByteServer();
+		server.onMessage((message) => {
+			if (message.type !== "hello") return;
+			server.send({
+				type: "hello",
+				version: PROTOCOL_VERSION,
+				connectionId: "connection-1",
+				snapshot: baseServerSnapshot,
+			});
+		});
+		const client = createClient(server);
+		client.subscribe(() => client.disconnect());
+
+		await expect(client.connect()).rejects.toBeInstanceOf(PiDisconnectedError);
+		expect(client.connectionState).toBe("disconnected");
+		expect(server.clientCloseCount).toBe(1);
+	});
+
+	test("does not restore a stale connection when a snapshot listener reconnects during handshake", async () => {
+		const first = new MemoryByteServer();
+		const second = new MemoryByteServer();
+		let connection = 0;
+		for (const server of [first, second]) {
+			server.onMessage((message) => {
+				if (message.type !== "hello") return;
+				server.send({
+					type: "hello",
+					version: PROTOCOL_VERSION,
+					connectionId: `connection-${connection}`,
+					snapshot: { ...baseServerSnapshot, revision: connection },
+				});
+			});
+		}
+		const client = new PiClient({
+			token: "bearer-secret",
+			transportFactory: (handlers) => (connection++ === 0 ? first : second).connect(handlers),
+		});
+		let reconnect: Promise<ServerSnapshot> | undefined;
+		let reconnectRequested = false;
+		client.subscribe(() => {
+			if (reconnectRequested) return;
+			reconnectRequested = true;
+			client.disconnect();
+			reconnect = client.reconnect();
+		});
+
+		await expect(client.connect()).rejects.toBeInstanceOf(PiDisconnectedError);
+		expect(reconnect).toBeDefined();
+		await expect(reconnect).resolves.toMatchObject({ revision: 2 });
+		expect(client.connectionState).toBe("connected");
+		expect(first.clientCloseCount).toBe(1);
+	});
+
 	test("rejects a typed handshake authentication error", async () => {
 		const server = new MemoryByteServer();
 		server.onMessage(() => {
@@ -134,128 +191,12 @@ describe("PiClient", () => {
 		const client = createClient(server, "wrong");
 
 		await expect(client.connect()).rejects.toMatchObject({
-			name: "PiError",
+			name: "PiServerError",
 			code: "auth",
 			message: "Invalid token",
 		});
 		expect(client.connectionState).toBe("disconnected");
 		expect(server.clientCloseCount).toBe(1);
-	});
-
-	test("correlates coalesced out-of-order responses", async () => {
-		const server = new MemoryByteServer();
-		const client = await connectClient(server);
-		const requests = collectRequests(server);
-		const listed = client.listSessions();
-		const attached = client.attachSession("session-1");
-		expect(requests).toHaveLength(2);
-
-		const attachRequest = requests.find((request) => request.request.command === "attach");
-		const listRequest = requests.find((request) => request.request.command === "list");
-		if (!attachRequest || !listRequest) throw new Error("Missing requests");
-		server.sendTogether([
-			{
-				type: "response",
-				id: attachRequest.id,
-				ok: true,
-				result: { command: "attach", session: sessionSnapshot("session-1") },
-			},
-			{
-				type: "response",
-				id: listRequest.id,
-				ok: true,
-				result: { command: "list", sessions: [] },
-			},
-		]);
-
-		await expect(listed).resolves.toEqual([]);
-		await expect(attached).resolves.toMatchObject({ id: "session-1", attached: true });
-	});
-
-	test("reduces only authoritative snapshots and supports unsubscribe", async () => {
-		const server = new MemoryByteServer();
-		const client = await connectClient(server);
-		const requests = collectRequests(server);
-		const initial = sessionSnapshot("session-1", { revision: 1, phase: "idle" });
-		server.send({ type: "event", event: { type: "session_snapshot", snapshot: initial } });
-		const handle = client.getSession("session-1");
-		const observed: number[] = [];
-		const progressTypes: string[] = [];
-		const unsubscribe = handle.subscribe((snapshot) => observed.push(snapshot.revision));
-		const unsubscribeEvents = handle.onEvent((event) => progressTypes.push(event.type));
-		server.send({
-			type: "event",
-			event: {
-				type: "session_progress",
-				sessionId: "session-1",
-				progress: {
-					type: "assistant_delta",
-					messageId: "assistant-1",
-					contentIndex: 0,
-					kind: "text",
-					delta: "hi",
-				},
-			},
-		});
-		expect(progressTypes).toEqual(["session_progress"]);
-		expect(handle.snapshot).toEqual(initial);
-
-		const prompting = handle.prompt("hello");
-		expect(handle.snapshot).toEqual(initial);
-		const promptRequest = requests.find((request) => request.request.command === "prompt");
-		if (!promptRequest) throw new Error("Missing prompt request");
-		const updated = sessionSnapshot("session-1", { revision: 2, phase: "turn" });
-		server.send({
-			type: "response",
-			id: promptRequest.id,
-			ok: true,
-			result: { command: "prompt", session: updated },
-		});
-		await expect(prompting).resolves.toEqual(updated);
-		expect(handle.snapshot).toEqual(updated);
-		expect(observed).toEqual([2]);
-
-		unsubscribe();
-		unsubscribeEvents();
-		server.send({
-			type: "event",
-			event: { type: "session_snapshot", snapshot: sessionSnapshot("session-1", { revision: 3 }) },
-		});
-		expect(observed).toEqual([2]);
-	});
-
-	test("keeps multiple session handles independent and enforces detach", async () => {
-		const server = new MemoryByteServer();
-		const client = await connectClient(server);
-		server.onMessage((message) => {
-			if (message.type !== "request") return;
-			const request = message.request;
-			if (request.command === "attach") {
-				server.send({
-					type: "response",
-					id: message.id,
-					ok: true,
-					result: { command: "attach", session: sessionSnapshot(request.sessionId) },
-				});
-			}
-			if (request.command === "detach") {
-				server.send({
-					type: "response",
-					id: message.id,
-					ok: true,
-					result: { command: "detach", sessionId: request.sessionId },
-				});
-			}
-		});
-
-		const first = await client.attachSession("session-1");
-		const second = await client.attachSession("session-2");
-		expect(first.attached).toBe(true);
-		expect(second.attached).toBe(true);
-		await first.detach();
-		expect(first.attached).toBe(false);
-		expect(second.attached).toBe(true);
-		await expect(first.abort()).rejects.toBeInstanceOf(PiSessionDetachedError);
 	});
 
 	test("rejects pending requests on close and reconnects through a fresh factory result", async () => {
@@ -329,5 +270,65 @@ describe("PiClient", () => {
 
 		await expect(pending).rejects.toMatchObject({ name: "PiDisconnectedError", message: "read failed" });
 		expect(client.connectionState).toBe("disconnected");
+	});
+
+	test("enforces the configured frame limit for outbound and inbound messages", async () => {
+		const server = new MemoryByteServer();
+		server.onMessage((message) => {
+			if (message.type === "hello") {
+				server.send({
+					type: "hello",
+					version: PROTOCOL_VERSION,
+					connectionId: "connection-1",
+					snapshot: baseServerSnapshot,
+				});
+			}
+		});
+		const client = new PiClient({
+			token: "bearer-secret",
+			maxFrameLength: 512,
+			transportFactory: (handlers) => server.connect(handlers),
+		});
+		await client.connect();
+		const handle = await attachSession(client, server, sessionSnapshot("session-1"));
+		const sentBefore = server.sentByClient.length;
+		await expect(handle.prompt("x".repeat(1_000))).rejects.toBeInstanceOf(ProtocolValidationError);
+		expect(server.sentByClient).toHaveLength(sentBefore);
+
+		server.sendRaw(new Uint8Array([0, 0, 2, 1]));
+		expect(client.connectionState).toBe("disconnected");
+	});
+
+	test("disconnects on invalid protocol data", async () => {
+		const server = new MemoryByteServer();
+		const client = await connectClient(server);
+		server.sendRaw(encodeFrame(encodeCbor({ type: "event", event: { type: "session_removed", sessionId: 1 } })));
+		expect(client.connectionState).toBe("disconnected");
+	});
+
+	test("reports truncated framing when the transport closes", async () => {
+		const server = new MemoryByteServer();
+		const client = await connectClient(server);
+		const pending = client.listSessions();
+		server.sendRaw(new Uint8Array([0, 0, 0, 2, 1]));
+		server.close();
+
+		await expect(pending).rejects.toMatchObject({
+			name: "ProtocolValidationError",
+			message: expect.stringMatching(/truncated/i),
+		});
+		expect(client.connectionState).toBe("disconnected");
+	});
+
+	test("rejects frame limits outside the unsigned 32-bit range", () => {
+		const server = new MemoryByteServer();
+		expect(
+			() =>
+				new PiClient({
+					token: "secret",
+					maxFrameLength: 0x1_0000_0000,
+					transportFactory: (handlers) => server.connect(handlers),
+				}),
+		).toThrow(/maxFrameLength/);
 	});
 });

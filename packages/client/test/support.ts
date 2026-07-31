@@ -8,7 +8,7 @@ import {
 	type ServerSnapshot,
 	type SessionSnapshot,
 } from "@earendil-works/pi-protocol";
-import type { ByteTransport, ByteTransportHandlers } from "../src/index.ts";
+import type { ByteTransport, ByteTransportHandlers, PiSessionHandle } from "../src/index.ts";
 import { PiClient } from "../src/index.ts";
 
 export class MemoryByteServer {
@@ -133,4 +133,22 @@ export function collectRequests(server: MemoryByteServer): RequestEnvelope[] {
 		if (message.type === "request") requests.push(message);
 	});
 	return requests;
+}
+
+export async function attachSession(
+	client: PiClient,
+	server: MemoryByteServer,
+	snapshot: SessionSnapshot,
+): Promise<PiSessionHandle> {
+	const requests = collectRequests(server);
+	const attaching = client.attachSession(snapshot.id);
+	const request = requests.find((candidate) => candidate.request.command === "attach");
+	if (!request) throw new Error("Missing attach request");
+	server.send({
+		type: "response",
+		id: request.id,
+		ok: true,
+		result: { command: "attach", session: snapshot },
+	});
+	return attaching;
 }

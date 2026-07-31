@@ -1,12 +1,12 @@
 import type { JsonValue, ProtocolError, ProtocolErrorCode } from "@earendil-works/pi-protocol";
 
-export class PiError extends Error {
+export class PiServerError extends Error {
 	readonly code: ProtocolErrorCode;
 	readonly details: JsonValue | undefined;
 
 	constructor(error: ProtocolError) {
 		super(error.message);
-		this.name = "PiError";
+		this.name = "PiServerError";
 		this.code = error.code;
 		this.details = error.details;
 	}
