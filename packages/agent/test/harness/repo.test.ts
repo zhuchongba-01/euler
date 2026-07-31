@@ -1,19 +1,20 @@
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
-import { JsonlSessionRepo } from "../../src/harness/session/jsonl-repo.ts";
-import { InMemorySessionRepo } from "../../src/harness/session/memory-repo.ts";
+import { JsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
+import { InMemorySessionStore } from "../../src/harness/session/memory-repo.ts";
+import { SessionRepo } from "../../src/harness/session/repo-utils.ts";
 import { createAssistantMessage, createTempDir, createUserMessage } from "./session-test-utils.ts";
 
-describe("InMemorySessionRepo", () => {
+describe("InMemorySessionStore", () => {
 	it("opens, deletes, and forks by metadata", async () => {
-		const repo = new InMemorySessionRepo();
+		const repo = new SessionRepo({ store: new InMemorySessionStore() });
 		const session = await repo.create({ id: "session-1" });
 		const metadata = await session.getMetadata();
 		const user1 = await session.appendMessage(createUserMessage("one"));
 		const assistant1 = await session.appendMessage(createAssistantMessage("two"));
 		const user2 = await session.appendMessage(createUserMessage("three"));
-		expect(await repo.open(metadata)).toBe(session);
+		await expect((await repo.open(metadata)).getMetadata()).resolves.toEqual(metadata);
 		expect((await repo.list()).map((info) => info.id)).toEqual(["session-1"]);
 		const fork = await repo.fork(metadata, { entryId: user2, id: "session-2" });
 		expect((await fork.getEntries()).map((entry) => entry.id)).toEqual([user1, assistant1]);
@@ -24,13 +25,13 @@ describe("InMemorySessionRepo", () => {
 	});
 });
 
-describe("JsonlSessionRepo", () => {
+describe("JsonlSessionStore", () => {
 	it("stores sessions below encoded cwd directories and lists by cwd", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		const cwd = "/tmp/my-project";
 		const otherCwd = "/tmp/other-project";
-		const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: root });
+		const repo = new SessionRepo({ store: new JsonlSessionStore({ fs: env, sessionsRoot: root }) });
 		const session = await repo.create({ cwd, id: "019de8c2-de29-73e9-ae0c-e134db34c447" });
 		const otherSession = await repo.create({ cwd: otherCwd, id: "other-session" });
 		const metadata = await session.getMetadata();
@@ -47,7 +48,7 @@ describe("JsonlSessionRepo", () => {
 	it("opens, deletes, and forks by metadata", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
-		const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: root });
+		const repo = new SessionRepo({ store: new JsonlSessionStore({ fs: env, sessionsRoot: root }) });
 		const source = await repo.create({ cwd: "/tmp/source", id: "source-session" });
 		const sourceMetadata = await source.getMetadata();
 		const user1 = await source.appendMessage(createUserMessage("one"));
@@ -69,7 +70,7 @@ describe("JsonlSessionRepo", () => {
 	it("persists header metadata through create, list, and fork", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
-		const repo = new JsonlSessionRepo({ fs: env, sessionsRoot: root });
+		const repo = new SessionRepo({ store: new JsonlSessionStore({ fs: env, sessionsRoot: root }) });
 		const source = await repo.create({
 			cwd: "/tmp/source",
 			id: "source-session",
