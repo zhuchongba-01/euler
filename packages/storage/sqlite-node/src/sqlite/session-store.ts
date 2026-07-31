@@ -1,5 +1,15 @@
-import type { SessionSnapshot, SessionStore, SessionTreeEntry } from "@earendil-works/pi-agent-core";
-import { createSessionId, getFileSystemResultOrThrow, SessionError } from "@earendil-works/pi-agent-core";
+import type {
+	SessionForkSelection,
+	SessionReader,
+	SessionStore,
+	SessionTreeEntry,
+} from "@earendil-works/pi-agent-core";
+import {
+	createSessionId,
+	getFileSystemResultOrThrow,
+	readSessionEntriesForFork,
+	SessionError,
+} from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
 import { SqliteSessionConnection } from "./storage/index.ts";
 import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
@@ -69,7 +79,7 @@ class SqliteSessionStore
 		this.databasePathInput = options.databasePath;
 	}
 
-	create(options: SqliteSessionCreateOptions): Promise<SessionSnapshot<SqliteSessionMetadata>> {
+	create(options: SqliteSessionCreateOptions): Promise<SessionReader<SqliteSessionMetadata>> {
 		this.assertOpen();
 		return this.operations.enqueue(async () => {
 			const db = await this.getDatabase();
@@ -82,18 +92,18 @@ class SqliteSessionStore
 					metadata: options.metadata,
 				}),
 			);
-			const metadata = await connection.getMetadata();
+			const metadata = connection.metadata;
 			this.writers.set(metadata.id, connection);
-			return { metadata, entries: [] };
+			return this.reader(connection);
 		});
 	}
 
-	load(metadata: SqliteSessionMetadata): Promise<SessionSnapshot<SqliteSessionMetadata>> {
+	load(metadata: SqliteSessionMetadata): Promise<SessionReader<SqliteSessionMetadata>> {
 		this.assertOpen();
 		return this.operations.enqueue(() => this.loadSession(metadata));
 	}
 
-	private async loadSession(metadata: SqliteSessionMetadata): Promise<SessionSnapshot<SqliteSessionMetadata>> {
+	private async loadSession(metadata: SqliteSessionMetadata): Promise<SessionReader<SqliteSessionMetadata>> {
 		if (
 			!getFileSystemResultOrThrow(await this.env.exists(metadata.path), `Failed to check database ${metadata.path}`)
 		) {
@@ -102,7 +112,7 @@ class SqliteSessionStore
 		const connection =
 			this.writers.get(metadata.id) ?? (await SqliteSessionConnection.open(await this.getDatabase(), metadata));
 		this.writers.set(metadata.id, connection);
-		return { metadata: await connection.getMetadata(), entries: await connection.getEntries() };
+		return this.reader(connection);
 	}
 
 	list(options: SqliteSessionListOptions = {}): Promise<SqliteSessionMetadata[]> {
@@ -158,12 +168,15 @@ class SqliteSessionStore
 	fork(
 		source: SqliteSessionMetadata,
 		options: SqliteSessionCreateOptions,
-		entries: readonly SessionTreeEntry[],
-	): Promise<SessionSnapshot<SqliteSessionMetadata>> {
+		selection: SessionForkSelection,
+	): Promise<SessionReader<SqliteSessionMetadata>> {
 		this.assertOpen();
 		return this.operations.enqueue(async () => {
 			const db = await this.getDatabase();
 			const connection = await db.transaction(async () => {
+				const sourceConnection = this.writers.get(source.id) ?? (await SqliteSessionConnection.open(db, source));
+				this.writers.set(source.id, sourceConnection);
+				const entries = await readSessionEntriesForFork(sourceConnection, selection);
 				const connection = await SqliteSessionConnection.create(db, await this.getDatabasePath(), {
 					cwd: options.cwd,
 					sessionId: options.id ?? createSessionId(),
@@ -173,9 +186,9 @@ class SqliteSessionStore
 				for (const entry of entries) await connection.appendEntry(entry, { transaction: false });
 				return connection;
 			});
-			const metadata = await connection.getMetadata();
+			const metadata = connection.metadata;
 			this.writers.set(metadata.id, connection);
-			return { metadata, entries: [...entries] };
+			return this.reader(connection);
 		});
 	}
 
@@ -198,6 +211,28 @@ class SqliteSessionStore
 
 	private assertOpen(): void {
 		if (this.disposed) throw new SessionError("storage", "SQLite session store is disposed");
+	}
+
+	private reader(connection: SqliteSessionConnection): SessionReader<SqliteSessionMetadata> {
+		return {
+			metadata: connection.metadata,
+			readHead: () => {
+				this.assertOpen();
+				return this.operations.enqueue(() => connection.readHead());
+			},
+			readEntry: (id) => {
+				this.assertOpen();
+				return this.operations.enqueue(() => connection.readEntry(id));
+			},
+			readEntries: (options) => {
+				this.assertOpen();
+				return this.operations.enqueue(() => connection.readEntries(options));
+			},
+			readPathToRootOrCompaction: (leafId) => {
+				this.assertOpen();
+				return this.operations.enqueue(() => connection.readPathToRootOrCompaction(leafId));
+			},
+		};
 	}
 
 	private async getDatabasePath(): Promise<string> {

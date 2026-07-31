@@ -1,4 +1,4 @@
-import type { SessionTreeEntry } from "@earendil-works/pi-agent-core";
+import type { SessionEntryCursorOptions, SessionReader, SessionTreeEntry } from "@earendil-works/pi-agent-core";
 import { SessionError, toError } from "@earendil-works/pi-agent-core";
 import { uuidv7 } from "@earendil-works/pi-ai";
 import type { SqliteDatabase, SqliteSessionMetadata } from "../types.ts";
@@ -101,19 +101,19 @@ async function loadSqliteSession(
 	};
 }
 
-export class SqliteSessionConnection {
+export class SqliteSessionConnection implements SessionReader<SqliteSessionMetadata> {
 	private readonly db: SqliteDatabase;
-	private readonly metadata: SqliteSessionMetadata;
+	readonly metadata: SqliteSessionMetadata;
 	private byId: Map<string, SessionTreeEntry>;
 	private currentLeafId: string | null;
 	private activeBranchId: string | null;
 	private materializedState: SessionMaterializedState;
 
-	private async getPathToRootOrCompactionEntries(leafId: string | null): Promise<SessionTreeEntry[]> {
+	async readPathToRootOrCompaction(leafId: string | null): Promise<SessionTreeEntry[]> {
 		if (leafId === null) return [];
 		const path: SessionTreeEntry[] = [];
 		let stopAtEntryId: string | null = null;
-		let current = await this.getEntry(leafId);
+		let current = await this.readEntry(leafId);
 		if (!current) throw new SessionError("not_found", `Entry ${leafId} not found`);
 		while (current) {
 			path.unshift(current);
@@ -123,7 +123,7 @@ export class SqliteSessionConnection {
 				stopAtEntryId = current.firstKeptEntryId ?? null;
 			}
 			if (!current.parentId) break;
-			const parent = await this.getEntry(current.parentId);
+			const parent = await this.readEntry(current.parentId);
 			if (!parent) throw new SessionError("invalid_session", `Entry ${current.parentId} not found`);
 			current = parent;
 		}
@@ -135,7 +135,7 @@ export class SqliteSessionConnection {
 		// Rebuild the branch path only when branch membership changes: branch switch
 		// (leaf navigation) or a new fork from a parent that already has a child.
 		// Linear appends stay cheap and extend the active branch incrementally.
-		const path = await this.getPathToRootOrCompactionEntries(leafId);
+		const path = await this.readPathToRootOrCompaction(leafId);
 		const entryRowsById = await loadEntryRowsByIds(
 			this.db,
 			this.metadata.id,
@@ -238,8 +238,23 @@ export class SqliteSessionConnection {
 		);
 	}
 
-	async getMetadata(): Promise<SqliteSessionMetadata> {
-		return this.metadata;
+	async readHead(): Promise<{ leafId: string | null }> {
+		const row = await this.db
+			.prepare(
+				`SELECT
+					s.active_leaf_id,
+					(s.active_leaf_id IS NULL OR EXISTS (
+						SELECT 1 FROM session_entries AS e WHERE e.session_id = s.id AND e.id = s.active_leaf_id
+					)) AS active_leaf_exists
+				FROM sessions AS s
+				WHERE s.id = ?`,
+			)
+			.get<{ active_leaf_id: string | null; active_leaf_exists: number }>(this.metadata.id);
+		if (!row) throw new SessionError("not_found", `Session not found: ${this.metadata.id}`);
+		if (row.active_leaf_exists === 0) {
+			throw new SessionError("invalid_session", `Entry ${row.active_leaf_id} not found`);
+		}
+		return { leafId: row.active_leaf_id };
 	}
 
 	async appendEntry(entry: SessionTreeEntry, options: { transaction?: boolean } = {}): Promise<void> {
@@ -300,7 +315,7 @@ export class SqliteSessionConnection {
 		}
 	}
 
-	private async getEntry(id: string): Promise<SessionTreeEntry | undefined> {
+	async readEntry(id: string): Promise<SessionTreeEntry | undefined> {
 		const cached = this.byId.get(id);
 		if (cached) return cached;
 		const row = await this.db
@@ -318,12 +333,20 @@ export class SqliteSessionConnection {
 		}
 	}
 
-	async getEntries(): Promise<SessionTreeEntry[]> {
-		const rows = await this.db
-			.prepare(
-				"SELECT session_id, id, entry_seq, parent_id, type, timestamp, payload FROM session_entries WHERE session_id = ? ORDER BY entry_seq",
-			)
-			.all<SessionEntryRow>(this.metadata.id);
+	async readEntries(options?: SessionEntryCursorOptions): Promise<SessionTreeEntry[]> {
+		const afterEntrySeq = options?.afterEntrySeq ?? 0;
+		const rows =
+			options?.limit === undefined
+				? await this.db
+						.prepare(
+							"SELECT session_id, id, entry_seq, parent_id, type, timestamp, payload FROM session_entries WHERE session_id = ? AND entry_seq > ? ORDER BY entry_seq",
+						)
+						.all<SessionEntryRow>(this.metadata.id, afterEntrySeq)
+				: await this.db
+						.prepare(
+							"SELECT session_id, id, entry_seq, parent_id, type, timestamp, payload FROM session_entries WHERE session_id = ? AND entry_seq > ? ORDER BY entry_seq LIMIT ?",
+						)
+						.all<SessionEntryRow>(this.metadata.id, afterEntrySeq, options.limit);
 		const entries = decodeEntryRows(rows);
 		for (const entry of entries) {
 			this.byId.set(entry.id, entry);
