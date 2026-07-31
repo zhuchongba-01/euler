@@ -4,17 +4,23 @@ import { join } from "node:path";
 import { encodeClientMessage, encodeFrame, PROTOCOL_VERSION } from "@earendil-works/pi-protocol";
 import { afterEach, describe, expect, test } from "vitest";
 import { type PiServer, PiServerError } from "../src/index.ts";
+import {
+	connectUnixTestClient,
+	Deferred,
+	type ProtocolTestClient,
+	TEST_TOKEN,
+	TestSessionBackend,
+} from "../src/testing/index.ts";
 import { createUnixServer, type UnixServerOptions } from "../src/transports/unix/index.ts";
-import { ConformanceBackend, connectUnix, Deferred, TEST_TOKEN, type WireClient } from "./support.ts";
 
 const servers = new Set<PiServer>();
-const clients = new Set<WireClient>();
+const clients = new Set<ProtocolTestClient>();
 const tempDirectories = new Set<string>();
 
 async function startServer(
-	backend = new ConformanceBackend(),
+	backend = new TestSessionBackend(),
 	overrides: Partial<UnixServerOptions> = {},
-): Promise<{ server: PiServer; backend: ConformanceBackend }> {
+): Promise<{ server: PiServer; backend: TestSessionBackend }> {
 	const directory = await mkdtemp(join(tmpdir(), "pis-"));
 	tempDirectories.add(directory);
 	const server = createUnixServer(backend, {
@@ -27,8 +33,8 @@ async function startServer(
 	return { server, backend };
 }
 
-async function connect(server: PiServer): Promise<WireClient> {
-	const client = await connectUnix(server.addresses[0]!);
+async function connect(server: PiServer): Promise<ProtocolTestClient> {
+	const client = await connectUnixTestClient(server.addresses[0]!);
 	clients.add(client);
 	return client;
 }
@@ -83,7 +89,7 @@ describe("Unix transport conformance", () => {
 	});
 
 	test("closes connections that do not complete hello before the timeout", async () => {
-		const { server } = await startServer(new ConformanceBackend(), { handshakeTimeoutMs: 20 });
+		const { server } = await startServer(new TestSessionBackend(), { handshakeTimeoutMs: 20 });
 		const client = await connect(server);
 		await client.waitForClose();
 		expect(client.messages).toContainEqual(
@@ -92,7 +98,7 @@ describe("Unix transport conformance", () => {
 	});
 
 	test("keeps the handshake timeout active until the server hello is sent", async () => {
-		const backend = new ConformanceBackend();
+		const backend = new TestSessionBackend();
 		const delay = backend.delayNextList();
 		const { server } = await startServer(backend, { handshakeTimeoutMs: 20 });
 		const client = await connect(server);
@@ -116,7 +122,7 @@ describe("Unix transport conformance", () => {
 		});
 		await malformed.waitForClose();
 
-		const boundedServer = await startServer(new ConformanceBackend(), { maxFrameLength: 128 });
+		const boundedServer = await startServer(new TestSessionBackend(), { maxFrameLength: 128 });
 		const oversized = await connect(boundedServer.server);
 		const frame = new Uint8Array(4 + 129);
 		frame[3] = 129;
@@ -124,7 +130,7 @@ describe("Unix transport conformance", () => {
 		await oversized.waitForClose();
 		expect(oversized.messages.some((message) => message.type === "hello")).toBe(false);
 
-		const outboundServer = await startServer(new ConformanceBackend(), { maxFrameLength: 128 });
+		const outboundServer = await startServer(new TestSessionBackend(), { maxFrameLength: 128 });
 		const outbound = await connect(outboundServer.server);
 		await outbound.sendMessage({ type: "hello", version: PROTOCOL_VERSION, token: TEST_TOKEN });
 		await outbound.waitForClose();
@@ -132,7 +138,7 @@ describe("Unix transport conformance", () => {
 	});
 
 	test("catches up a handshaking client after a concurrent server change", async () => {
-		class RacingBackend extends ConformanceBackend {
+		class RacingBackend extends TestSessionBackend {
 			readonly entered = new Deferred<void>();
 			readonly release = new Deferred<void>();
 			race = false;
@@ -171,7 +177,7 @@ describe("Unix transport conformance", () => {
 	});
 
 	test("shares request, event, attachment, and disconnect behavior", async () => {
-		const backend = new ConformanceBackend();
+		const backend = new TestSessionBackend();
 		backend.seed("first");
 		backend.seed("second");
 		const { server } = await startServer(backend);
@@ -227,7 +233,7 @@ describe("Unix transport conformance", () => {
 	});
 
 	test("disconnects attached clients when a runtime reports a terminal error", async () => {
-		const backend = new ConformanceBackend();
+		const backend = new TestSessionBackend();
 		backend.seed("terminal");
 		const errors: Error[] = [];
 		const { server } = await startServer(backend, { onError: (error) => errors.push(error) });
@@ -254,7 +260,7 @@ describe("Unix transport conformance", () => {
 	});
 
 	test("does not expose unexpected backend errors to clients", async () => {
-		class FailingBackend extends ConformanceBackend {
+		class FailingBackend extends TestSessionBackend {
 			private listCount = 0;
 
 			override async listSessions() {
@@ -281,7 +287,7 @@ describe("Unix transport conformance", () => {
 	});
 
 	test("can respond out of request order after the handshake", async () => {
-		const backend = new ConformanceBackend();
+		const backend = new TestSessionBackend();
 		backend.seed("first");
 		const { server } = await startServer(backend);
 		const client = await connect(server);
@@ -303,7 +309,7 @@ describe("Unix transport conformance", () => {
 	});
 
 	test("gracefully closes connections, sessions, and listener resources", async () => {
-		const backend = new ConformanceBackend();
+		const backend = new TestSessionBackend();
 		backend.seed("first");
 		const { server } = await startServer(backend);
 		const socketPath = server.addresses[0];

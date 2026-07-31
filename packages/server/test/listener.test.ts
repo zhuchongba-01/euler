@@ -1,23 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { ByteConnectionAcceptor } from "../src/connection.ts";
 import type { PiServerListener } from "../src/listener.ts";
-import { PiServer } from "../src/server.ts";
-import type { PiSessionBackend } from "../src/types.ts";
-
-const backend: PiSessionBackend = {
-	async listSessions() {
-		return [];
-	},
-	async listModels() {
-		return [];
-	},
-	async createSession() {
-		throw new Error("not used");
-	},
-	async openSession() {
-		throw new Error("not used");
-	},
-};
+import { createTestServer } from "../src/testing/index.ts";
 
 class TestListener implements PiServerListener {
 	address: string | undefined;
@@ -47,7 +31,7 @@ describe("PiServer listener composition", () => {
 	test("starts and closes every configured listener", async () => {
 		const first = new TestListener("first");
 		const second = new TestListener("second");
-		const server = new PiServer(backend, { token: "secret", listeners: [first, second] });
+		const { server } = createTestServer({ token: "secret", listeners: [first, second] });
 
 		await server.start();
 		expect(server.addresses).toEqual(["first", "second"]);
@@ -64,7 +48,7 @@ describe("PiServer listener composition", () => {
 		const first = new TestListener("first");
 		const failure = new Error("listener failed");
 		const second = new TestListener("second", failure);
-		const server = new PiServer(backend, { token: "secret", listeners: [first, second] });
+		const { server } = createTestServer({ token: "secret", listeners: [first, second] });
 
 		await expect(server.start()).rejects.toBe(failure);
 		expect(first.closeCount).toBe(1);

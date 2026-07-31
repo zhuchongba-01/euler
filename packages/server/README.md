@@ -42,11 +42,15 @@ await server.start();
 
 `PiServer` composes transport listeners through the `PiServerListener` interface. The Unix submodule exports the `createUnixListener()` building block and `createUnixServer()` preset, keeping the common case concise without coupling the primary server to Unix sockets. The listener uses authenticated, length-prefixed CBOR messages from `@earendil-works/pi-protocol`. It does not yet replace the legacy JSONL IPC control plane, child-process supervisor, standalone `server` CLI, or Radius presence integration.
 
+## Transport testing
+
+Custom transports can use `@earendil-works/pi-server/testing` for deterministic protocol conformance tests. It exports `createTestServer()`, `TestSessionBackend`, `ProtocolTestClient`, and the transport-neutral `WireChannel` contract. `connectUnixTestClient()` is provided for Unix transport tests.
+
 ## `pi-ai` protocol bridge
 
 `@earendil-works/pi-ai` domain objects and `@earendil-works/pi-protocol` wire DTOs remain independent. This package owns their boundary and exports `toProtocolModelMetadata()`, `toProtocolAssistantMessage()`, `toProtocolUserMessage()`, and `toProtocolToolResultMessage()`.
 
-The adapters normalize values that cannot cross the wire and exhaustively handle closed `pi-ai` unions. The protocol mirrors `pi-ai` vocabulary such as `toolCall` and `toolUse` where the semantics are identical. Compile-time assertions cover shared thinking-level and model-input vocabularies. Tests encode adapter output through the protocol runtime schemas so incompatible changes fail in the bridging package.
+The adapters reject invalid tool inputs, explicitly sanitize diagnostic details, and exhaustively handle closed `pi-ai` unions. The protocol mirrors `pi-ai` vocabulary such as `toolCall` and `toolUse` where the semantics are identical. Compile-time assertions cover shared thinking-level and model-input vocabularies. Tests encode adapter output through the protocol runtime schemas so incompatible changes fail in the bridging package.
 
 ## Legacy server migration
 

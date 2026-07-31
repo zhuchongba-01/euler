@@ -5,11 +5,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import type { PiServer } from "../src/index.ts";
+import {
+	connectUnixTestClient,
+	type ProtocolTestClient,
+	TEST_TOKEN,
+	TestSessionBackend,
+} from "../src/testing/index.ts";
 import { createUnixServer } from "../src/transports/unix/index.ts";
-import { ConformanceBackend, connectUnix, TEST_TOKEN, type WireClient } from "./support.ts";
 
 const servers = new Set<PiServer>();
-const clients = new Set<WireClient>();
+const clients = new Set<ProtocolTestClient>();
 const children = new Set<ChildProcess>();
 const tempDirectories = new Set<string>();
 
@@ -20,7 +25,7 @@ async function makeSocketPath(nested = false): Promise<string> {
 }
 
 function makeServer(path: string): PiServer {
-	const server = createUnixServer(new ConformanceBackend(), { token: TEST_TOKEN, path });
+	const server = createUnixServer(new TestSessionBackend(), { token: TEST_TOKEN, path });
 	servers.add(server);
 	return server;
 }
@@ -55,7 +60,7 @@ describe("Unix listener filesystem lifecycle", () => {
 			ino: firstIdentity.ino,
 		});
 
-		const client = await connectUnix(path);
+		const client = await connectUnixTestClient(path);
 		clients.add(client);
 		expect(await client.hello()).toMatchObject({ type: "hello" });
 	});
@@ -110,7 +115,7 @@ describe("Unix listener filesystem lifecycle", () => {
 		await server.start();
 		const liveIdentity = await lstat(path);
 		expect(liveIdentity.isSocket()).toBe(true);
-		const client = await connectUnix(path);
+		const client = await connectUnixTestClient(path);
 		clients.add(client);
 		expect(await client.hello()).toMatchObject({ type: "hello" });
 	});

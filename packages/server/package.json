@@ -10,6 +10,10 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
 		},
+		"./testing": {
+			"types": "./dist/testing/index.d.ts",
+			"import": "./dist/testing/index.js"
+		},
 		"./unix": {
 			"types": "./dist/transports/unix/index.d.ts",
 			"import": "./dist/transports/unix/index.js"
