@@ -7,7 +7,7 @@
 - Added chainable `pi.registerMarkdownTransformer()` hooks for display-only transformation of user and assistant Markdown.
 - Added an experimental fullscreen UI mode, selectable through `--ui-mode fullscreen` or `/settings` ([#7304](https://github.com/earendil-works/pi/issues/7304)).
 - Added a sticky editor, status, widget, and footer dock to fullscreen mode while keeping the transcript independently scrollable.
-- Added a transient draggable transcript scrollbar to fullscreen mode.
+- Added a draggable transcript scrollbar to fullscreen mode with configurable `auto`, `always`, and `hidden` modes through `/settings`; `always` reserves the rightmost column.
 - Added page scrolling and marked-message navigation shortcuts to fullscreen mode.
 
 ### Fixed
