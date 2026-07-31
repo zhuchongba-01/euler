@@ -6,10 +6,6 @@
 
 - Changed `toProtocolToolResultMessage()` to require the original `ToolCall` and verify tool result association.
 
-### Changed
-
-- Made protocol session detach requests idempotent so clients can safely reconcile interrupted cleanup.
-
 ### Fixed
 
 - Hardened protocol adapters against contradictory lifecycle states, invalid identifiers and timestamps, sparse execution arrays, and additive `pi-ai` contract drift.
