@@ -4,6 +4,7 @@ export interface PromiseResolvers<T> {
 	reject(reason?: unknown): void;
 }
 
+/** Remove in favor of `Promise.withResolvers()` when the repository's TypeScript lib baseline moves to ES2024. */
 export function createPromiseResolvers<T>(): PromiseResolvers<T> {
 	let resolve!: PromiseResolvers<T>["resolve"];
 	let reject!: PromiseResolvers<T>["reject"];
