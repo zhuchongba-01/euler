@@ -144,7 +144,7 @@ describe("AgentHarness", () => {
 	it("rejects waiting before shutdown is requested", async () => {
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: getModel("anthropic", "claude-sonnet-4-5"),
 		});
 
@@ -213,7 +213,7 @@ describe("AgentHarness", () => {
 		]);
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 		});
 		harness.on("before_agent_start", () => {
@@ -231,7 +231,7 @@ describe("AgentHarness", () => {
 		registration.setResponses([() => fauxAssistantMessage("reply")]);
 		const harness = new AgentHarness({
 			models,
-			session: new Session(new InMemorySessionStorage()),
+			session: await createInMemorySession(),
 			model: registration.getModel(),
 		});
 		let subscriberCalls = 0;
