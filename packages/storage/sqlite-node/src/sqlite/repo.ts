@@ -10,7 +10,7 @@ import {
 	getEntriesToFork,
 	getFileSystemResultOrThrow,
 	SessionError,
-	SessionRepo,
+	SessionRepository,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
 import { SqliteSessionSearch } from "./search-backend.ts";
@@ -246,9 +246,12 @@ export function createSqliteSessionStore(options: SqliteSessionStoreOptions): Sq
 	return new SqliteSessionStore(options);
 }
 
-export function createSqliteSessionRepo(
+export function createSqliteSessionRepository(
 	options: SqliteSessionStoreOptions,
-): SessionRepo<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions> {
+): SessionRepository<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions> {
 	const store = createSqliteSessionStore(options);
-	return new SessionRepo({ store, search: new SqliteSessionSearch<SqliteSessionMetadata>(options) });
+	return new SessionRepository({
+		store,
+		search: new SqliteSessionSearch<SqliteSessionMetadata>({ ...options, mode: "canonical" }),
+	});
 }

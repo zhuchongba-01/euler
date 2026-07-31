@@ -2,15 +2,15 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
 	createNodeSqliteFactory,
-	createSqliteSessionRepo,
+	createSqliteSessionRepository,
 	type SqliteSessionMetadata,
 	SqliteSessionSearch,
 	SqliteSessionStore,
 	type SqliteSessionStoreApi,
 } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
-import { createJsonlSessionRepo, JsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
-import { SessionRepo } from "../../src/harness/session/repo-utils.ts";
+import { createJsonlSessionRepository, JsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
+import { SessionRepository } from "../../src/harness/session/repo-utils.ts";
 import type {
 	JsonlSessionMetadata,
 	JsonlSessionStoreApi,
@@ -26,7 +26,7 @@ describe("JsonlSessionStore with scanning search", () => {
 	it("searches canonical session entries by scanning", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
-		const repo = createJsonlSessionRepo({ fs: env, sessionsRoot: join(root, "sessions") });
+		const repo = createJsonlSessionRepository({ fs: env, sessionsRoot: join(root, "sessions") });
 		const included = await repo.create({ cwd: root, id: "included" });
 		const excluded = await repo.create({ cwd: `${root}/other`, id: "excluded" });
 		const entryId = await included.appendMessage(createUserMessage("Find the auth defect"));
@@ -44,7 +44,7 @@ describe("SqliteSessionStore with explicit SQLite FTS5 search", () => {
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
 		const databasePath = join(root, "sessions.sqlite");
-		const repo = createSqliteSessionRepo({ env, sqlite, databasePath });
+		const repo = createSqliteSessionRepository({ env, sqlite, databasePath });
 		const included = await repo.create({ cwd: root, id: "included" });
 		const excluded = await repo.create({ cwd: `${root}/other`, id: "excluded" });
 		const metadata = await included.getMetadata();
@@ -71,6 +71,25 @@ describe("SqliteSessionStore with explicit SQLite FTS5 search", () => {
 
 		await repo.delete(metadata);
 		await expect(repo.search({ text: "auth", cwd: root })).resolves.toEqual([]);
+	});
+
+	it("initializes canonical storage when searched before the first session is created", async () => {
+		const root = createTempDir();
+		const env = new NodeExecutionEnv({ cwd: root });
+		const repo = createSqliteSessionRepository({
+			env,
+			sqlite: createNodeSqliteFactory(),
+			databasePath: join(root, "sessions.sqlite"),
+		});
+
+		await expect(repo.search({ text: "auth" })).resolves.toEqual([]);
+		const session = await repo.create({ cwd: root, id: "session-1" });
+		const entryId = await session.appendMessage(createUserMessage("Find the auth defect"));
+
+		await expect(repo.search({ text: "auth" })).resolves.toEqual([
+			expect.objectContaining({ entryId, metadata: expect.objectContaining({ id: "session-1" }) }),
+		]);
+		await expect(session.appendMessage(createUserMessage("Still writable"))).resolves.toBeTypeOf("string");
 	});
 });
 
@@ -116,7 +135,7 @@ describe("JsonlSessionStore with SQLite search index", () => {
 				return metadata;
 			},
 		} satisfies JsonlSessionStoreApi;
-		const repo = new SessionRepo({ store, search });
+		const repo = new SessionRepository({ store, search });
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("Find the auth defect"));
 
@@ -177,7 +196,7 @@ describe("JsonlSessionStore with multiple search indexes", () => {
 				return metadata;
 			},
 		} satisfies JsonlSessionStoreApi;
-		const repo = new SessionRepo({ store, search: primary });
+		const repo = new SessionRepository({ store, search: primary });
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("indexed in both places"));
 
@@ -246,7 +265,7 @@ describe("SqliteSessionStore with custom search", () => {
 				return metadata;
 			},
 		} satisfies SqliteSessionStoreApi;
-		const repo = new SessionRepo({ store, search });
+		const repo = new SessionRepository({ store, search });
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const metadata = await session.getMetadata();
 		const entryId = await session.appendMessage(createUserMessage("indexed remotely"));
