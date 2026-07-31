@@ -1,4 +1,4 @@
-import type { FileSystem, SessionCreateOptions, SessionMetadata, SessionStore } from "@earendil-works/pi-agent-core";
+import type { FileSystem, SessionCreateOptions, SessionMetadata } from "@earendil-works/pi-agent-core";
 
 /** Result of a prepared SQLite statement execution. */
 export interface SqliteRunResult {
@@ -43,8 +43,5 @@ export interface SqliteSessionCreateOptions extends SessionCreateOptions {
 export interface SqliteSessionListOptions {
 	cwd?: string;
 }
-
-export interface SqliteSessionStoreApi
-	extends SessionStore<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions> {}
 
 export type SqliteSessionStoreEnv = Pick<FileSystem, "absolutePath" | "createDir" | "exists">;

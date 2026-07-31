@@ -3,17 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
 	createNodeSqliteFactory,
 	createSqliteSessionRepository,
+	createSqliteSessionSearch,
+	createSqliteSessionStore,
 	type SqliteSessionMetadata,
-	SqliteSessionSearch,
-	SqliteSessionStore,
-	type SqliteSessionStoreApi,
 } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
-import { createJsonlSessionRepository, JsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
-import { SessionRepository } from "../../src/harness/session/repo-utils.ts";
+import { createJsonlSessionRepository, createJsonlSessionStore } from "../../src/harness/session/jsonl-repo.ts";
+import { createSessionRepository } from "../../src/harness/session/repo-utils.ts";
 import type {
 	JsonlSessionMetadata,
-	JsonlSessionStoreApi,
 	SessionSearch,
 	SessionSearchHit,
 	SessionSearchIndex,
@@ -100,12 +98,12 @@ describe("JsonlSessionStore with SQLite search index", () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
-		const search = new SqliteSessionSearch<JsonlSessionMetadata>({
+		const search = createSqliteSessionSearch<JsonlSessionMetadata>({
 			env,
 			sqlite,
 			databasePath: join(root, "search.sqlite"),
 		});
-		const canonical = new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") });
+		const canonical = createJsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") });
 		const store = {
 			load: (metadata) => canonical.load(metadata),
 			list: (options) => canonical.list(options),
@@ -134,8 +132,8 @@ describe("JsonlSessionStore with SQLite search index", () => {
 				await search.replaceSession(metadata, (await canonical.load(metadata)).entries);
 				return metadata;
 			},
-		} satisfies JsonlSessionStoreApi;
-		const repo = new SessionRepository({ store, search });
+		} satisfies ReturnType<typeof createJsonlSessionStore>;
+		const repo = createSessionRepository({ store, search });
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("Find the auth defect"));
 
@@ -150,17 +148,17 @@ describe("JsonlSessionStore with multiple search indexes", () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
-		const primary = new SqliteSessionSearch<JsonlSessionMetadata>({
+		const primary = createSqliteSessionSearch<JsonlSessionMetadata>({
 			env,
 			sqlite,
 			databasePath: join(root, "primary-search.sqlite"),
 		});
-		const secondary = new SqliteSessionSearch<JsonlSessionMetadata>({
+		const secondary = createSqliteSessionSearch<JsonlSessionMetadata>({
 			env,
 			sqlite,
 			databasePath: join(root, "secondary-search.sqlite"),
 		});
-		const canonical = new JsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") });
+		const canonical = createJsonlSessionStore({ fs: env, sessionsRoot: join(root, "sessions") });
 		const store = {
 			load: (metadata) => canonical.load(metadata),
 			list: (options) => canonical.list(options),
@@ -195,8 +193,8 @@ describe("JsonlSessionStore with multiple search indexes", () => {
 				await secondary.replaceSession(metadata, entries);
 				return metadata;
 			},
-		} satisfies JsonlSessionStoreApi;
-		const repo = new SessionRepository({ store, search: primary });
+		} satisfies ReturnType<typeof createJsonlSessionStore>;
+		const repo = createSessionRepository({ store, search: primary });
 		const session = await repo.create({ cwd: root, id: "jsonl-session" });
 		const entryId = await session.appendMessage(createUserMessage("indexed in both places"));
 
@@ -235,7 +233,7 @@ describe("SqliteSessionStore with custom search", () => {
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
 		const databasePath = join(root, "sessions.sqlite");
-		const canonical = new SqliteSessionStore({ env, sqlite, databasePath });
+		const canonical = createSqliteSessionStore({ env, sqlite, databasePath });
 		const store = {
 			load: (metadata) => canonical.load(metadata),
 			list: (options) => canonical.list(options),
@@ -264,8 +262,8 @@ describe("SqliteSessionStore with custom search", () => {
 				await index.replaceSession(metadata, (await canonical.load(metadata)).entries);
 				return metadata;
 			},
-		} satisfies SqliteSessionStoreApi;
-		const repo = new SessionRepository({ store, search });
+		} satisfies ReturnType<typeof createSqliteSessionStore>;
+		const repo = createSessionRepository({ store, search });
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		const metadata = await session.getMetadata();
 		const entryId = await session.appendMessage(createUserMessage("indexed remotely"));

@@ -83,7 +83,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_search_fts USING fts5(
  * Storage-independent SQLite FTS search. Its database may be separate from,
  * or shared with, the canonical session backend.
  */
-export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>
+class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>
 	implements SessionSearch<TMetadata>, SessionSearchIndex<TMetadata>
 {
 	private readonly options: {
@@ -235,4 +235,10 @@ export class SqliteSessionSearch<TMetadata extends SessionMetadata = SessionMeta
 			await db.close();
 		}
 	}
+}
+
+export function createSqliteSessionSearch<TMetadata extends SessionMetadata = SessionMetadata>(
+	options: SqliteSessionSearchOptions,
+): SessionSearch<TMetadata> & SessionSearchIndex<TMetadata> {
+	return new SqliteSessionSearch<TMetadata>(options);
 }
