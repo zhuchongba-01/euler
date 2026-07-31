@@ -41,7 +41,7 @@ Subscriber exceptions are isolated from protocol state. Set `onListenerError` in
 
 ## Unix-domain sockets
 
-Node.js consumers can use the separately exported Unix-domain socket transport:
+Node.js and Bun consumers can use the separately exported Unix-domain socket transport:
 
 ```ts
 import { PiClient } from "@earendil-works/pi-client";
@@ -59,4 +59,4 @@ await client.connect();
 
 `maxPendingBytes` bounds queued outbound data. It defaults to four times the protocol frame limit. The transport preserves send order and waits for socket backpressure before resolving each send.
 
-The `@earendil-works/pi-client` root remains transport- and runtime-neutral. Importing the Node-specific transport requires the explicit `@earendil-works/pi-client/unix` subpath.
+The `@earendil-works/pi-client` root remains transport- and runtime-neutral. Importing the Node-compatible transport requires the explicit `@earendil-works/pi-client/unix` subpath.
