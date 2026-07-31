@@ -450,15 +450,13 @@ END;
 			cwd: root,
 			sessionId: "session-1",
 		});
-		const originalPrepare = db.prepare.bind(db);
-		db.prepare = (sql: string) => {
-			if (sql.startsWith("INSERT INTO branch_entries")) {
-				return new ThrowingStatement(async () => {
-					throw new Error("branch insert failed");
-				});
-			}
-			return originalPrepare(sql);
-		};
+		await db.exec(`
+			CREATE TEMP TRIGGER fail_branch_entry_insert
+			BEFORE INSERT ON branch_entries
+			BEGIN
+				SELECT RAISE(ABORT, 'branch insert failed');
+			END;
+		`);
 
 		const rootEntry = {
 			type: "message" as const,
@@ -467,8 +465,11 @@ END;
 			timestamp: new Date().toISOString(),
 			message: createUserMessage("root"),
 		};
-		await expect(storage.appendEntry(rootEntry)).rejects.toMatchObject({ code: "storage" });
-		db.prepare = originalPrepare;
+		try {
+			await expect(storage.appendEntry(rootEntry)).rejects.toMatchObject({ code: "storage" });
+		} finally {
+			await db.exec("DROP TRIGGER fail_branch_entry_insert");
+		}
 		const sessionRow = await db
 			.prepare("SELECT active_leaf_id FROM sessions WHERE id = ?")
 			.get<{ active_leaf_id: string | null }>("session-1");
