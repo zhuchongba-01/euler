@@ -110,9 +110,8 @@ describe("Unix listener filesystem lifecycle", () => {
 		await server.start();
 		const liveIdentity = await lstat(path);
 		expect(liveIdentity.isSocket()).toBe(true);
-		expect({ dev: liveIdentity.dev, ino: liveIdentity.ino }).not.toEqual({
-			dev: staleIdentity.dev,
-			ino: staleIdentity.ino,
-		});
+		const client = await connectUnix(path);
+		clients.add(client);
+		expect(await client.hello()).toMatchObject({ type: "hello" });
 	});
 });
