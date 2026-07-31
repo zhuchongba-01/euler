@@ -38,3 +38,25 @@ Call `handlers.onData(chunk)` for inbound bytes, `handlers.onClose()` for an ord
 Treat peers as untrusted. Use a secure transport where required and protect the protocol bearer token.
 
 Subscriber exceptions are isolated from protocol state. Set `onListenerError` in `PiClientOptions` to report them to application logging or diagnostics.
+
+## Unix-domain sockets
+
+Node.js consumers can use the separately exported Unix-domain socket transport:
+
+```ts
+import { PiClient } from "@earendil-works/pi-client";
+import { createUnixTransportFactory } from "@earendil-works/pi-client/unix";
+
+const client = new PiClient({
+  token: bearerToken,
+  transportFactory: createUnixTransportFactory({
+    path: "/tmp/pi.sock",
+  }),
+});
+
+await client.connect();
+```
+
+`maxPendingBytes` bounds queued outbound data. It defaults to four times the protocol frame limit. The transport preserves send order and waits for socket backpressure before resolving each send.
+
+The `@earendil-works/pi-client` root remains transport- and runtime-neutral. Importing the Node-specific transport requires the explicit `@earendil-works/pi-client/unix` subpath.
