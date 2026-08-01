@@ -9,6 +9,12 @@ export interface CachedBranch {
 	leafSeq: number;
 }
 
+export interface CachedBranchQuery {
+	stopAtType?: SessionEntryRow["type"];
+	stopAtId?: string;
+	order?: "newestFirst" | "oldestFirst";
+}
+
 export async function readCachedBranch(
 	db: SqliteDatabase,
 	sessionId: string,
@@ -21,6 +27,78 @@ export async function readCachedBranch(
 		.get<{ branch_id: string; entry_seq: number }>(sessionId, leafId);
 	if (!membership) return undefined;
 	return { branchId: membership.branch_id, leafSeq: membership.entry_seq };
+}
+
+export async function isCachedBranchValid(
+	db: SqliteDatabase,
+	sessionId: string,
+	branch: CachedBranch,
+	leafId: string,
+	startSeq = 0,
+): Promise<boolean> {
+	const result = await db
+		.prepare(
+			`WITH path AS (
+				SELECT
+					b.entry_id,
+					b.entry_seq,
+					e.id AS stored_entry_id,
+					e.parent_id,
+					LAG(b.entry_id) OVER (ORDER BY b.entry_seq) AS previous_entry_id
+				FROM branch_entries AS b
+				LEFT JOIN session_entries AS e ON e.session_id = b.session_id AND e.id = b.entry_id
+				WHERE b.session_id = ? AND b.branch_id = ? AND b.entry_seq BETWEEN ? AND ?
+			)
+			SELECT
+				COUNT(*) AS row_count,
+				COALESCE(SUM(
+					stored_entry_id IS NULL OR
+					(? = 0 AND previous_entry_id IS NULL AND parent_id IS NOT NULL) OR
+					(previous_entry_id IS NOT NULL AND parent_id IS NOT previous_entry_id)
+				), 0) AS invalid_count,
+				COALESCE(MAX(entry_seq = ? AND entry_id = ?), 0) AS contains_leaf
+			FROM path`,
+		)
+		.get<{ row_count: number; invalid_count: number; contains_leaf: number }>(
+			sessionId,
+			branch.branchId,
+			startSeq,
+			branch.leafSeq,
+			startSeq,
+			branch.leafSeq,
+			leafId,
+		);
+	return result?.row_count !== 0 && result?.invalid_count === 0 && result.contains_leaf === 1;
+}
+
+export async function readNewestCachedStopSeq(
+	db: SqliteDatabase,
+	sessionId: string,
+	branch: CachedBranch,
+	stopAtType: SessionEntryRow["type"] | undefined,
+	stopAtId: string | undefined,
+): Promise<number | undefined> {
+	const predicates: string[] = [];
+	const params: unknown[] = [sessionId, branch.branchId, branch.leafSeq];
+	if (stopAtType !== undefined) {
+		predicates.push("e.type = ?");
+		params.push(stopAtType);
+	}
+	if (stopAtId !== undefined) {
+		predicates.push("b.entry_id = ?");
+		params.push(stopAtId);
+	}
+	if (predicates.length === 0) return undefined;
+	const row = await db
+		.prepare(
+			`SELECT MAX(b.entry_seq) AS entry_seq
+			FROM branch_entries AS b
+			JOIN session_entries AS e ON e.session_id = b.session_id AND e.id = b.entry_id
+			WHERE b.session_id = ? AND b.branch_id = ? AND b.entry_seq <= ?
+				AND (${predicates.join(" OR ")})`,
+		)
+		.get<{ entry_seq: number | null }>(...params);
+	return row?.entry_seq ?? undefined;
 }
 
 export async function readCachedBranchRows(
@@ -38,6 +116,51 @@ export async function readCachedBranchRows(
 			ORDER BY b.entry_seq`,
 		)
 		.all<SessionEntryRow>(sessionId, branch.branchId, startSeq, branch.leafSeq);
+}
+
+export async function queryCachedBranchRows(
+	db: SqliteDatabase,
+	sessionId: string,
+	branch: CachedBranch,
+	query: CachedBranchQuery,
+): Promise<SessionEntryRow[]> {
+	const oldestFirst = query.order === "oldestFirst";
+	const boundaryParams: unknown[] = [sessionId, branch.branchId, branch.leafSeq];
+	const stopPredicates: string[] = [];
+	if (query.stopAtType !== undefined) {
+		stopPredicates.push("stop_entry.type = ?");
+		boundaryParams.push(query.stopAtType);
+	}
+	if (query.stopAtId !== undefined) {
+		stopPredicates.push("stop.entry_id = ?");
+		boundaryParams.push(query.stopAtId);
+	}
+
+	const boundary = stopPredicates.length
+		? `WITH boundary AS (
+			SELECT ${oldestFirst ? "MIN" : "MAX"}(stop.entry_seq) AS entry_seq
+			FROM branch_entries AS stop
+			JOIN session_entries AS stop_entry
+				ON stop_entry.session_id = stop.session_id AND stop_entry.id = stop.entry_id
+			WHERE stop.session_id = ? AND stop.branch_id = ? AND stop.entry_seq <= ?
+				AND (${stopPredicates.join(" OR ")})
+		)`
+		: "";
+	const range = stopPredicates.length
+		? `AND b.entry_seq ${oldestFirst ? "<=" : ">="} COALESCE(
+			(SELECT entry_seq FROM boundary), ${oldestFirst ? branch.leafSeq : 0}
+		)`
+		: "";
+	const sql = `${boundary}
+		SELECT e.session_id, e.id, e.entry_seq, e.parent_id, e.type, e.timestamp, e.payload
+		FROM branch_entries AS b
+		JOIN session_entries AS e ON e.session_id = b.session_id AND e.id = b.entry_id
+		WHERE b.session_id = ? AND b.branch_id = ? AND b.entry_seq <= ?
+			${range}
+		ORDER BY b.entry_seq ${oldestFirst ? "ASC" : "DESC"}`;
+
+	const params = [...(stopPredicates.length === 0 ? [] : boundaryParams), sessionId, branch.branchId, branch.leafSeq];
+	return db.prepare(sql).all<SessionEntryRow>(...params);
 }
 
 export async function readCachedEntryRowsByType(

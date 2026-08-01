@@ -8,10 +8,14 @@ import { SessionError, toError } from "@earendil-works/pi-agent-core";
 import type { SqliteDatabase, SqliteSessionMetadata } from "../types.ts";
 import {
 	appendEntryToBranchCache,
+	type CachedBranch,
+	isCachedBranchValid,
+	queryCachedBranchRows,
 	readCachedBranch,
 	readCachedBranchRows,
 	readCachedEntryRowsByType,
 	readCachedEntrySeq,
+	readNewestCachedStopSeq,
 	rebuildCachedBranch,
 } from "./branch-cache.ts";
 import { decodeEntry, encodeEntry, type SessionEntryRow } from "./session-entries.ts";
@@ -81,32 +85,87 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 			throw new RangeError("Session branch query limit must be a positive integer");
 		}
 		if (query.start === null) return [];
-		const fullPath = await this.readPathToRoot(query.start);
-		const path: SessionTreeEntry[] = [];
-		for (let index = fullPath.length - 1; index >= 0; index--) {
-			const entry = fullPath[index]!;
-			path.push(entry);
-			if (entry.id === query.stopAtId || entry.type === query.stopAtType) break;
+		const startId = query.start;
+		let cached = await readCachedBranch(this.db, this.metadata.id, startId);
+		const validationStartSeq =
+			cached && query.order !== "oldestFirst"
+				? await readNewestCachedStopSeq(this.db, this.metadata.id, cached, query.stopAtType, query.stopAtId)
+				: undefined;
+		if (!cached || !(await isCachedBranchValid(this.db, this.metadata.id, cached, startId, validationStartSeq))) {
+			if (query.order !== "oldestFirst" && (query.stopAtId !== undefined || query.stopAtType !== undefined)) {
+				return this.findEntriesOnCanonicalBranch({ ...query, start: startId });
+			}
+			cached = await this.repairBranchCacheForQuery(startId, cached?.branchId);
 		}
-		if (query.order === "oldestFirst") path.reverse();
-		const entries = path.filter(
+		const decoded = decodeEntryRows(await queryCachedBranchRows(this.db, this.metadata.id, cached, query));
+		const filtered = decoded.filter(
 			(entry) =>
 				(query.type === undefined || entry.type === query.type) &&
 				(query.customType === undefined || (entry.type === "custom" && entry.customType === query.customType)),
 		);
-		return query.limit === undefined ? entries : entries.slice(0, query.limit);
+		const entries = query.limit === undefined ? filtered : filtered.slice(0, query.limit);
+		for (const entry of entries) this.byId.set(entry.id, entry);
+		return entries;
 	}
 
-	private async readPathToRoot(leafId: string): Promise<SessionTreeEntry[]> {
-		const cached = await readCachedBranch(this.db, this.metadata.id, leafId);
-		if (cached) {
-			const entries = decodeEntryRows(await readCachedBranchRows(this.db, this.metadata.id, cached, 0));
-			if (this.isValidCachedPath(entries, leafId, null)) {
-				for (const entry of entries) this.byId.set(entry.id, entry);
-				return entries;
+	private async findEntriesOnCanonicalBranch(
+		query: SessionBranchQuery & { start: string },
+	): Promise<SessionTreeEntry[]> {
+		const rows: SessionEntryRow[] = [];
+		const visited = new Set<string>();
+		let currentId: string | null = query.start;
+		while (currentId !== null) {
+			if (visited.has(currentId)) throw invalidSession(`cycle in parent chain at entry ${currentId}`);
+			visited.add(currentId);
+			const row: SessionEntryRow | undefined = await this.db
+				.prepare(
+					"SELECT session_id, id, entry_seq, parent_id, type, timestamp, payload FROM session_entries WHERE session_id = ? AND id = ?",
+				)
+				.get<SessionEntryRow>(this.metadata.id, currentId);
+			if (!row) {
+				if (currentId === query.start) throw new SessionError("not_found", `Entry ${query.start} not found`);
+				throw invalidSession(`Entry ${currentId} not found`);
 			}
+			rows.push(row);
+			if (row.id === query.stopAtId || row.type === query.stopAtType) break;
+			currentId = row.parent_id;
 		}
-		return this.repairBranchCache(leafId, cached?.branchId);
+		const entries = decodeEntryRows(rows).filter(
+			(entry) =>
+				(query.type === undefined || entry.type === query.type) &&
+				(query.customType === undefined || (entry.type === "custom" && entry.customType === query.customType)),
+		);
+		const limited = query.limit === undefined ? entries : entries.slice(0, query.limit);
+		for (const entry of limited) this.byId.set(entry.id, entry);
+		return limited;
+	}
+
+	private async repairBranchCacheForQuery(leafId: string, branchIdToReplace?: string): Promise<CachedBranch> {
+		const visited = new Set<string>();
+		let currentId: string | null = leafId;
+		while (currentId !== null) {
+			if (visited.has(currentId)) throw invalidSession(`cycle in parent chain at entry ${currentId}`);
+			visited.add(currentId);
+			const row: { parent_id: string | null } | undefined = await this.db
+				.prepare("SELECT parent_id FROM session_entries WHERE session_id = ? AND id = ?")
+				.get<{ parent_id: string | null }>(this.metadata.id, currentId);
+			if (!row) {
+				if (currentId === leafId) throw new SessionError("not_found", `Entry ${leafId} not found`);
+				throw invalidSession(`Entry ${currentId} not found`);
+			}
+			currentId = row.parent_id;
+		}
+		try {
+			await rebuildCachedBranch(this.db, this.metadata.id, leafId, branchIdToReplace);
+		} catch (error) {
+			if (error instanceof SessionError) throw error;
+			throw new SessionError("storage", `Failed to rebuild SQLite branch cache at entry ${leafId}`, toError(error));
+		}
+		const cached = await readCachedBranch(this.db, this.metadata.id, leafId);
+		if (!cached || !(await isCachedBranchValid(this.db, this.metadata.id, cached, leafId))) {
+			throw invalidSession(`branch cache repair did not produce a valid path to entry ${leafId}`);
+		}
+		return cached;
 	}
 
 	async readPathToRootOrCompaction(leafId: string | null): Promise<SessionTreeEntry[]> {

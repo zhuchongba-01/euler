@@ -199,6 +199,47 @@ describe("SQLite branch cache", () => {
 		expect((await fork.getEntries()).map((entry) => entry.id)).toEqual([rootId, childId]);
 	});
 
+	it("repairs a stale branch cache from canonical parent links", async () => {
+		const root = createTempDir();
+		const databasePath = join(root, "sessions.sqlite");
+		const env = new NodeExecutionEnv({ cwd: root });
+		const sqlite = createNodeSqliteFactory();
+		const repo = createSessionRepository({ store: createSqliteSessionStore({ env, sqlite, databasePath }) });
+		const session = await repo.create({ cwd: root, id: "session-1" });
+		const rootId = await session.appendMessage(createUserMessage("root"));
+		const staleId = await session.appendMessage(createAssistantMessage("stale"));
+		const leafId = await session.appendMessage(createUserMessage("leaf"));
+
+		const db = await sqlite.open(databasePath);
+		try {
+			await db
+				.prepare("UPDATE session_entries SET parent_id = ? WHERE session_id = ? AND id = ?")
+				.run(rootId, "session-1", leafId);
+		} finally {
+			await db.close();
+		}
+
+		expect(
+			(await session.findEntriesOnBranch({ start: leafId, order: "oldestFirst" })).map((entry) => entry.id),
+		).toEqual([rootId, leafId]);
+		const inspection = await sqlite.open(databasePath);
+		try {
+			const rows = await inspection
+				.prepare(
+					`SELECT entry_id FROM branch_entries
+					WHERE session_id = ? AND branch_id = (
+						SELECT branch_id FROM branch_entries WHERE session_id = ? AND entry_id = ? LIMIT 1
+					)
+					ORDER BY entry_seq`,
+				)
+				.all<{ entry_id: string }>("session-1", "session-1", leafId);
+			expect(rows.map((row) => row.entry_id)).toEqual([rootId, leafId]);
+			expect(rows.map((row) => row.entry_id)).not.toContain(staleId);
+		} finally {
+			await inspection.close();
+		}
+	});
+
 	it("deletes branch entries and tips with the session", async () => {
 		const root = createTempDir();
 		const databasePath = join(root, "sessions.sqlite");
