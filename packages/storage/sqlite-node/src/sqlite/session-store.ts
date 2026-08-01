@@ -229,6 +229,10 @@ class SqliteSessionStore
 				this.assertOpen();
 				return this.operations.enqueue(() => connection.readEntries(options));
 			},
+			findEntriesOnBranch: (query) => {
+				this.assertOpen();
+				return this.operations.enqueue(() => connection.findEntriesOnBranch(query));
+			},
 			readPathToRootOrCompaction: (leafId) => {
 				this.assertOpen();
 				return this.operations.enqueue(() => connection.readPathToRootOrCompaction(leafId));
