@@ -1,4 +1,9 @@
-import type { SessionEntryCursorOptions, SessionReader, SessionTreeEntry } from "@earendil-works/pi-agent-core";
+import type {
+	SessionBranchQuery,
+	SessionEntryCursorOptions,
+	SessionReader,
+	SessionTreeEntry,
+} from "@earendil-works/pi-agent-core";
 import { SessionError, toError } from "@earendil-works/pi-agent-core";
 import type { SqliteDatabase, SqliteSessionMetadata } from "../types.ts";
 import {
@@ -70,6 +75,39 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 	readonly metadata: SqliteSessionMetadata;
 	private byId: Map<string, SessionTreeEntry>;
 	private materializedState: SessionMaterializedState;
+
+	async findEntriesOnBranch(query: SessionBranchQuery & { start: string | null }): Promise<SessionTreeEntry[]> {
+		if (query.limit !== undefined && (!Number.isInteger(query.limit) || query.limit <= 0)) {
+			throw new RangeError("Session branch query limit must be a positive integer");
+		}
+		if (query.start === null) return [];
+		const fullPath = await this.readPathToRoot(query.start);
+		const path: SessionTreeEntry[] = [];
+		for (let index = fullPath.length - 1; index >= 0; index--) {
+			const entry = fullPath[index]!;
+			path.push(entry);
+			if (entry.id === query.stopAtId || entry.type === query.stopAtType) break;
+		}
+		if (query.order === "oldestFirst") path.reverse();
+		const entries = path.filter(
+			(entry) =>
+				(query.type === undefined || entry.type === query.type) &&
+				(query.customType === undefined || (entry.type === "custom" && entry.customType === query.customType)),
+		);
+		return query.limit === undefined ? entries : entries.slice(0, query.limit);
+	}
+
+	private async readPathToRoot(leafId: string): Promise<SessionTreeEntry[]> {
+		const cached = await readCachedBranch(this.db, this.metadata.id, leafId);
+		if (cached) {
+			const entries = decodeEntryRows(await readCachedBranchRows(this.db, this.metadata.id, cached, 0));
+			if (this.isValidCachedPath(entries, leafId, null)) {
+				for (const entry of entries) this.byId.set(entry.id, entry);
+				return entries;
+			}
+		}
+		return this.repairBranchCache(leafId, cached?.branchId);
+	}
 
 	async readPathToRootOrCompaction(leafId: string | null): Promise<SessionTreeEntry[]> {
 		if (leafId === null) return [];
