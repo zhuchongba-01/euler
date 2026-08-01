@@ -153,6 +153,7 @@ class SqliteSessionStore
 		return this.operations.enqueue(async () => {
 			const db = await this.getDatabase();
 			await db.transaction(async () => {
+				await db.prepare("DELETE FROM branch_tips WHERE session_id = ?").run(metadata.id);
 				await db.prepare("DELETE FROM branch_entries WHERE session_id = ?").run(metadata.id);
 				await db.prepare("DELETE FROM session_entries WHERE session_id = ?").run(metadata.id);
 				await db.prepare("DELETE FROM entry_materialized WHERE session_id = ?").run(metadata.id);
