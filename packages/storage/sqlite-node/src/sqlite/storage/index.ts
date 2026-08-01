@@ -74,7 +74,6 @@ async function loadSqliteSession(
 	sessionId: string,
 ): Promise<{
 	row: SessionRow;
-	leafId: string | null;
 	activeBranchId: string | null;
 	materializedState: SessionMaterializedState;
 }> {
@@ -83,7 +82,6 @@ async function loadSqliteSession(
 		.get<SessionRow>(sessionId);
 	if (!row) throw new SessionError("not_found", `Session not found: ${sessionId}`);
 
-	const leafId = row.active_leaf_id;
 	const materializedRow = await db
 		.prepare("SELECT session_id, payload FROM session_materialized WHERE session_id = ?")
 		.get<SessionMaterializedRow>(sessionId);
@@ -95,7 +93,6 @@ async function loadSqliteSession(
 		.all<EntryMaterializedRow>(sessionId);
 	return {
 		row,
-		leafId,
 		activeBranchId: await loadActiveBranchId(db, sessionId),
 		materializedState: materializedStateFromRows(materializedRow, entryMaterializedRows),
 	};
@@ -105,7 +102,6 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 	private readonly db: SqliteDatabase;
 	readonly metadata: SqliteSessionMetadata;
 	private byId: Map<string, SessionTreeEntry>;
-	private currentLeafId: string | null;
 	private activeBranchId: string | null;
 	private materializedState: SessionMaterializedState;
 
@@ -116,7 +112,7 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 		let current = await this.readEntry(leafId);
 		if (!current) throw new SessionError("not_found", `Entry ${leafId} not found`);
 		while (current) {
-			path.unshift(current);
+			path.push(current);
 			if (stopAtEntryId !== null && current.id === stopAtEntryId) break;
 			if (current.type === "compaction") {
 				if (current.retainedTail) break;
@@ -127,10 +123,10 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 			if (!parent) throw new SessionError("invalid_session", `Entry ${current.parentId} not found`);
 			current = parent;
 		}
-		return path;
+		return path.reverse();
 	}
 
-	private async materializeBranch(leafId: string | null): Promise<void> {
+	private async materializeBranch(leafId: string | null): Promise<string> {
 		const branchId = uuidv7();
 		// Rebuild the branch path only when branch membership changes: branch switch
 		// (leaf navigation) or a new fork from a parent that already has a child.
@@ -148,31 +144,31 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 				.prepare("INSERT INTO branch_entries (session_id, branch_id, entry_id, entry_seq) VALUES (?, ?, ?, ?)")
 				.run(this.metadata.id, branchId, entry.id, entryRow.entry_seq);
 		}
-		this.activeBranchId = branchId;
+		return branchId;
 	}
 
-	private async appendToActiveBranch(entryId: string, parentId: string | null): Promise<void> {
-		if (!this.activeBranchId) {
-			await this.materializeBranch(parentId);
-		}
-		// After a branch is materialized/resynced, subsequent linear appends only add the
-		// new tip entry. We do not rebuild the full branch on every append.
-		if (!this.activeBranchId) {
-			throw invalidSession(`active branch missing for session ${this.metadata.id}`);
-		}
+	private async appendToActiveBranch(
+		entryId: string,
+		parentId: string | null,
+		activeBranchId: string | null,
+	): Promise<string> {
+		let branchId = activeBranchId;
+		// Reuse the staged active branch when available. Otherwise materialize
+		// the parent path once, then add only the new tip entry below.
+		if (!branchId) branchId = await this.materializeBranch(parentId);
 		const entryRow = await this.db
 			.prepare("SELECT entry_seq FROM session_entries WHERE session_id = ? AND id = ?")
 			.get<{ entry_seq: number }>(this.metadata.id, entryId);
 		if (!entryRow) throw invalidSession(`missing entry row for session ${this.metadata.id} entry ${entryId}`);
 		await this.db
 			.prepare("INSERT INTO branch_entries (session_id, branch_id, entry_id, entry_seq) VALUES (?, ?, ?, ?)")
-			.run(this.metadata.id, this.activeBranchId, entryId, entryRow.entry_seq);
+			.run(this.metadata.id, branchId, entryId, entryRow.entry_seq);
+		return branchId;
 	}
 
 	private constructor(
 		db: SqliteDatabase,
 		metadata: SqliteSessionMetadata,
-		leafId: string | null,
 		activeBranchId: string | null,
 		materializedState: SessionMaterializedState,
 	) {
@@ -180,7 +176,6 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 		this.metadata = metadata;
 		this.byId = new Map<string, SessionTreeEntry>();
 		this.materializedState = materializedState;
-		this.currentLeafId = leafId;
 		this.activeBranchId = activeBranchId;
 	}
 
@@ -189,7 +184,6 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 		return new SqliteSessionConnection(
 			db,
 			rowToMetadata(loaded.row, metadata.path),
-			loaded.leafId,
 			loaded.activeBranchId,
 			loaded.materializedState,
 		);
@@ -233,7 +227,6 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 				metadata: options.metadata,
 			},
 			null,
-			null,
 			createEmptyMaterializedState(),
 		);
 	}
@@ -259,17 +252,16 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 
 	async appendEntry(entry: SessionTreeEntry, options: { transaction?: boolean } = {}): Promise<void> {
 		const encoded = encodeEntry(entry);
-		const previousMaterializedState: SessionMaterializedState = {
+		const nextMaterializedState: SessionMaterializedState = {
 			...this.materializedState,
 			labelsById: new Map(this.materializedState.labelsById),
 			modelThinkingConfigs: [...this.materializedState.modelThinkingConfigs],
 			currentModel: this.materializedState.currentModel ? { ...this.materializedState.currentModel } : null,
 		};
-		const previousById = new Map(this.byId);
-		const previousLeafId = this.currentLeafId;
-		const previousActiveBranchId = this.activeBranchId;
+		const nextLeafId = leafIdAfterEntry(entry);
+		let nextActiveBranchId = this.activeBranchId;
 		try {
-			applyEntryToMaterializedState(this.materializedState, entry);
+			applyEntryToMaterializedState(nextMaterializedState, entry);
 			const write = async () => {
 				const parentHadExistingChild = await hasExistingChild(this.db, this.metadata.id, entry.parentId);
 				const nextSeq = await getNextSequence(this.db, this.metadata.id);
@@ -281,35 +273,31 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 				await advanceSequence(this.db, this.metadata.id, nextSeq);
 				await this.db
 					.prepare("UPDATE session_materialized SET payload = ? WHERE session_id = ?")
-					.run(serializeSummary(this.materializedState), this.metadata.id);
+					.run(serializeSummary(nextMaterializedState), this.metadata.id);
 				for (const materializedEntry of entryMaterializedValues(entry)) {
 					await this.db
 						.prepare("INSERT INTO entry_materialized (session_id, entry_seq, type, payload) VALUES (?, ?, ?, ?)")
 						.run(this.metadata.id, nextSeq, materializedEntry.type, materializedEntry.payload);
 				}
-				this.byId.set(entry.id, entry);
-				this.currentLeafId = leafIdAfterEntry(entry);
 				await this.db
 					.prepare("UPDATE sessions SET active_leaf_id = ? WHERE id = ?")
-					.run(this.currentLeafId, this.metadata.id);
+					.run(nextLeafId, this.metadata.id);
 				if (entry.type === "leaf") {
-					this.activeBranchId = null;
-					await this.materializeBranch(entry.targetId);
-					await this.appendToActiveBranch(entry.id, entry.parentId);
+					nextActiveBranchId = await this.materializeBranch(entry.targetId);
+					nextActiveBranchId = await this.appendToActiveBranch(entry.id, entry.parentId, nextActiveBranchId);
 				} else {
 					if (parentHadExistingChild) {
-						await this.materializeBranch(entry.parentId);
+						nextActiveBranchId = await this.materializeBranch(entry.parentId);
 					}
-					await this.appendToActiveBranch(entry.id, entry.parentId);
+					nextActiveBranchId = await this.appendToActiveBranch(entry.id, entry.parentId, nextActiveBranchId);
 				}
 			};
 			if (options.transaction === false) await write();
 			else await this.db.transaction(write);
+			this.materializedState = nextMaterializedState;
+			this.byId.set(entry.id, entry);
+			this.activeBranchId = nextActiveBranchId;
 		} catch (error) {
-			this.materializedState = previousMaterializedState;
-			this.byId = previousById;
-			this.currentLeafId = previousLeafId;
-			this.activeBranchId = previousActiveBranchId;
 			if (error instanceof SessionError) throw error;
 			throw new SessionError("storage", `Failed to append SQLite session entry ${entry.id}`, toError(error));
 		}

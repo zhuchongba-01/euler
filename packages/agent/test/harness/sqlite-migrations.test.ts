@@ -440,7 +440,7 @@ END;
 		await expect(reopened.getEntries()).rejects.toMatchObject({ code: "invalid_entry" });
 	});
 
-	it("rolls back state when appendEntry fails after mutating caches", async () => {
+	it("does not publish connection state when an append transaction fails", async () => {
 		const root = createTempDir();
 		const databasePath = join(root, "sessions.sqlite");
 		const sqlite = createNodeSqliteFactory();
@@ -450,30 +450,43 @@ END;
 			cwd: root,
 			sessionId: "session-1",
 		});
-		const originalPrepare = db.prepare.bind(db);
-		db.prepare = (sql: string) => {
-			if (sql.startsWith("UPDATE sessions SET active_leaf_id = ?")) {
-				return new ThrowingStatement(async () => {
-					throw new Error("active leaf update failed");
-				});
-			}
-			return originalPrepare(sql);
-		};
+		await db.exec(`
+			CREATE TEMP TRIGGER fail_branch_entry_insert
+			BEFORE INSERT ON branch_entries
+			BEGIN
+				SELECT RAISE(ABORT, 'branch insert failed');
+			END;
+		`);
 
-		await expect(
-			storage.appendEntry({
-				type: "message",
-				id: "root",
-				parentId: null,
-				timestamp: new Date().toISOString(),
-				message: createUserMessage("root"),
-			}),
-		).rejects.toMatchObject({ code: "storage" });
+		const rootEntry = {
+			type: "message" as const,
+			id: "root",
+			parentId: null,
+			timestamp: new Date().toISOString(),
+			message: createUserMessage("root"),
+		};
+		try {
+			await expect(storage.appendEntry(rootEntry)).rejects.toMatchObject({ code: "storage" });
+		} finally {
+			await db.exec("DROP TRIGGER fail_branch_entry_insert");
+		}
 		const sessionRow = await db
 			.prepare("SELECT active_leaf_id FROM sessions WHERE id = ?")
 			.get<{ active_leaf_id: string | null }>("session-1");
 		expect(sessionRow?.active_leaf_id).toBeNull();
 		expect(await storage.readEntries()).toEqual([]);
+		await expect(
+			storage.appendEntry({
+				type: "leaf",
+				id: "leaf",
+				parentId: null,
+				timestamp: new Date().toISOString(),
+				targetId: rootEntry.id,
+			}),
+		).rejects.toMatchObject({ code: "not_found" });
+		expect(await storage.readEntries()).toEqual([]);
+		await storage.appendEntry(rootEntry);
+		expect(await storage.readEntries()).toEqual([rootEntry]);
 		await db.close();
 	});
 
