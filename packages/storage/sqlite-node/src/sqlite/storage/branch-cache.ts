@@ -46,15 +46,19 @@ export async function readCachedEntryRowsByType(
 	branch: CachedBranch,
 	type: SessionEntryRow["type"],
 ): Promise<SessionEntryRow[]> {
+	// Drive the join from the usually sparse entry type. Ordering from branch_entries
+	// makes SQLite scan the complete cached path before filtering by type.
 	return db
 		.prepare(
 			`SELECT e.session_id, e.id, e.entry_seq, e.parent_id, e.type, e.timestamp, e.payload
-			FROM branch_entries AS b
-			JOIN session_entries AS e ON e.session_id = b.session_id AND e.id = b.entry_id
-			WHERE b.session_id = ? AND b.branch_id = ? AND b.entry_seq <= ? AND e.type = ?
-			ORDER BY b.entry_seq DESC`,
+			FROM session_entries AS e INDEXED BY idx_session_entries_session_type
+			CROSS JOIN branch_entries AS b
+			WHERE e.session_id = ? AND e.type = ?
+				AND b.session_id = e.session_id AND b.entry_id = e.id
+				AND b.branch_id = ? AND b.entry_seq <= ?
+			ORDER BY e.entry_seq DESC`,
 		)
-		.all<SessionEntryRow>(sessionId, branch.branchId, branch.leafSeq, type);
+		.all<SessionEntryRow>(sessionId, type, branch.branchId, branch.leafSeq);
 }
 
 export async function readCachedEntrySeq(
