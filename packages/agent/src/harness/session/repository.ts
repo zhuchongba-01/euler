@@ -5,14 +5,11 @@ import {
 	type SessionCreateOptions,
 	SessionError,
 	type SessionForkOptions,
+	type SessionForkSelection,
 	type SessionMetadata,
-	type SessionSearch,
-	type SessionSearchHit,
-	type SessionStore,
 	type SessionTreeEntry,
 } from "../types.ts";
-import { createSessionForkSelection } from "./fork.ts";
-import { createSessionFromReader, type Session, type SessionContextBuildOptions } from "./session.ts";
+import type { Session } from "./session.ts";
 
 export function createSessionId(): string {
 	return uuidv7();
@@ -22,82 +19,16 @@ export function createTimestamp(): string {
 	return new Date().toISOString();
 }
 
-export class SessionRepository<
+export interface SessionRepository<
 	TMetadata extends SessionMetadata = SessionMetadata,
 	TCreateOptions extends SessionCreateOptions = SessionCreateOptions,
 	TListOptions = void,
-> {
-	private readonly store: SessionStore<TMetadata, TCreateOptions, TListOptions>;
-	private readonly searchStore: SessionSearch<TMetadata> | null;
-	private readonly contextBuildOptions: SessionContextBuildOptions;
-
-	constructor(options: {
-		store: SessionStore<TMetadata, TCreateOptions, TListOptions>;
-		search?: SessionSearch<TMetadata> | null;
-		contextBuildOptions?: SessionContextBuildOptions;
-	}) {
-		this.store = options.store;
-		this.searchStore = options.search ?? null;
-		this.contextBuildOptions = options.contextBuildOptions ?? {};
-	}
-
-	async create(options: TCreateOptions): Promise<Session<TMetadata>> {
-		return createSessionFromReader(this.store, await this.store.create(options), this.contextBuildOptions);
-	}
-
-	async open(metadata: TMetadata): Promise<Session<TMetadata>> {
-		return createSessionFromReader(this.store, await this.store.load(metadata), this.contextBuildOptions);
-	}
-
-	async list(options?: TListOptions): Promise<TMetadata[]> {
-		return await this.store.list(options);
-	}
-
-	async delete(metadata: TMetadata): Promise<void> {
-		await this.store.delete(metadata);
-	}
-
-	async fork(source: TMetadata, options: SessionForkOptions & TCreateOptions): Promise<Session<TMetadata>> {
-		const selection = createSessionForkSelection(options);
-		const createOptions = { ...options };
-		delete createOptions.entryId;
-		delete createOptions.position;
-		return createSessionFromReader(
-			this.store,
-			await this.store.fork(source, createOptions, selection),
-			this.contextBuildOptions,
-		);
-	}
-
-	async search(options: Parameters<SessionSearch<TMetadata>["search"]>[0]): Promise<SessionSearchHit<TMetadata>[]> {
-		return this.searchStore ? await this.searchStore.search(options) : [];
-	}
-}
-
-export function createSessionRepository<
-	TMetadata extends SessionMetadata = SessionMetadata,
-	TCreateOptions extends SessionCreateOptions = SessionCreateOptions,
-	TListOptions = void,
->(options: {
-	store: SessionStore<TMetadata, TCreateOptions, TListOptions>;
-	search?: SessionSearch<TMetadata> | null;
-	contextBuildOptions?: SessionContextBuildOptions;
-}): SessionRepository<TMetadata, TCreateOptions, TListOptions> {
-	return new SessionRepository(options);
-}
-
-export function findSessionEntryMatches<TMetadata extends SessionMetadata>(
-	metadata: TMetadata,
-	entries: readonly SessionTreeEntry[],
-	text: string,
-): SessionSearchHit<TMetadata>[] {
-	const normalizedText = text.trim().toLowerCase();
-	if (!normalizedText) return [];
-	return entries.flatMap((entry) => {
-		const payload = JSON.stringify(entry);
-		if (!payload.toLowerCase().includes(normalizedText)) return [];
-		return [{ metadata, entryId: entry.id, timestamp: entry.timestamp, snippet: payload }];
-	});
+> extends AsyncDisposable {
+	create(options: TCreateOptions): Promise<Session<TMetadata>>;
+	open(metadata: TMetadata): Promise<Session<TMetadata>>;
+	list(options?: TListOptions): Promise<TMetadata[]>;
+	delete(metadata: TMetadata): Promise<void>;
+	fork(source: TMetadata, options: SessionForkOptions & TCreateOptions): Promise<Session<TMetadata>>;
 }
 
 export function getFileSystemResultOrThrow<TValue>(result: Result<TValue, FileError>, message: string): TValue {
@@ -106,4 +37,35 @@ export function getFileSystemResultOrThrow<TValue>(result: Result<TValue, FileEr
 		throw new SessionError(code, `${message}: ${result.error.message}`, result.error);
 	}
 	return result.value;
+}
+
+type MaybePromise<T> = T | Promise<T>;
+
+interface SessionForkEntrySource {
+	readEntry(id: string): MaybePromise<SessionTreeEntry | undefined>;
+	readEntries(): MaybePromise<readonly SessionTreeEntry[]>;
+	readPathToRootOrCompaction(leafId: string | null): MaybePromise<readonly SessionTreeEntry[]>;
+}
+
+/** @internal Transitional fork selection shared by built-in repositories. */
+export function createSessionForkSelection(options: SessionForkOptions): SessionForkSelection {
+	if (!options.entryId) return { kind: "all" };
+	return (options.position ?? "before") === "at"
+		? { kind: "through_entry", entryId: options.entryId }
+		: { kind: "before_user_message", entryId: options.entryId };
+}
+
+/** @internal Shared fork selection validation for built-in repositories. */
+export async function readSessionEntriesForFork(
+	source: SessionForkEntrySource,
+	selection: SessionForkSelection,
+): Promise<readonly SessionTreeEntry[]> {
+	if (selection.kind === "all") return source.readEntries();
+	const target = await source.readEntry(selection.entryId);
+	if (!target) throw new SessionError("invalid_fork_target", `Entry ${selection.entryId} not found`);
+	if (selection.kind === "through_entry") return source.readPathToRootOrCompaction(target.id);
+	if (target.type !== "message" || target.message.role !== "user") {
+		throw new SessionError("invalid_fork_target", `Entry ${selection.entryId} is not a user message`);
+	}
+	return source.readPathToRootOrCompaction(target.parentId);
 }

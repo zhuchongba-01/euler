@@ -1,7 +1,7 @@
 import type {
 	SessionBranchQuery,
 	SessionEntryCursorOptions,
-	SessionReader,
+	SessionStats,
 	SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import { SessionError, toError } from "@earendil-works/pi-agent-core";
@@ -74,7 +74,7 @@ async function loadSqliteSession(
 	};
 }
 
-export class SqliteSessionConnection implements SessionReader<SqliteSessionMetadata> {
+export class SqliteSessionConnection {
 	private readonly db: SqliteDatabase;
 	readonly metadata: SqliteSessionMetadata;
 	private byId: Map<string, SessionTreeEntry>;
@@ -330,6 +330,19 @@ export class SqliteSessionConnection implements SessionReader<SqliteSessionMetad
 			},
 			createEmptyMaterializedState(),
 		);
+	}
+
+	async getLabel(id: string): Promise<string | undefined> {
+		return this.materializedState.labelsById.get(id);
+	}
+
+	async getName(): Promise<string | undefined> {
+		return this.materializedState.name;
+	}
+
+	async getStats(): Promise<SessionStats> {
+		const { messageCount, cachedTokens, uncachedTokens, totalTokens, costTotal } = this.materializedState;
+		return { messageCount, cachedTokens, uncachedTokens, totalTokens, costTotal };
 	}
 
 	async readHead(): Promise<{ leafId: string | null }> {

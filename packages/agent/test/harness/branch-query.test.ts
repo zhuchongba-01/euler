@@ -1,17 +1,16 @@
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createNodeSqliteFactory, createSqliteSessionStore } from "../../../storage/sqlite-node/src/index.ts";
+import { createNodeSqliteFactory, SqliteSessionRepository } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
-import { createJsonlSessionStore } from "../../src/harness/session/jsonl-store.ts";
-import { createInMemorySessionStore } from "../../src/harness/session/memory-store.ts";
-import { createSessionRepository } from "../../src/harness/session/repository.ts";
+import { JsonlSessionRepository } from "../../src/harness/session/jsonl-repo.ts";
+import { InMemorySessionBackend, InMemorySessionRepository } from "../../src/harness/session/memory-repo.ts";
 import type { Session } from "../../src/harness/session/session.ts";
 import { createAssistantMessage, createTempDir, createUserMessage } from "./session-test-utils.ts";
 
-const ownedStores: AsyncDisposable[] = [];
+const ownedRepositories: AsyncDisposable[] = [];
 
 afterEach(async () => {
-	for (const store of ownedStores.splice(0)) await store[Symbol.asyncDispose]();
+	for (const repository of ownedRepositories.splice(0)) await repository[Symbol.asyncDispose]();
 });
 
 async function verifyBranchQueries(session: Session): Promise<{ tail: string; fullPath: string[] }> {
@@ -90,9 +89,8 @@ async function verifyBranchQueries(session: Session): Promise<{ tail: string; fu
 
 describe("bounded session branch queries", () => {
 	it("provides identical in-memory query semantics", async () => {
-		const store = createInMemorySessionStore();
-		ownedStores.push(store);
-		const repo = createSessionRepository({ store });
+		const repo = new InMemorySessionRepository();
+		ownedRepositories.push(repo);
 		const session = await repo.create({ id: "memory" });
 		const expected = await verifyBranchQueries(session);
 		const reopened = await repo.open(await session.getMetadata());
@@ -102,10 +100,10 @@ describe("bounded session branch queries", () => {
 	});
 
 	it("rejects corrupt parent chains in array-backed readers", async () => {
-		const store = createInMemorySessionStore();
-		ownedStores.push(store);
-		const reader = await store.create({ id: "corrupt-memory" });
-		await store.appendEntry(reader.metadata, {
+		const backend = new InMemorySessionBackend();
+		ownedRepositories.push(backend);
+		const storage = await backend.create({ id: "corrupt-memory" });
+		await storage.appendEntry({
 			type: "message",
 			id: "orphan",
 			parentId: "missing-parent",
@@ -114,30 +112,30 @@ describe("bounded session branch queries", () => {
 		});
 
 		expect(
-			(await reader.findEntriesOnBranch({ start: "orphan", stopAtId: "orphan" })).map((entry) => entry.id),
+			(await storage.findEntriesOnBranch({ start: "orphan", stopAtId: "orphan" })).map((entry) => entry.id),
 		).toEqual(["orphan"]);
 		expect(
-			(await reader.findEntriesOnBranch({ start: "orphan", stopAtType: "message" })).map((entry) => entry.id),
+			(await storage.findEntriesOnBranch({ start: "orphan", stopAtType: "message" })).map((entry) => entry.id),
 		).toEqual(["orphan"]);
-		await expect(reader.findEntriesOnBranch({ start: "orphan" })).rejects.toMatchObject({
+		await expect(storage.findEntriesOnBranch({ start: "orphan" })).rejects.toMatchObject({
 			code: "invalid_session",
 			message: "Entry missing-parent not found",
 		});
-		await store.appendEntry(reader.metadata, {
+		await storage.appendEntry({
 			type: "message",
 			id: "cycle-a",
 			parentId: "cycle-b",
 			timestamp: "2026-01-01T00:00:01.000Z",
 			message: createUserMessage("a"),
 		});
-		await store.appendEntry(reader.metadata, {
+		await storage.appendEntry({
 			type: "message",
 			id: "cycle-b",
 			parentId: "cycle-a",
 			timestamp: "2026-01-01T00:00:02.000Z",
 			message: createUserMessage("b"),
 		});
-		await expect(reader.findEntriesOnBranch({ start: "cycle-b" })).rejects.toMatchObject({
+		await expect(storage.findEntriesOnBranch({ start: "cycle-b" })).rejects.toMatchObject({
 			code: "invalid_session",
 			message: "Session branch contains a cycle at cycle-b",
 		});
@@ -145,9 +143,8 @@ describe("bounded session branch queries", () => {
 
 	it("provides identical JSONL query semantics", async () => {
 		const root = createTempDir();
-		const store = createJsonlSessionStore({ fs: new NodeExecutionEnv({ cwd: root }), sessionsRoot: root });
-		ownedStores.push(store);
-		const repo = createSessionRepository({ store });
+		const repo = new JsonlSessionRepository({ fs: new NodeExecutionEnv({ cwd: root }), sessionsRoot: root });
+		ownedRepositories.push(repo);
 		const session = await repo.create({ id: "jsonl", cwd: root });
 		const expected = await verifyBranchQueries(session);
 		const reopened = await repo.open(await session.getMetadata());
@@ -160,13 +157,12 @@ describe("bounded session branch queries", () => {
 		const root = createTempDir();
 		const databasePath = join(root, "sessions.sqlite");
 		const sqlite = createNodeSqliteFactory();
-		const store = createSqliteSessionStore({
+		const repo = new SqliteSessionRepository({
 			env: new NodeExecutionEnv({ cwd: root }),
 			sqlite,
 			databasePath,
 		});
-		ownedStores.push(store);
-		const repo = createSessionRepository({ store });
+		ownedRepositories.push(repo);
 		const session = await repo.create({ id: "bounded-sqlite", cwd: root });
 		const rootId = await session.appendMessage(createUserMessage("root"));
 		const middleId = await session.appendMessage(createAssistantMessage("middle"));
@@ -226,13 +222,12 @@ describe("bounded session branch queries", () => {
 		const root = createTempDir();
 		const databasePath = join(root, "sessions.sqlite");
 		const sqlite = createNodeSqliteFactory();
-		const store = createSqliteSessionStore({
+		const repo = new SqliteSessionRepository({
 			env: new NodeExecutionEnv({ cwd: root }),
 			sqlite,
 			databasePath,
 		});
-		ownedStores.push(store);
-		const repo = createSessionRepository({ store });
+		ownedRepositories.push(repo);
 		const session = await repo.create({ id: "invalid-filtered-sqlite", cwd: root });
 		await session.appendMessage(createUserMessage("root"));
 		const customId = await session.appendCustomEntry("note", { value: 1 });
@@ -269,13 +264,12 @@ describe("bounded session branch queries", () => {
 		const root = createTempDir();
 		const databasePath = join(root, "sessions.sqlite");
 		const sqlite = createNodeSqliteFactory();
-		const store = createSqliteSessionStore({
+		const repo = new SqliteSessionRepository({
 			env: new NodeExecutionEnv({ cwd: root }),
 			sqlite,
 			databasePath,
 		});
-		ownedStores.push(store);
-		const repo = createSessionRepository({ store });
+		ownedRepositories.push(repo);
 		const session = await repo.create({ id: "bounded-corrupt-sqlite", cwd: root });
 		const rootId = await session.appendMessage(createUserMessage("root"));
 		const childId = await session.appendMessage(createAssistantMessage("child"));
@@ -324,13 +318,12 @@ describe("bounded session branch queries", () => {
 
 	it("provides identical SQLite query semantics", async () => {
 		const root = createTempDir();
-		const store = createSqliteSessionStore({
+		const repo = new SqliteSessionRepository({
 			env: new NodeExecutionEnv({ cwd: root }),
 			sqlite: createNodeSqliteFactory(),
 			databasePath: join(root, "sessions.sqlite"),
 		});
-		ownedStores.push(store);
-		const repo = createSessionRepository({ store });
+		ownedRepositories.push(repo);
 		const session = await repo.create({ id: "sqlite", cwd: root });
 		const expected = await verifyBranchQueries(session);
 		const reopened = await repo.open(await session.getMetadata());
