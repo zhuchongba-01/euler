@@ -4,11 +4,11 @@
 
 ### Breaking Changes
 
-- Replaced backend-specific `SessionRepo` implementations and separately exposed persistence classes with resource-owning `SessionRepository` implementations backed by coherent per-session `SessionStorage` objects. Use `new InMemorySessionRepository()` or `new JsonlSessionRepository()`, and implement `SessionRepository` directly for custom backends.
+- Changed `Session` into the sole opened-session aggregate and replaced `SessionStorage`, `SessionRepo`, and concrete per-session persistence classes with a non-owning `SessionRepository` and caller-owned, async-disposable `SessionStore` instances. Create stores with `createInMemorySessionStore()` or `createJsonlSessionStore()`, compose them with `createSessionRepository({ store, search: createScanningSessionSearch(store) })`, and dispose the store after draining harness and session work.
+- `Session` instances are now created by `SessionRepository`; direct construction from an independently supplied store and snapshot was removed.
 
 ### Added
 
-- Added independently composable `SessionSearch`, including scanning search over any `SessionRepository`.
 - Added bounded `Session.findEntriesOnBranch()` and `findEntryOnBranch()` queries with explicit traversal, filtering, ordering, and limit options.
 
 ## [0.83.0] - 2026-07-29
