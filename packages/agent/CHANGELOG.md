@@ -4,8 +4,9 @@
 
 ### Breaking Changes
 
-- Changed `Session` into the sole opened-session aggregate and replaced `SessionStorage`, `SessionRepo`, and concrete per-session persistence classes with a non-owning `SessionRepository` and caller-owned, async-disposable `SessionStore` instances. Create stores with `createInMemorySessionStore()` or `createJsonlSessionStore()`, compose them with `createSessionRepository({ store, search: createScanningSessionSearch(store) })`, and dispose the store after draining harness and session work.
-- `Session` instances are now created by `SessionRepository`; direct construction from an independently supplied store and snapshot was removed.
+- Changed `Session` into the sole opened-session aggregate and replaced `SessionRepo` and concrete per-session persistence classes with a non-owning `SessionRepository`, caller-owned `SessionCollection`, and coherent per-session `SessionStorage`. Create collections with `createInMemorySessionCollection()` or `createJsonlSessionCollection()`, compose them with `createSessionRepository({ collection, search: createScanningSessionSearch(collection) })`, and dispose the collection after draining harness and session work.
+- `Session` instances are now created by `SessionRepository`; direct construction from an independently supplied collection and snapshot was removed.
+- Replaced per-session `SessionReader` objects and repository-level append routing with coherent `SessionStorage` implementations that own both reads and writes.
 
 ### Added
 

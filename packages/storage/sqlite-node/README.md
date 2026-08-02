@@ -2,11 +2,11 @@
 
 Node sqlite storage backend for `@earendil-works/pi-agent-core` sessions. Provides the
 `node:sqlite` adapter (`SqliteDatabase` implementation) and the SQLite session
-store implementation (`createSqliteSessionStore`, migrations, materialized views). The store
-lazily owns one shared database connection and implements `AsyncDisposable`.
+session collection (`createSqliteSessionCollection`, migrations, materialized views). The
+collection lazily owns one shared database connection and implements `AsyncDisposable`.
 
 ```ts
-await using store = createSqliteSessionStore(options);
+await using collection = createSqliteSessionCollection(options);
 const search = createSqliteSessionSearch(options);
-const repository = createSessionRepository({ store, search });
+const repository = createSessionRepository({ collection, search });
 ```

@@ -2,39 +2,39 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	createNodeSqliteFactory,
+	createSqliteSessionCollection,
 	createSqliteSessionSearch,
-	createSqliteSessionStore,
 	type SqliteSessionMetadata,
 } from "../../../storage/sqlite-node/src/index.ts";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
-import { createJsonlSessionStore } from "../../src/harness/session/jsonl-store.ts";
+import { createJsonlSessionCollection } from "../../src/harness/session/jsonl-collection.ts";
 import { createSessionRepository } from "../../src/harness/session/repository.ts";
 import { createScanningSessionSearch } from "../../src/harness/session/search-backend.ts";
 import type { SessionSearch, SessionSearchHit, SessionSearchOptions } from "../../src/harness/types.ts";
 import { createTempDir, createUserMessage } from "./session-test-utils.ts";
 
-const ownedStores: AsyncDisposable[] = [];
+const ownedCollections: AsyncDisposable[] = [];
 
 afterEach(async () => {
-	for (const store of ownedStores.splice(0)) await store[Symbol.asyncDispose]();
+	for (const collection of ownedCollections.splice(0)) await collection[Symbol.asyncDispose]();
 });
 
-function createSqliteRepository(options: Parameters<typeof createSqliteSessionStore>[0]) {
-	const store = createSqliteSessionStore(options);
-	ownedStores.push(store);
+function createSqliteRepository(options: Parameters<typeof createSqliteSessionCollection>[0]) {
+	const collection = createSqliteSessionCollection(options);
+	ownedCollections.push(collection);
 	return createSessionRepository({
-		store,
+		collection,
 		search: createSqliteSessionSearch(options),
 	});
 }
 
-function createJsonlRepository(options: Parameters<typeof createJsonlSessionStore>[0]) {
-	const store = createJsonlSessionStore(options);
-	ownedStores.push(store);
-	return createSessionRepository({ store, search: createScanningSessionSearch(store) });
+function createJsonlRepository(options: Parameters<typeof createJsonlSessionCollection>[0]) {
+	const collection = createJsonlSessionCollection(options);
+	ownedCollections.push(collection);
+	return createSessionRepository({ collection, search: createScanningSessionSearch(collection) });
 }
 
-describe("JsonlSessionStore with scanning search", () => {
+describe("JsonlSessionCollection with scanning search", () => {
 	it("searches canonical session entries by scanning", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
@@ -50,8 +50,8 @@ describe("JsonlSessionStore with scanning search", () => {
 	});
 });
 
-describe("SqliteSessionStore with explicit SQLite FTS5 search", () => {
-	it("uses SQLite FTS5 when composed with its search store", async () => {
+describe("SqliteSessionCollection with explicit SQLite FTS5 search", () => {
+	it("uses SQLite FTS5 when composed with its search collection", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		const sqlite = createNodeSqliteFactory();
@@ -168,7 +168,7 @@ describe("SqliteSessionStore with explicit SQLite FTS5 search", () => {
 	});
 });
 
-describe("SqliteSessionStore with custom search", () => {
+describe("SqliteSessionCollection with custom search", () => {
 	it("can swap out the default search implementation", async () => {
 		const root = createTempDir();
 		const searches: SessionSearchOptions[] = [];
@@ -179,12 +179,12 @@ describe("SqliteSessionStore with custom search", () => {
 			},
 		};
 		const env = new NodeExecutionEnv({ cwd: root });
-		const store = createSqliteSessionStore({
+		const collection = createSqliteSessionCollection({
 			env,
 			sqlite: createNodeSqliteFactory(),
 			databasePath: join(root, "sessions.sqlite"),
 		});
-		const repo = createSessionRepository({ store, search });
+		const repo = createSessionRepository({ collection, search });
 		const session = await repo.create({ cwd: root, id: "session-1" });
 		await session.appendMessage(createUserMessage("stored canonically"));
 
