@@ -9,7 +9,7 @@ import {
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
 import { createJsonlSessionCollection } from "../../src/harness/session/jsonl-collection.ts";
 import { createSessionRepository } from "../../src/harness/session/repository.ts";
-import { createScanningSessionSearch } from "../../src/harness/session/search-backend.ts";
+import { createScanningSessionSearch } from "../../src/harness/session/scanning-session-search.ts";
 import type { SessionSearch, SessionSearchHit, SessionSearchOptions } from "../../src/harness/types.ts";
 import { createTempDir, createUserMessage } from "./session-test-utils.ts";
 

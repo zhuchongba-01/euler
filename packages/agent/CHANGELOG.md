@@ -4,6 +4,7 @@
 
 ### Breaking Changes
 
+- `SessionRepository.search()` now throws a `SessionError` with code `unsupported` when no search implementation is configured instead of returning no hits.
 - Changed `Session` into the sole opened-session aggregate and replaced `SessionRepo` and concrete per-session persistence classes with a non-owning `SessionRepository`, caller-owned `SessionCollection`, and coherent per-session `SessionStorage`. Create collections with `createInMemorySessionCollection()` or `createJsonlSessionCollection()`, compose them with `createSessionRepository({ collection, search: createScanningSessionSearch(collection) })`, and dispose the collection after draining harness and session work.
 - `Session` instances are now created by `SessionRepository`; direct construction from an independently supplied collection and snapshot was removed.
 - Replaced per-session `SessionReader` objects and repository-level append routing with coherent `SessionStorage` implementations that own both reads and writes.
