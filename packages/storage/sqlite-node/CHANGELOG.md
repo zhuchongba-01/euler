@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Replaced `SqliteSessionRepo` with the resource-owning `SqliteSessionRepository`.
+
 ### Added
 
+- Added query-only SQLite FTS search over canonical session entries.
 - Added bounded active-branch queries to the SQLite session reader.
 
 ## [0.83.0] - 2026-07-29

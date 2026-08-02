@@ -5,8 +5,8 @@ import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type {
 	SqliteDatabase,
 	SqliteDatabaseFactory,
-	SqliteSessionCollectionEnv,
 	SqliteSessionMetadata,
+	SqliteSessionRepositoryEnv,
 } from "./types.ts";
 
 function getParentPath(path: string): string {
@@ -24,7 +24,7 @@ async function configureSqliteDatabase(db: SqliteDatabase): Promise<void> {
 }
 
 export interface SqliteSessionSearchOptions {
-	env: Pick<SqliteSessionCollectionEnv, "absolutePath" | "createDir">;
+	env: Pick<SqliteSessionRepositoryEnv, "absolutePath" | "createDir">;
 	sqlite: SqliteDatabaseFactory;
 	databasePath: string;
 }

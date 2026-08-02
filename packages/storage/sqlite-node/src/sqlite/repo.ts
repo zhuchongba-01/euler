@@ -1,13 +1,18 @@
 import type {
-	SessionCollection,
+	SessionForkOptions,
 	SessionForkSelection,
+	SessionRepository,
 	SessionStorage,
 	SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import {
+	createSession,
+	createSessionForkSelection,
 	createSessionId,
 	getFileSystemResultOrThrow,
 	readSessionEntriesForFork,
+	type Session,
+	type SessionContextBuildOptions,
 	SessionError,
 } from "@earendil-works/pi-agent-core";
 import { applyMigrations } from "./migrations.ts";
@@ -16,10 +21,10 @@ import { rowToMetadata, type SessionRow } from "./storage/sessions.ts";
 import type {
 	SqliteDatabase,
 	SqliteDatabaseFactory,
-	SqliteSessionCollectionEnv,
 	SqliteSessionCreateOptions,
 	SqliteSessionListOptions,
 	SqliteSessionMetadata,
+	SqliteSessionRepositoryEnv,
 } from "./types.ts";
 
 function getParentPath(path: string): string {
@@ -36,8 +41,8 @@ async function configureSqliteDatabase(db: SqliteDatabase): Promise<void> {
 	await db.exec("PRAGMA busy_timeout=5000");
 }
 
-export type SqliteSessionCollectionOptions = {
-	env: SqliteSessionCollectionEnv;
+export type SqliteSessionBackendOptions = {
+	env: SqliteSessionRepositoryEnv;
 	sqlite: SqliteDatabaseFactory;
 	databasePath: string;
 };
@@ -59,10 +64,8 @@ class SerialOperationQueue {
 	}
 }
 
-class SqliteSessionCollection
-	implements SessionCollection<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions>
-{
-	private readonly env: SqliteSessionCollectionEnv;
+class SqliteSessionBackend {
+	private readonly env: SqliteSessionRepositoryEnv;
 	private readonly sqlite: SqliteDatabaseFactory;
 	private readonly databasePathInput: string;
 	private databasePath: string | undefined;
@@ -73,7 +76,7 @@ class SqliteSessionCollection
 	private readonly operations = new SerialOperationQueue();
 	private readonly writers = new Map<string, SqliteSessionConnection>();
 
-	constructor(options: SqliteSessionCollectionOptions) {
+	constructor(options: SqliteSessionBackendOptions) {
 		this.env = options.env;
 		this.sqlite = options.sqlite;
 		this.databasePathInput = options.databasePath;
@@ -209,7 +212,7 @@ class SqliteSessionCollection
 	}
 
 	private assertOpen(): void {
-		if (this.disposed) throw new SessionError("storage", "SQLite session collection is disposed");
+		if (this.disposed) throw new SessionError("storage", "SQLite session repository is disposed");
 	}
 
 	private storage(connection: SqliteSessionConnection): SessionStorage<SqliteSessionMetadata> {
@@ -275,8 +278,50 @@ class SqliteSessionCollection
 	}
 }
 
-export function createSqliteSessionCollection(
-	options: SqliteSessionCollectionOptions,
-): SessionCollection<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions> {
-	return new SqliteSessionCollection(options);
+export interface SqliteSessionRepositoryOptions extends SqliteSessionBackendOptions {
+	contextBuildOptions?: SessionContextBuildOptions;
+}
+
+export class SqliteSessionRepository
+	implements SessionRepository<SqliteSessionMetadata, SqliteSessionCreateOptions, SqliteSessionListOptions>
+{
+	private readonly backend: SqliteSessionBackend;
+	private readonly contextBuildOptions: SessionContextBuildOptions;
+
+	constructor(options: SqliteSessionRepositoryOptions) {
+		const { contextBuildOptions, ...backendOptions } = options;
+		this.backend = new SqliteSessionBackend(backendOptions);
+		this.contextBuildOptions = contextBuildOptions ?? {};
+	}
+
+	async create(options: SqliteSessionCreateOptions): Promise<Session<SqliteSessionMetadata>> {
+		return createSession(await this.backend.create(options), this.contextBuildOptions);
+	}
+
+	async open(metadata: SqliteSessionMetadata): Promise<Session<SqliteSessionMetadata>> {
+		return createSession(await this.backend.open(metadata), this.contextBuildOptions);
+	}
+
+	async list(options?: SqliteSessionListOptions): Promise<SqliteSessionMetadata[]> {
+		return await this.backend.list(options);
+	}
+
+	async delete(metadata: SqliteSessionMetadata): Promise<void> {
+		await this.backend.delete(metadata);
+	}
+
+	async fork(
+		source: SqliteSessionMetadata,
+		options: SessionForkOptions & SqliteSessionCreateOptions,
+	): Promise<Session<SqliteSessionMetadata>> {
+		const { entryId: _entryId, position: _position, ...createOptions } = options;
+		return createSession(
+			await this.backend.fork(source, createOptions, createSessionForkSelection(options)),
+			this.contextBuildOptions,
+		);
+	}
+
+	async [Symbol.asyncDispose](): Promise<void> {
+		await this.backend[Symbol.asyncDispose]();
+	}
 }
