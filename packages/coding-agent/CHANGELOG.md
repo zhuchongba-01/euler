@@ -778,6 +778,10 @@
 - Fixed `/share` and `/export` HTML exports to use the active fallback theme when the configured custom theme no longer exists ([#5596](https://github.com/earendil-works/pi/issues/5596)).
 - Fixed custom fallback model IDs with `:<thinking>` suffixes to preserve the requested thinking level when the provider template model does not advertise reasoning ([#5560](https://github.com/earendil-works/pi/pull/5560) by [@haoqixu](https://github.com/haoqixu)).
 
+### Fixed
+
+- Fixed `find` results when searching from filesystem roots, including POSIX `/` and Windows bare drive roots, so relative paths preserve the first segment and directory matches use a single trailing slash ([#6104](https://github.com/earendil-works/pi/issues/6104)).
+
 ## [0.79.1] - 2026-06-09
 
 ### New Features
