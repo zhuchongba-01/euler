@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- Fixed `Ctrl+X` copy confirmations in fullscreen mode adding a transcript status line instead of showing the transient `Copied!` marker.
 - Fixed Kitty image previews in fullscreen mode overlapping the sticky editor and footer dock while scrolling.
 - Fixed image-heavy fullscreen sessions lagging when layout changes retransmitted visible Kitty image payloads and rendered the transcript twice per frame.
 - Fixed spaces in `/settings` searches toggling the highlighted setting while typing multi-word queries such as **UI mode** or **Quiet startup**.
