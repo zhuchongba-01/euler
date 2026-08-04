@@ -26,7 +26,6 @@ import type {
 } from "@earendil-works/pi-agent-core";
 import { contentText } from "@earendil-works/pi-ai";
 import type {
-	Api,
 	AssistantMessage,
 	AuthResult,
 	ImageContent,
@@ -407,10 +406,8 @@ export class AgentSession {
 		return this._modelRuntime;
 	}
 
-	private async _getRequiredRequestAuth<TApi extends Api>(
-		model: Model<TApi>,
-	): Promise<{
-		model: Model<TApi>;
+	private async _getRequiredRequestAuth(model: Model<any>): Promise<{
+		model: Model<any>;
 		apiKey?: string;
 		headers?: Record<string, string>;
 		env?: Record<string, string>;
@@ -446,10 +443,8 @@ export class AgentSession {
 		throw new Error(formatNoApiKeyFoundMessage(model.provider));
 	}
 
-	private async _getSummarizationRequestAuth<TApi extends Api>(
-		model: Model<TApi>,
-	): Promise<{
-		model: Model<TApi>;
+	private async _getSummarizationRequestAuth(model: Model<any>): Promise<{
+		model: Model<any>;
 		apiKey?: string;
 		headers?: Record<string, string>;
 		env?: Record<string, string>;
