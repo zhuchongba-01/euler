@@ -108,6 +108,7 @@
 - Fixed cancellation while waiting for file-backed credential or model-catalog locks, preventing cancelled mutations from running or committing later.
 - Fixed concurrent in-memory credential mutations losing unrelated provider updates by serializing their read-modify-write sections.
 - Updated `undici` to 8.9.0 and the packaged `brace-expansion` to 5.0.9 to address GHSA-8xcm-r25x-g524, GHSA-4cwx-7wf7-3272, GHSA-m8rv-5g2x-5cg5, GHSA-jr45-8vmc-qm54, GHSA-v3r7-h72x-cjcm, and GHSA-rgw5-rvv9-x895.
+- Fixed GitHub Copilot compaction and branch summaries using the Individual endpoint instead of the credential-resolved Business or Enterprise endpoint ([#6768](https://github.com/earendil-works/pi/issues/6768)).
 
 ## [0.83.0] - 2026-07-29
 
