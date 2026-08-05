@@ -10,7 +10,7 @@
 
 ### Added
 
-- Added the typed harness telemetry schema, callback helpers, and generated schema reference.
+- Added typed AI-request and harness telemetry schemas, callback helpers, and a generated schema reference.
 - Added bounded `Session.findEntriesOnBranch()` and `findEntryOnBranch()` queries with explicit traversal, filtering, ordering, and limit options.
 - Added a compile-complete `AgentHarness` v2 scaffold; unfinished operation paths reject with `HarnessNotImplemented` while durable execution is implemented.
 - Added `JsonlSessionRepo`, a v4 append-only JSONL session repository with metadata validation and shared storage semantics ([#7611](https://github.com/earendil-works/pi/pull/7611) by [@davidbrai](https://github.com/davidbrai)).
