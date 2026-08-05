@@ -517,12 +517,10 @@ class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadata> {
 		return row ? decodeEntry(row) : undefined;
 	}
 
-	// TODO: Remove redundant structuredClone calls from findEntries, findEntriesOnBranch,
-	// findRecords, and getLog; SQLite row decoding already returns fresh object graphs.
 	async findEntries(query: EntryQuery = {}): Promise<Entry[]> {
 		const rows = readEntryRows(this.db, this.metadata.id, { order: query.order });
 		const entries = rows.map(decodeEntry).filter((entry) => matchesEntryQuery(entry, query));
-		return structuredClone(query.limit === undefined ? entries : entries.slice(0, query.limit));
+		return query.limit === undefined ? entries : entries.slice(0, query.limit);
 	}
 
 	async findEntriesOnBranch(query: EntryQuery & BranchBounds & { start: string }): Promise<Entry[]> {
@@ -538,12 +536,12 @@ class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadata> {
 			.map(entryRowFromCached)
 			.map(decodeEntry)
 			.filter((entry) => matchesEntryQuery(entry, query));
-		return structuredClone(query.limit === undefined ? entries : entries.slice(0, query.limit));
+		return query.limit === undefined ? entries : entries.slice(0, query.limit);
 	}
 
 	async findRecords(query: RecordQuery = {}): Promise<LaneRecord[]> {
 		const rows = readRecordRows(this.db, this.metadata.id, query);
-		return structuredClone(rows.map(decodeRecord));
+		return rows.map(decodeRecord);
 	}
 
 	async findOpenOperations(lane: string, options?: { limit?: number }): Promise<OperationStartedRecord[]> {
@@ -585,7 +583,7 @@ class SqliteSessionStorage implements SessionStorage<SqliteSessionMetadata> {
 				};
 			}),
 		].sort((left, right) => left.seq - right.seq);
-		return structuredClone(options.limit === undefined ? log : log.slice(0, options.limit));
+		return options.limit === undefined ? log : log.slice(0, options.limit);
 	}
 
 	async getName(): Promise<string | undefined> {
