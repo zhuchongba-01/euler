@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 export function createTempDir(): string {
-	const dir = mkdtempSync(join(tmpdir(), "pi-storage-sqlite-node-"));
+	const dir = mkdtempSync(join(tmpdir(), "pi-session-backend-sqlite-node-"));
 	tempDirs.push(dir);
 	return dir;
 }
