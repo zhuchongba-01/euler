@@ -18,6 +18,7 @@
 
 ### Added
 
+- Added terminal-friendly Unicode rendering for LaTeX expressions in Markdown, including inline and display math, fractions, scripts, common symbols, aligned equations, cases, and matrices.
 - Added the shared `TuiMode` type and `mode` discriminants to the main-screen and alternate-screen TUI renderers.
 - Added TUI lifecycle and render-state handoff APIs for replacing renderers without replaying main-screen content.
 - Exported the bundled `Marked` parser and token types.
