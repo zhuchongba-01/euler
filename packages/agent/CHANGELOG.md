@@ -6,13 +6,17 @@
 
 - Replaced the legacy harness session model with the v4 lane-based `Session`, `SessionStorage`, and `SessionRepo` APIs, including durable operation records, global facts, shared sequence numbers, and tree-scoped lane views.
 - Promoted the v2 session and `AgentHarness` API from the experimental entrypoint to the default package export and removed the experimental subpaths.
-- Removed the legacy JSONL and in-memory repository APIs. `InMemorySessionRepo` is the reference v4 repository; JSONL v4 support will use the new `SessionRepo` contract.
+- Removed the legacy JSONL and in-memory repository APIs. Use the v4 `JsonlSessionRepo` or `InMemorySessionRepo`, both implementing the new `SessionRepo` contract.
 
 ### Added
 
 - Added the typed harness telemetry schema, callback helpers, and generated schema reference.
 - Added bounded `Session.findEntriesOnBranch()` and `findEntryOnBranch()` queries with explicit traversal, filtering, ordering, and limit options.
 - Added a compile-complete `AgentHarness` v2 scaffold; unfinished operation paths reject with `HarnessNotImplemented` while durable execution is implemented.
+- Added `JsonlSessionRepo`, a v4 append-only JSONL session repository with metadata validation and shared storage semantics ([#7611](https://github.com/earendil-works/pi/pull/7611) by [@davidbrai](https://github.com/davidbrai)).
+- Added indexed `Session.findOpenOperations()` recovery queries and `RecordQuery.operationKind` filtering ([#7646](https://github.com/earendil-works/pi/pull/7646)).
+- Added `AgentOptions.shouldStopAfterTurn` for gracefully stopping after a completed turn before queued messages or another model call are processed. See [Agent Options](README.md#agent-options) ([#7367](https://github.com/earendil-works/pi/pull/7367) by [@acmerfight](https://github.com/acmerfight)).
+- Added proxy forwarding for arbitrary OpenAI-compatible `samplingParams` ([#7568](https://github.com/earendil-works/pi/pull/7568) by [@mrexodia](https://github.com/mrexodia)).
 
 ### Fixed
 
