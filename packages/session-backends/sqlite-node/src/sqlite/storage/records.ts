@@ -1,3 +1,4 @@
+import { SessionError } from "@earendil-works/pi-agent-core";
 import type { SqliteDatabase } from "../types.ts";
 
 export interface RecordRow {
@@ -103,29 +104,26 @@ export function readOpenOperationRows(
 	db: SqliteDatabase,
 	sessionId: string,
 	lane: string,
-	options: { limit?: number } = {},
+	_options: { limit?: number } = {},
 ): RecordRow[] {
-	const params: unknown[] = [sessionId, lane];
-	const limit = options.limit === undefined ? "" : " LIMIT ?";
-	if (options.limit !== undefined) params.push(options.limit);
-	return db
+	const laneRow = db
+		.prepare("SELECT open_operation_id FROM lanes WHERE session_id = ? AND lane = ?")
+		.get<{ open_operation_id: string | null }>(sessionId, lane);
+	if (!laneRow?.open_operation_id) return [];
+
+	const record = db
 		.prepare(
-			`SELECT started.session_id, started.seq, started.id, started.lane, started.run_id,
-				started.type, started.op_kind, started.timestamp, started.payload
-			FROM records AS started
-			WHERE started.session_id = ?
-				AND started.lane = ?
-				AND started.type = 'operation_started'
-				AND NOT EXISTS (
-					SELECT 1
-					FROM records AS finished
-					WHERE finished.session_id = started.session_id
-						AND finished.lane = started.lane
-						AND finished.run_id = started.id
-						AND finished.type = 'operation_finished'
-						AND finished.seq > started.seq
-				)
-			ORDER BY started.seq DESC${limit}`,
+			`SELECT session_id, seq, id, lane, run_id, type, op_kind, timestamp, payload
+			FROM records
+			WHERE session_id = ?
+				AND id = ?`,
 		)
-		.all<RecordRow>(...params);
+		.get<RecordRow>(sessionId, laneRow.open_operation_id);
+	if (!record) {
+		throw new SessionError("storage", `Lane ${lane} points at missing open operation ${laneRow.open_operation_id}`);
+	}
+	if (record.lane !== lane || record.type !== "operation_started") {
+		throw new SessionError("storage", `Lane ${lane} points at invalid open operation ${laneRow.open_operation_id}`);
+	}
+	return [record];
 }

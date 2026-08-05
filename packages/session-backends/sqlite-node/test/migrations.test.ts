@@ -34,8 +34,8 @@ describe("SQLite migrations", () => {
 			);
 			const sessionColumns = db.prepare("PRAGMA table_info(sessions)").all<{ name: string }>();
 			expect(sessionColumns.map((column) => column.name)).not.toContain("leaf_id");
-			const recordIndexes = db.prepare("PRAGMA index_list(records)").all<{ name: string }>();
-			expect(recordIndexes.map((index) => index.name)).toContain("idx_records_session_lane_run_id_type");
+			const laneColumns = db.prepare("PRAGMA table_info(lanes)").all<{ name: string }>();
+			expect(laneColumns.map((column) => column.name)).toContain("open_operation_id");
 		} finally {
 			db.close();
 		}
