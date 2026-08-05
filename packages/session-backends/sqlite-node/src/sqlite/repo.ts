@@ -825,7 +825,7 @@ export class SqliteSessionRepository
 						metadata,
 					});
 					createSequence(db, id);
-					createStats(db, id);
+					createStats(db, id, entries.filter((entry) => entry.type === "message").length);
 
 					let nextSeq = 1;
 					const allocateSeq = () => nextSeq++;
