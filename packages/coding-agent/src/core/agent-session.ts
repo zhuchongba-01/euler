@@ -1904,6 +1904,8 @@ export class AgentSession {
 				usage,
 				details,
 			};
+			// compaction_end listeners may submit queued prompts, so expose idle state before notifying them.
+			this._compactionAbortController = undefined;
 			this._emit({
 				type: "compaction_end",
 				reason: "manual",
@@ -1915,6 +1917,7 @@ export class AgentSession {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			const aborted = message === "Compaction cancelled" || (error instanceof Error && error.name === "AbortError");
+			this._compactionAbortController = undefined;
 			this._emit({
 				type: "compaction_end",
 				reason: "manual",
