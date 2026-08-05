@@ -68,6 +68,7 @@
 
 ### Added
 
+- Added the callback-based telemetry context contract, typed pi-ai telemetry schema, generated schema reference, and explicit telemetry context propagation across stream, deferred, and image request options.
 - Added deferred provider request contracts, durable response handles, authenticated fetch/cancel dispatch, and faux-provider support for pending, ready, failed, and cancelled responses ([#7339](https://github.com/earendil-works/pi/pull/7339) by [@davidbrai](https://github.com/davidbrai)).
 - Added Baseten as a built-in OpenAI-compatible provider with models.dev catalog generation and native `chat_template_args` reasoning controls.
 

@@ -26,6 +26,8 @@
 	],
 	"scripts": {
 		"clean": "shx rm -rf dist",
+		"generate-telemetry-docs": "node scripts/generate-telemetry-docs.ts",
+		"check:telemetry-docs": "node scripts/generate-telemetry-docs.ts --check",
 		"build": "tsgo -p tsconfig.build.json",
 		"test": "vitest --run",
 		"test:harness": "vitest --run --config vitest.harness.config.ts",
