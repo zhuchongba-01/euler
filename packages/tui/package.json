@@ -16,6 +16,9 @@
 		"dist/**/*",
 		"native/win32/prebuilds/**/*.node",
 		"native/darwin/prebuilds/**/*.node",
+		"native/darwin/src/**/*.c",
+		"native/darwin/build.sh",
+		"native/darwin/README.md",
 		"README.md"
 	],
 	"keywords": [
