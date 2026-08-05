@@ -82,6 +82,7 @@
 - Added page scrolling and marked-message navigation shortcuts to fullscreen mode.
 - Added an optional `scrollbarThumb` theme color for fullscreen scrollbar thumbs, falling back to `selectedBg`.
 - Added configurable themed Unicode rendering for supported Mermaid diagrams in interactive messages, including optional rendering while streaming.
+- Added opt-in `Ctrl+P`/`Ctrl+N` prompt history navigation, with explicit history bindings taking precedence over application shortcuts while the editor is focused.
 
 ### Fixed
 

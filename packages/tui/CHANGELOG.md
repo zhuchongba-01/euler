@@ -27,6 +27,7 @@
 - Added edge auto-scrolling for alternate-screen drag selection across off-screen scroll-view content.
 - Added proportional scrollbars with mouse dragging, Home/End document navigation, transient `auto` mode, and an `always` mode that reserves the rightmost column; scrollbar modes can be changed at runtime.
 - Added page scrolling and OSC 133 semantic prompt navigation to the alternate-screen viewport.
+- Added configurable previous/next prompt history actions for navigation independent of vertical cursor movement.
 
 ## [0.83.0] - 2026-07-29
 
