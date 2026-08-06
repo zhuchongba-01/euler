@@ -7,6 +7,7 @@
 		"paths": {
 			"*": ["./*"],
 			"@earendil-works/pi-telemetry": ["./packages/telemetry/src/index.ts"],
+			"@earendil-works/pi-telemetry/testing": ["./packages/telemetry/src/testing/index.ts"],
 			"@earendil-works/pi-ai": ["./packages/ai/src/index.ts"],
 			"@earendil-works/pi-ai/oauth": ["./packages/ai/src/oauth.ts"],
 			"@earendil-works/pi-ai/*": ["./packages/ai/src/*.ts", "./packages/ai/src/providers/*.ts"],
