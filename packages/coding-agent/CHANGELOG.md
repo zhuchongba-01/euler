@@ -6,6 +6,10 @@
 
 - Added `pi auth check` provider/model auth preflight with optional credential output ([#7152](https://github.com/earendil-works/pi/issues/7152)).
 
+### Fixed
+
+- Fixed right-click not pasting clipboard text in fullscreen mode on Windows.
+
 ## [0.84.0] - 2026-08-06
 
 ### New Features
