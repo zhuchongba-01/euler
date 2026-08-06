@@ -9,6 +9,7 @@
 ### Changed
 
 - Softened the bash tool's `PI_*` environment guideline in an attempt to reduce unnecessary inspection commands ([#7128](https://github.com/earendil-works/pi/issues/7128)).
+- Reduced worst-case automatic terminal theme detection delay from 200 ms to 100 ms by probing color-scheme and background support concurrently.
 
 ### Fixed
 
