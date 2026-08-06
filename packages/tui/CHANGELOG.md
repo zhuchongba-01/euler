@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added double-click word selection, word-aware drag selection, and triple-click line selection in the fullscreen TUI ([#7725](https://github.com/earendil-works/pi/issues/7725)).
+
 ### Fixed
 
 - Fixed LaTeX relation, multiplication, and named-operator spacing, and correctly composed matrices with stacked fractions, operator limits, and adjacent matrices.
