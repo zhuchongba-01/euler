@@ -119,6 +119,7 @@
 
 ### Fixed
 
+- Fixed the footer showing `(sub)` for generic OAuth/OpenID sign-ins without a known subscription; extension OAuth providers can opt in with `isSubscription`.
 - Fixed path-containing `find` globs returning no results on Windows ([#6817](https://github.com/earendil-works/pi/issues/6817)).
 - Fixed messages queued during manual `/compact` failing instead of being sent after compaction completes.
 - Fixed Git Bash, MSYS, Cygwin, and WSL drive paths passed to built-in file tools resolving against the current Windows drive instead of their native drive ([#7064](https://github.com/earendil-works/pi/issues/7064), [#7547](https://github.com/earendil-works/pi/issues/7547)).
