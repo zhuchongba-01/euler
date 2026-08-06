@@ -6,6 +6,10 @@
 
 - Added `pi auth check` provider/model auth preflight with optional credential output ([#7152](https://github.com/earendil-works/pi/issues/7152)).
 
+### Changed
+
+- Softened the bash tool's `PI_*` environment guideline in an attempt to reduce unnecessary inspection commands ([#7128](https://github.com/earendil-works/pi/issues/7128)).
+
 ### Fixed
 
 - Fixed right-click not pasting clipboard text in fullscreen mode on Windows.
