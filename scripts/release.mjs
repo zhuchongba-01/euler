@@ -16,13 +16,14 @@
  * 7. Commit and tag the release
  * 8. Add new [Unreleased] section to changelogs
  * 9. Commit next-cycle changelog updates
- * 10. Push main and the tag to trigger CI publishing
+ * 10. Push main and the tag to trigger CI publication and verified pi.dev announcement
  */
 
 import { execSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { findPackageDirectories } from "./package-workspaces.mjs";
+import { getPublicWorkspacePackages } from "./release-packages.mjs";
 
 const RELEASE_TARGET = process.argv[2];
 const BUMP_TYPES = new Set(["major", "minor", "patch"]);
@@ -52,10 +53,7 @@ function getVersion() {
 }
 
 function assertPackagesAreRegisteredWithNpm() {
-	const packageNames = findPackageDirectories()
-		.map((directory) => JSON.parse(readFileSync(join(directory, "package.json"), "utf8")))
-		.filter((pkg) => pkg.private !== true)
-		.map((pkg) => pkg.name);
+	const packageNames = getPublicWorkspacePackages().map((pkg) => pkg.name);
 	const unregisteredPackages = [];
 
 	console.log("Checking npm package registration...");
@@ -106,10 +104,7 @@ function shellQuote(value) {
 
 function removeStaleWorkspaceLockEntries() {
 	const workspaceVersions = new Map(
-		findPackageDirectories()
-			.map((directory) => JSON.parse(readFileSync(join(directory, "package.json"), "utf8")))
-			.filter((pkg) => pkg.private !== true)
-			.map((pkg) => [pkg.name, pkg.version]),
+		getPublicWorkspacePackages().map((pkg) => [pkg.name, pkg.version]),
 	);
 	const lockPath = "package-lock.json";
 	const lock = JSON.parse(readFileSync(lockPath, "utf8"));
@@ -283,4 +278,4 @@ run("git push origin main");
 run(`git push origin v${version}`);
 console.log();
 
-console.log(`=== Prepared release v${version}; CI publishing starts after the tag push ===`);
+console.log(`=== Prepared release v${version}; CI publication and pi.dev announcement start after the tag push ===`);
