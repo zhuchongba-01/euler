@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- Fixed extension TUI method wrappers recursing indefinitely when delegating to the original method ([#7731](https://github.com/earendil-works/pi/issues/7731)).
 - Fixed right-click not pasting clipboard text in fullscreen mode on Windows.
 
 ## [0.84.0] - 2026-08-06
