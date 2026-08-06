@@ -11,6 +11,10 @@
 
 - Added bounded active-branch queries, durable operation records, global facts, shared sequence allocation, session statistics, and fenced writer leases to the SQLite backend.
 
+### Fixed
+
+- Fixed SQLite session listings to avoid acquiring writer claims and include current session names, allowing inventory reads while sessions have active writers ([#7655](https://github.com/earendil-works/pi/pull/7655)).
+
 ## [0.83.0] - 2026-07-29
 
 ## [0.82.1] - 2026-07-25
