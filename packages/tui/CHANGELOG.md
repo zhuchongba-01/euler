@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed LaTeX relation, multiplication, and named-operator spacing, and correctly composed matrices with stacked fractions, operator limits, and adjacent matrices.
+
 ## [0.84.0] - 2026-08-06
 
 ### Added
