@@ -6,7 +6,7 @@
 
 ### New Features
 
-- **Fullscreen TUI mode** — Switch between regular and fullscreen modes at runtime, with a sticky editor and footer, independently scrollable transcript, and draggable scrollbars. See [UI & Display](docs/settings.md#ui--display).
+- **Fullscreen TUI mode** — Switch between regular and fullscreen modes at runtime, with a sticky editor and footer, independently scrollable transcript, and draggable scrollbars. See [UI & Display](docs/settings.md#ui-display).
 - **Mermaid and LaTeX rendering** — Render Mermaid diagrams and terminal-friendly Unicode math in interactive transcripts. See [Markdown settings](docs/settings.md#markdown) and [TUI Markdown](../tui/README.md#markdown).
 - **Per-directory context overrides** — Use `AGENTS.override.md` to replace context files for a specific directory. See [Context Files](docs/usage.md#context-files).
 - **Advanced custom model sampling** — Configure arbitrary OpenAI-compatible `samplingParams` and opt-in vLLM `thinking_token_budget` values. See [Sampling Parameters](docs/models.md#sampling-parameters).
