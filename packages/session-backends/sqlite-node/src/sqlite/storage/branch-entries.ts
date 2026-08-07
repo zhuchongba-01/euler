@@ -19,9 +19,13 @@ export interface CachedBranchEntryRow {
 }
 
 export interface CachedBranchQuery {
+	type?: Entry["type"];
+	customType?: string;
 	stopAtType?: Entry["type"];
 	stopAtId?: string;
+	cursor?: { afterSeq: number };
 	order?: "newestFirst" | "oldestFirst";
+	limit?: number;
 }
 
 export function readCachedBranch(db: SqliteDatabase, sessionId: string, leafId: string) {
@@ -41,12 +45,13 @@ export function queryCachedBranchRows(
 	query: CachedBranchQuery,
 ) {
 	const oldestFirst = query.order === "oldestFirst";
-	const stopPredicates = [];
-	if (query.stopAtType !== undefined) stopPredicates.push(sql`stop_entry.type = ${query.stopAtType}`);
+	const stopPredicates: ReturnType<typeof sql>[] = [];
+	if (query.stopAtType !== undefined) stopPredicates.push(sql`stop.entry_type = ${query.stopAtType}`);
 	if (query.stopAtId !== undefined) stopPredicates.push(sql`stop.entry_id = ${query.stopAtId}`);
 
 	const aggregate = oldestFirst ? sql`MIN` : sql`MAX`;
-	const comparison = oldestFirst ? sql`<=` : sql`>=`;
+	const boundaryComparison = oldestFirst ? sql`<=` : sql`>=`;
+	const cursorComparison = oldestFirst ? sql`>` : sql`<`;
 	const direction = oldestFirst ? sql`ASC` : sql`DESC`;
 	const boundary =
 		stopPredicates.length === 0
@@ -54,28 +59,33 @@ export function queryCachedBranchRows(
 			: sql`WITH boundary AS (
 				SELECT ${aggregate}(stop.entry_seq) AS entry_seq
 				FROM branch_entries AS stop
-				JOIN entries AS stop_entry
-					ON stop_entry.session_id = stop.session_id AND stop_entry.id = stop.entry_id
 				WHERE stop.session_id = ${sessionId}
 					AND stop.branch_id = ${branch.branchId}
 					AND stop.entry_seq <= ${branch.leafSeq}
 					AND (${joinSqlFragments(stopPredicates, " OR ")})
 			)`;
-	const range =
-		stopPredicates.length === 0
-			? sql``
-			: sql`AND b.entry_seq ${comparison} COALESCE(
-				(SELECT entry_seq FROM boundary), ${oldestFirst ? branch.leafSeq : 0}
-			)`;
+
+	const predicates = [
+		sql`b.session_id = ${sessionId}`,
+		sql`b.branch_id = ${branch.branchId}`,
+		sql`b.entry_seq <= ${branch.leafSeq}`,
+	];
+	if (stopPredicates.length > 0) {
+		predicates.push(sql`b.entry_seq ${boundaryComparison} COALESCE(
+			(SELECT entry_seq FROM boundary), ${oldestFirst ? branch.leafSeq : 0}
+		)`);
+	}
+	if (query.cursor !== undefined) predicates.push(sql`b.entry_seq ${cursorComparison} ${query.cursor.afterSeq}`);
+	if (query.type !== undefined) predicates.push(sql`b.entry_type = ${query.type}`);
+	if (query.customType !== undefined) predicates.push(sql`b.custom_type = ${query.customType}`);
+	const limit = query.limit === undefined ? sql`` : sql` LIMIT ${query.limit}`;
+
 	return sql`${boundary}
 		SELECT e.session_id, e.id, e.seq AS entry_seq, e.parent_id, e.type, e.timestamp, e.payload
 		FROM branch_entries AS b
 		JOIN entries AS e ON e.session_id = b.session_id AND e.id = b.entry_id
-		WHERE b.session_id = ${sessionId}
-			AND b.branch_id = ${branch.branchId}
-			AND b.entry_seq <= ${branch.leafSeq}
-			${range}
-		ORDER BY b.entry_seq ${direction}`.all<CachedBranchEntryRow>(db);
+		WHERE ${joinSqlFragments(predicates, " AND ")}
+		ORDER BY b.entry_seq ${direction}${limit}`.all<CachedBranchEntryRow>(db);
 }
 
 export function deleteBranchEntries(db: SqliteDatabase, sessionId: string) {

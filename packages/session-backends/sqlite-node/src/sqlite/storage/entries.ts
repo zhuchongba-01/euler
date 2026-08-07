@@ -42,14 +42,15 @@ export function readEntryRow(db: SqliteDatabase, sessionId: string, entryId: str
 export function readEntryRows(
 	db: SqliteDatabase,
 	sessionId: string,
-	options: { afterSeq?: number; order?: EntryOrder } = {},
+	options: { afterSeq?: number; order?: EntryOrder; limit?: number } = {},
 ) {
 	const after = options.afterSeq === undefined ? sql`` : sql` AND seq > ${options.afterSeq}`;
 	const direction = options.order === "oldestFirst" ? sql`ASC` : sql`DESC`;
+	const limit = options.limit === undefined ? sql`` : sql` LIMIT ${options.limit}`;
 	return sql`SELECT session_id, seq, id, parent_id, type, timestamp, payload
 		FROM entries
 		WHERE session_id = ${sessionId}${after}
-		ORDER BY seq ${direction}`.all<EntryRow>(db);
+		ORDER BY seq ${direction}${limit}`.all<EntryRow>(db);
 }
 
 export function idExistsInEntries(db: SqliteDatabase, sessionId: string, id: string) {
