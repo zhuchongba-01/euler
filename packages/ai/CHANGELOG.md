@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed upstream request buffer limit failures to trigger automatic assistant retries.
+
 ## [0.84.1] - 2026-08-07
 
 ### Added
