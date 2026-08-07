@@ -5,7 +5,7 @@
 ### Added
 
 - Added unbound half-page transcript scrolling actions, `tui.altScreen.halfPageUp` and `tui.altScreen.halfPageDown`, for fullscreen TUI keybindings ([#7735](https://github.com/earendil-works/pi/issues/7735)).
-- Added double-click word selection, word-aware drag selection, and triple-click line selection in the fullscreen TUI ([#7725](https://github.com/earendil-works/pi/issues/7725)).
+- Added double-click word and whitespace selection, granularity-aware drag selection, and triple-click paragraph selection in the fullscreen TUI ([#7725](https://github.com/earendil-works/pi/issues/7725), [#7733](https://github.com/earendil-works/pi/pull/7733) by [@volsa](https://github.com/volsa)).
 - Added an optional right-click paste handler to the alternate-screen TUI, currently enabled on Windows.
 
 ### Fixed

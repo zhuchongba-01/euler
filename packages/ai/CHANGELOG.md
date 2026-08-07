@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added Qwen Token Plan Individual as a built-in provider with its documented subscription model catalog and the shared international `QWEN_TOKEN_PLAN_API_KEY` ([#7659](https://github.com/earendil-works/pi/pull/7659) by [@arasovic](https://github.com/arasovic)).
+
 ## [0.84.0] - 2026-08-06
 
 ### Breaking Changes
