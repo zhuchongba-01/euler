@@ -5,6 +5,7 @@
 ### Fixed
 
 - Fixed upstream request buffer limit failures to trigger automatic assistant retries.
+- Fixed OpenAI Responses function and custom tool calls to preserve namespaces during streaming, proxying, and replay ([#7709](https://github.com/earendil-works/pi/issues/7709)).
 
 ## [0.84.1] - 2026-08-07
 
