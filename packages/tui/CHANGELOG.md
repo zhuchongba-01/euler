@@ -15,6 +15,7 @@
 
 - Fixed fullscreen transcript search snapping back to the current match during manual scrolling and fragmented SGR mouse input leaking into the search query.
 - Fixed required LaTeX arguments starting on a new line being parsed as empty ([#7760](https://github.com/earendil-works/pi/issues/7760)).
+- Fixed LaTeX control spaces split across line endings causing complete expressions to fall back to raw source.
 
 ## [0.84.1] - 2026-08-07
 
