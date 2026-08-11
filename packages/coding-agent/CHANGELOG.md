@@ -16,6 +16,7 @@
 ### Fixed
 
 - Fixed fullscreen transcript search snapping back to the current match during manual scrolling and fragmented mouse input leaking into the search query.
+- Fixed inherited required LaTeX arguments starting on a new line being parsed as empty ([#7760](https://github.com/earendil-works/pi/issues/7760)).
 
 ## [0.84.1] - 2026-08-07
 
