@@ -135,7 +135,6 @@ describe("StdinBuffer", () => {
 			assert.deepStrictEqual(emittedSequences, ["\x1b[<35"]);
 		});
 
-
 		it("should flush a lone ESC as Escape when CR arrives after the timeout", async () => {
 			// Legacy-mode Alt+Enter is ESC + CR; when the terminal/transport splits
 			// the bytes further apart than the timeout, ESC is flushed alone and the
@@ -162,8 +161,8 @@ describe("StdinBuffer", () => {
 
 			assert.deepStrictEqual(emittedSequences, ["\x1b\r"]);
 			assert.equal(matchesKey(emittedSequences[0] ?? "", "alt+enter"), true);
-    });
-    
+		});
+
 		it("keeps fragmented mouse sequences buffered across delayed chunks by default", async () => {
 			const delayedBuffer = new StdinBuffer();
 			const delayedSequences: string[] = [];
