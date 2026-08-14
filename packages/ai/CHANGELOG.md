@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added `createGatewayBindingFetch()` for routing Cloudflare AI Gateway requests through a Workers AI binding without an API token ([#7901](https://github.com/earendil-works/pi/pull/7901) by [@Maximo-Guk](https://github.com/Maximo-Guk)).
+- Added `AssistantMessage.endTurn` to preserve OpenAI Codex's terminal `end_turn` signal for diagnostics ([#7766](https://github.com/earendil-works/pi/pull/7766)).
+
 ### Changed
 
 - Changed Kimi Coding requests to use pi's runtime `User-Agent` header.
@@ -16,6 +21,8 @@
 - Fixed OpenAI Responses function and custom tool calls to preserve namespaces during streaming, proxying, and replay ([#7709](https://github.com/earendil-works/pi/issues/7709)).
 - Fixed built-in and custom DeepSeek API models to send output limits through the supported `max_tokens` field.
 - Fixed Google Generative AI and Vertex AI responses with tool calls incorrectly treating output-limit or provider-error stops as normal tool use ([#8059](https://github.com/earendil-works/pi/issues/8059)).
+- Fixed Amazon Bedrock replay rejecting tool arguments that contain empty object keys while preserving all valid nested values ([#7882](https://github.com/earendil-works/pi/pull/7882) by [@muyiyr](https://github.com/muyiyr)).
+- Fixed DeepSeek compatibility detection for base URLs whose hostname contains uppercase letters ([#7933](https://github.com/earendil-works/pi/pull/7933) by [@yearth](https://github.com/yearth)).
 
 ## [0.84.1] - 2026-08-07
 
