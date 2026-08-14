@@ -15,6 +15,7 @@
 - Fixed upstream request buffer limit failures to trigger automatic assistant retries.
 - Fixed OpenAI Responses function and custom tool calls to preserve namespaces during streaming, proxying, and replay ([#7709](https://github.com/earendil-works/pi/issues/7709)).
 - Fixed built-in and custom DeepSeek API models to send output limits through the supported `max_tokens` field.
+- Fixed Google Generative AI and Vertex AI responses with tool calls incorrectly treating output-limit or provider-error stops as normal tool use ([#8059](https://github.com/earendil-works/pi/issues/8059)).
 
 ## [0.84.1] - 2026-08-07
 
