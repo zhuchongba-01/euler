@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- Fixed single-object `edit` tool inputs failing validation by accepting them as one-edit arrays in both coding-agent and harness edit tools ([#7835](https://github.com/earendil-works/pi/issues/7835)).
 - Fixed managed-tool downloads delaying TUI startup and hiding diagnostics in fullscreen mode by mounting the TUI first and showing download progress and warnings inside it.
 - Fixed opening a model selector immediately after startup cancelling and restarting the in-progress model catalog refresh.
 - Fixed inherited GitHub Copilot login triggering API rate limits while enabling model policies by limiting concurrent policy updates ([#6187](https://github.com/earendil-works/pi/issues/6187)).
