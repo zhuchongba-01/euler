@@ -1813,7 +1813,7 @@ export class AgentSession {
 			env,
 			this.settingsManager.getRetrySettings(),
 			this._summarizationRetryCallbacks({ source: "compaction", reason }),
-			undefined, // cacheFriendly
+			undefined, // sessionId
 		);
 	}
 
