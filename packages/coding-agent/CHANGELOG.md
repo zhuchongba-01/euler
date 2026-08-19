@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Fixed UTF-8 BOM markers preventing frontmatter and user configuration files from loading ([#8337](https://github.com/earendil-works/pi/issues/8337)).
 - Fixed invalid settings files being easy to miss during interactive startup by rendering warnings with the file path inside the TUI ([#7829](https://github.com/earendil-works/pi/issues/7829)).
 - Fixed the subagent example repeatedly prompting before running project-local agents in trusted repositories ([#8261](https://github.com/earendil-works/pi/issues/8261)).
 - Added `session_compact_failed` extension events so compaction failures and aborts expose their reason, retry state, source, and error message to handlers ([#8175](https://github.com/earendil-works/pi/issues/8175)).
