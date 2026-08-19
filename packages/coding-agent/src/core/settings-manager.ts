@@ -190,7 +190,18 @@ export interface SettingsStorage {
 
 export interface SettingsError {
 	scope: SettingsScope;
+	path?: string;
 	error: Error;
+}
+
+type SettingsPaths = Partial<Record<SettingsScope, string>>;
+
+function toSettingsError(scope: SettingsScope, error: unknown, path?: string): SettingsError {
+	return {
+		scope,
+		...(path ? { path } : {}),
+		error: error instanceof Error ? error : new Error(String(error)),
+	};
 }
 
 export class FileSettingsStorage implements SettingsStorage {
@@ -293,6 +304,7 @@ export class SettingsManager {
 	private projectSettingsLoadError: Error | null = null; // Track if project settings file had parse errors
 	private writeQueue: Promise<void> = Promise.resolve();
 	private errors: SettingsError[];
+	private settingsPaths: SettingsPaths;
 
 	private constructor(
 		storage: SettingsStorage,
@@ -302,6 +314,7 @@ export class SettingsManager {
 		projectLoadError: Error | null = null,
 		initialErrors: SettingsError[] = [],
 		projectTrusted = true,
+		settingsPaths: SettingsPaths = {},
 	) {
 		this.storage = storage;
 		this.globalSettings = initialGlobal;
@@ -310,6 +323,7 @@ export class SettingsManager {
 		this.globalSettingsLoadError = globalLoadError;
 		this.projectSettingsLoadError = projectLoadError;
 		this.errors = [...initialErrors];
+		this.settingsPaths = settingsPaths;
 		this.settings = deepMergeSettings(this.globalSettings, this.projectSettings);
 	}
 
@@ -319,21 +333,35 @@ export class SettingsManager {
 		agentDir: string = getAgentDir(),
 		options: SettingsManagerCreateOptions = {},
 	): SettingsManager {
-		const storage = new FileSettingsStorage(cwd, agentDir);
-		return SettingsManager.fromStorage(storage, options);
+		const resolvedCwd = resolvePath(cwd);
+		const resolvedAgentDir = resolvePath(agentDir);
+		const storage = new FileSettingsStorage(resolvedCwd, resolvedAgentDir);
+		return SettingsManager.fromStorageWithPaths(storage, options, {
+			global: join(resolvedAgentDir, "settings.json"),
+			project: join(resolvedCwd, CONFIG_DIR_NAME, "settings.json"),
+		});
 	}
 
 	/** Create a SettingsManager from an arbitrary storage backend */
 	static fromStorage(storage: SettingsStorage, options: SettingsManagerCreateOptions = {}): SettingsManager {
+		return SettingsManager.fromStorageWithPaths(storage, options);
+	}
+
+	/** Create a manager while retaining optional file paths for reported storage errors. */
+	private static fromStorageWithPaths(
+		storage: SettingsStorage,
+		options: SettingsManagerCreateOptions,
+		settingsPaths: SettingsPaths = {},
+	): SettingsManager {
 		const projectTrusted = options.projectTrusted ?? true;
 		const globalLoad = SettingsManager.tryLoadFromStorage(storage, "global");
 		const projectLoad = SettingsManager.tryLoadFromStorage(storage, "project", projectTrusted);
 		const initialErrors: SettingsError[] = [];
 		if (globalLoad.error) {
-			initialErrors.push({ scope: "global", error: globalLoad.error });
+			initialErrors.push(toSettingsError("global", globalLoad.error, settingsPaths.global));
 		}
 		if (projectLoad.error) {
-			initialErrors.push({ scope: "project", error: projectLoad.error });
+			initialErrors.push(toSettingsError("project", projectLoad.error, settingsPaths.project));
 		}
 
 		return new SettingsManager(
@@ -344,6 +372,7 @@ export class SettingsManager {
 			projectLoad.error,
 			initialErrors,
 			projectTrusted,
+			settingsPaths,
 		);
 	}
 
@@ -546,8 +575,7 @@ export class SettingsManager {
 	}
 
 	private recordError(scope: SettingsScope, error: unknown): void {
-		const normalizedError = error instanceof Error ? error : new Error(String(error));
-		this.errors.push({ scope, error: normalizedError });
+		this.errors.push(toSettingsError(scope, error, this.settingsPaths[scope]));
 	}
 
 	private clearModifiedScope(scope: SettingsScope): void {
