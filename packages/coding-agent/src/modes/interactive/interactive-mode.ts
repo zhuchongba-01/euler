@@ -66,6 +66,7 @@ import {
 	computeCacheWaste,
 	detectCacheMiss,
 } from "../../core/cache-stats.ts";
+import { DEFAULT_THINKING_LEVEL, THINKING_LEVEL_OPTIONS } from "../../core/defaults.ts";
 import type {
 	AutocompleteProviderFactory,
 	EditorFactory,
@@ -229,6 +230,44 @@ function isDeadTerminalError(error: unknown): boolean {
 	}
 	const code = (error as NodeJS.ErrnoException).code;
 	return code !== undefined && DEAD_TERMINAL_ERROR_CODES.has(code);
+}
+
+export interface ModelCommandArgs {
+	searchTerm?: string;
+	persist: boolean;
+	error?: string;
+}
+
+export function parseModelCommandArgs(args: string | undefined): ModelCommandArgs {
+	if (!args?.trim()) return { persist: false };
+
+	let persist = false;
+	const searchTerms: string[] = [];
+	for (const token of args.trim().split(/\s+/u)) {
+		if (token === "--default") {
+			persist = true;
+			continue;
+		}
+
+		if (token.startsWith("--default=")) {
+			persist = true;
+			const value = token.slice("--default=".length);
+			if (value) searchTerms.push(value);
+			continue;
+		}
+
+		if (token.startsWith("--")) {
+			return {
+				persist,
+				searchTerm: searchTerms.join(" ") || undefined,
+				error: `Unknown /model option "${token}". Supported option: --default.`,
+			};
+		}
+
+		searchTerms.push(token);
+	}
+
+	return { persist, searchTerm: searchTerms.join(" ") || undefined };
 }
 
 const ANTHROPIC_SUBSCRIPTION_AUTH_WARNING =
@@ -681,6 +720,16 @@ export class InteractiveMode {
 		const modelCommand = slashCommands.find((command) => command.name === "model");
 		if (modelCommand) {
 			modelCommand.getArgumentCompletions = (prefix: string): AutocompleteItem[] | null => {
+				const trimmedPrefix = prefix.trimStart();
+				if (trimmedPrefix.startsWith("--") && !trimmedPrefix.includes(" ")) {
+					return "--default".startsWith(trimmedPrefix)
+						? [{ value: "--default ", label: "--default", description: "Set as startup default" }]
+						: null;
+				}
+
+				const parsed = parseModelCommandArgs(prefix);
+				if (parsed.error) return null;
+
 				const models =
 					this.session.scopedModels.length > 0
 						? this.session.scopedModels.map((s) => s.model)
@@ -696,10 +745,11 @@ export class InteractiveMode {
 					label: `${m.provider}/${m.id}`,
 				}));
 
-				return createFuzzyAutocompleteItems(items, prefix, getModelSearchText, (item) => ({
-					value: item.label,
+				const searchPrefix = parsed.persist ? (parsed.searchTerm ?? "") : prefix;
+				return createFuzzyAutocompleteItems(items, searchPrefix, getModelSearchText, (item) => ({
+					value: parsed.persist ? `--default ${item.label}` : item.label,
 					label: item.id,
-					description: item.provider,
+					description: parsed.persist ? `${item.provider} · set as startup default` : item.provider,
 				}));
 			};
 		}
@@ -2950,9 +3000,13 @@ export class InteractiveMode {
 				return;
 			}
 			if (text === "/model" || text.startsWith("/model ")) {
-				const searchTerm = text.startsWith("/model ") ? text.slice(7).trim() : undefined;
+				const args = parseModelCommandArgs(text.startsWith("/model ") ? text.slice(7).trim() : undefined);
 				this.editor.setText("");
-				await this.handleModelCommand(searchTerm);
+				if (args.error) {
+					this.showError(args.error);
+					return;
+				}
+				await this.handleModelCommand(args.searchTerm, { persist: args.persist });
 				return;
 			}
 			if (text === "/export" || text.startsWith("/export ")) {
@@ -4493,9 +4547,14 @@ export class InteractiveMode {
 	private showSettingsSelector(): void {
 		this.showSelector((done) => {
 			let selector: SettingsSelectorComponent | undefined;
+			const defaultProvider = this.settingsManager.getDefaultProvider();
+			const defaultModelId = this.settingsManager.getDefaultModel();
+			const defaultModel = defaultProvider && defaultModelId ? `${defaultProvider}/${defaultModelId}` : "not set";
 			selector = new SettingsSelectorComponent(
 				{
 					autoCompact: this.session.autoCompactionEnabled,
+					defaultModel,
+					availableDefaultModels: this.session.modelRuntime.getAvailableSnapshot(),
 					showImages: this.settingsManager.getShowImages(),
 					imageWidthCells: this.settingsManager.getImageWidthCells(),
 					autoResizeImages: this.settingsManager.getImageAutoResize(),
@@ -4505,8 +4564,9 @@ export class InteractiveMode {
 					followUpMode: this.session.followUpMode,
 					transport: this.settingsManager.getTransport(),
 					httpIdleTimeoutMs: this.settingsManager.getHttpIdleTimeoutMs(),
-					thinkingLevel: this.session.thinkingLevel,
-					availableThinkingLevels: this.session.getAvailableThinkingLevels(),
+					thinkingLevel: this.settingsManager.getDefaultThinkingLevel() ?? DEFAULT_THINKING_LEVEL,
+					availableThinkingLevels: [...THINKING_LEVEL_OPTIONS],
+					modelThinkingLevels: this.settingsManager.getAllModelThinkingLevels(),
 					currentTheme: this.themeController.getThemeSelection() || "dark",
 					terminalTheme: this.themeController.getTerminalTheme(),
 					availableThemes: getAvailableThemes(),
@@ -4534,6 +4594,18 @@ export class InteractiveMode {
 					onAutoCompactChange: (enabled) => {
 						this.session.setAutoCompactionEnabled(enabled);
 						this.footer.setAutoCompactEnabled(enabled);
+					},
+					onDefaultModelChange: async (model) => {
+						try {
+							await this.session.setModel(model, { persist: true });
+							this.footer.invalidate();
+							this.updateEditorBorderColor();
+							this.showStatus(`Default model: ${model.provider}/${model.id}`);
+							void this.maybeWarnAboutAnthropicSubscriptionAuth(model);
+							this.checkDaxnutsEasterEgg(model);
+						} catch (error) {
+							this.showError(error instanceof Error ? error.message : String(error));
+						}
 					},
 					onShowImagesChange: (enabled) => {
 						this.settingsManager.setShowImages(enabled);
@@ -4577,9 +4649,30 @@ export class InteractiveMode {
 						this.showStatus(`HTTP idle timeout: ${formatHttpIdleTimeoutMs(timeoutMs)}`);
 					},
 					onThinkingLevelChange: (level) => {
-						this.session.setThinkingLevel(level);
+						this.session.setThinkingLevel(level, { persist: true });
 						this.footer.invalidate();
 						this.updateEditorBorderColor();
+					},
+					onModelThinkingLevelChange: (provider, modelId, level) => {
+						this.settingsManager.setModelThinkingLevel(provider, modelId, level);
+						// If the override is for the current model, apply it to the session too
+						const current = this.session.model;
+						if (current && current.provider === provider && current.id === modelId) {
+							this.session.setThinkingLevel(level);
+							this.footer.invalidate();
+							this.updateEditorBorderColor();
+						}
+					},
+					onModelThinkingLevelRemove: (provider, modelId) => {
+						this.settingsManager.removeModelThinkingLevel(provider, modelId);
+						// If the override was for the current model, revert to global default
+						const current = this.session.model;
+						if (current && current.provider === provider && current.id === modelId) {
+							const globalDefault = this.settingsManager.getDefaultThinkingLevel() ?? DEFAULT_THINKING_LEVEL;
+							this.session.setThinkingLevel(globalDefault);
+							this.footer.invalidate();
+							this.updateEditorBorderColor();
+						}
 					},
 					onThemeChange: (themeSetting) => {
 						this.settingsManager.setTheme(themeSetting);
@@ -4703,19 +4796,19 @@ export class InteractiveMode {
 		});
 	}
 
-	private async handleModelCommand(searchTerm?: string): Promise<void> {
+	private async handleModelCommand(searchTerm?: string, options: { persist?: boolean } = {}): Promise<void> {
 		if (!searchTerm) {
-			this.showModelSelector();
+			this.showModelSelector(undefined, options);
 			return;
 		}
 
 		const model = await this.findExactModelMatch(searchTerm);
 		if (model) {
 			try {
-				await this.session.setModel(model);
+				await this.session.setModel(model, { persist: options.persist === true });
 				this.footer.invalidate();
 				this.updateEditorBorderColor();
-				this.showStatus(`Model: ${model.id}`);
+				this.showStatus(options.persist ? `Default model: ${model.provider}/${model.id}` : `Model: ${model.id}`);
 				void this.maybeWarnAboutAnthropicSubscriptionAuth(model);
 				this.checkDaxnutsEasterEgg(model);
 			} catch (error) {
@@ -4724,7 +4817,7 @@ export class InteractiveMode {
 			return;
 		}
 
-		this.showModelSelector(searchTerm);
+		this.showModelSelector(searchTerm, options);
 	}
 
 	private async findExactModelMatch(searchTerm: string): Promise<Model<any> | undefined> {
@@ -4852,21 +4945,22 @@ export class InteractiveMode {
 		});
 	}
 
-	private showModelSelector(initialSearchInput?: string): void {
+	private showModelSelector(initialSearchInput?: string, options: { persist?: boolean } = {}): void {
 		this.showSelector((done) => {
 			const selector = new ModelSelectorComponent(
 				this.ui,
 				this.session.model,
-				this.settingsManager,
 				this.session.modelRuntime,
 				this.session.scopedModels,
 				async (model) => {
 					try {
-						await this.session.setModel(model);
+						await this.session.setModel(model, { persist: options.persist === true });
 						this.footer.invalidate();
 						this.updateEditorBorderColor();
 						done();
-						this.showStatus(`Model: ${model.id}`);
+						this.showStatus(
+							options.persist ? `Default model: ${model.provider}/${model.id}` : `Model: ${model.id}`,
+						);
 						void this.maybeWarnAboutAnthropicSubscriptionAuth(model);
 						this.checkDaxnutsEasterEgg(model);
 					} catch (error) {
@@ -5558,7 +5652,7 @@ export class InteractiveMode {
 					selectionError = `${actionLabel}, but its default model "${defaultModelId}" is not available. Use /model to select a model.`;
 				} else {
 					try {
-						await this.session.setModel(selectedModel);
+						await this.session.setModel(selectedModel, { persist: true });
 					} catch (error: unknown) {
 						selectedModel = undefined;
 						const errorMessage = error instanceof Error ? error.message : String(error);
