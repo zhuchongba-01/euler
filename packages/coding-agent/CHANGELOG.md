@@ -6,6 +6,10 @@
 
 - Added transcript usage notices for compaction and branch summaries when cache miss notices are enabled.
 
+### Changed
+
+- Changed session sharing to render clickable terminal links and Radius shares to display only the artifact's canonical URL.
+
 ### Fixed
 
 - Fixed UTF-8 BOM markers preventing frontmatter and user configuration files from loading ([#8337](https://github.com/earendil-works/pi/issues/8337)).
