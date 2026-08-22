@@ -8,6 +8,7 @@
 
 ### Changed
 
+- Changed syntax highlighting to initialize only twenty common languages eagerly and defer the remaining grammars until after the initial TUI render, reducing CLI startup time.
 - Changed the Node.js CLI and RPC entrypoints to load a bundled runtime, reducing startup filesystem reads while keeping the public library and legacy module paths on the modular runtime for normal dependency identity.
 - Changed session sharing to render clickable terminal links and Radius shares to display only the artifact's canonical URL.
 
