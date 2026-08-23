@@ -8,6 +8,7 @@
 
 ### Changed
 
+- Changed package resource glob expansion to use Node.js's built-in implementation with deterministic visible-path matching, reducing the installed runtime dependency tree.
 - Changed the bundled Node.js runtime to load jiti's Babel transform only when an extension needs it, reducing CLI startup time and bundle size.
 - Changed syntax highlighting to initialize only twenty common languages eagerly and defer the remaining grammars until after the initial TUI render, reducing CLI startup time.
 - Changed the Node.js CLI and RPC entrypoints to load a bundled runtime, reducing startup filesystem reads while keeping the public library and legacy module paths on the modular runtime for normal dependency identity.
