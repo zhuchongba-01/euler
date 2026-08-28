@@ -17,6 +17,7 @@ import { bashToolSystemPromptContribution } from "../core/tools/bash.ts";
 import { editToolSystemPromptContribution } from "../core/tools/edit.ts";
 import { readToolSystemPromptContribution } from "../core/tools/read.ts";
 import { writeToolSystemPromptContribution } from "../core/tools/write.ts";
+import { EULER_ENV } from "../euler-env.ts";
 
 export interface CodingAgentHarnessTool extends HarnessTool {
 	promptSnippet?: string;
@@ -40,7 +41,7 @@ function createCodingAgentHarnessTool<TParameters extends TSchema, TDetails>(
 export interface CreateCodingAgentHarnessOptions extends Omit<AgentHarnessOptions, "toolContext" | "tools"> {
 	env: ExecutionEnv;
 	bashCommandPrefix?: string;
-	/** Path to the JSONL session file exposed to default bash commands as PI_SESSION_FILE. */
+	/** Path to the JSONL session file exposed to default bash commands as EULER_SESSION_FILE. */
 	sessionFile?: string;
 	tools?: CodingAgentHarnessTool[];
 	systemPromptOptions?: Omit<BuildSystemPromptOptions, "cwd" | "promptGuidelines" | "selectedTools" | "toolSnippets">;
@@ -111,11 +112,11 @@ export async function createCodingAgentHarness(options: CreateCodingAgentHarness
 							currentHarness.getModel(),
 							currentHarness.getThinkingLevel(),
 						]);
-						execution.env.PI_SESSION_ID = metadata.id;
-						execution.env.PI_SESSION_FILE = sessionFile ?? "";
-						execution.env.PI_PROVIDER = model.provider;
-						execution.env.PI_MODEL = model.id;
-						execution.env.PI_REASONING_LEVEL = thinkingLevel;
+						execution.env[EULER_ENV.sessionId] = metadata.id;
+						execution.env[EULER_ENV.sessionFile] = sessionFile ?? "";
+						execution.env[EULER_ENV.provider] = model.provider;
+						execution.env[EULER_ENV.model] = model.id;
+						execution.env[EULER_ENV.reasoningLevel] = thinkingLevel;
 					},
 				}),
 				toolContext,

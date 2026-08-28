@@ -112,7 +112,7 @@ export function hasAuthForProvider(provider: string): boolean {
 }
 
 /** Path to the real pi agent config directory */
-export const PI_AGENT_DIR = join(homedir(), ".pi", "agent");
+export const EULER_AGENT_DIR = join(homedir(), ".pi", "agent");
 
 /**
  * Get an AuthStorage instance backed by ~/.pi/agent/auth.json

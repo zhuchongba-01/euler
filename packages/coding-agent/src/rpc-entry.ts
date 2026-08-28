@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { APP_NAME } from "./config.ts";
 import { configureHttpDispatcher } from "./core/http-dispatcher.ts";
+import { EULER_ENV } from "./euler-env.ts";
 import { main } from "./main.ts";
 
 process.title = `${APP_NAME}-rpc`;
-process.env.EULER_CODING_AGENT = "true";
+process.env[EULER_ENV.codingAgent] = "true";
 process.env.AI_AGENT = APP_NAME;
 process.emitWarning = (() => {}) as typeof process.emitWarning;
 

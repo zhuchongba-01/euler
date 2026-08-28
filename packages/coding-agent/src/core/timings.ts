@@ -1,9 +1,11 @@
 /**
  * Central timing instrumentation for startup profiling.
- * Enable with PI_TIMING=1 environment variable.
+ * Enable with EULER_TIMING=1 environment variable.
  */
 
-const ENABLED = process.env.PI_TIMING === "1";
+import { isEulerEnvFlagEnabled } from "../euler-env.ts";
+
+const ENABLED = isEulerEnvFlagEnabled("timing");
 interface TimingNamespace {
 	timings: Array<{ label: string; ms: number }>;
 	lastTime: number;

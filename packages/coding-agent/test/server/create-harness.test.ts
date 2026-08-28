@@ -52,7 +52,7 @@ function createPromptTool(name: string, promptSnippet?: string, promptGuidelines
 const defaultPromptTools = [
 	createPromptTool("read", "Read file contents", ["Use read to examine files instead of cat or sed."]),
 	createPromptTool("bash", "Execute bash commands (ls, grep, find, etc.)", [
-		"You can inspect PI_* environment variables for current model and session details.",
+		"You can inspect EULER_* environment variables for current model and session details.",
 	]),
 	createPromptTool("edit", "Edit files", ["Edit carefully."]),
 	createPromptTool("write", "Create or overwrite files", ["Use write only for new files or complete rewrites."]),
@@ -96,9 +96,9 @@ describe("coding-agent Harness construction", () => {
 		expect(prompt).toContain("- read: Read file contents");
 		expect(prompt).toContain("- bash: Execute bash commands (ls, grep, find, etc.)");
 		expect(prompt).toContain("Use read to examine files instead of cat or sed.");
-		expect(prompt).toContain("You can inspect PI_* environment variables for current model and session details.");
+		expect(prompt).toContain("You can inspect EULER_* environment variables for current model and session details.");
 		expect(prompt.indexOf("Use read to examine files")).toBeLessThan(
-			prompt.indexOf("You can inspect PI_* environment variables"),
+			prompt.indexOf("You can inspect EULER_* environment variables"),
 		);
 	});
 
@@ -134,7 +134,7 @@ describe("coding-agent Harness construction", () => {
 		const session = new Session(new InMemorySessionStorage({ id: "session-file-harness", createdAt: 1 }));
 		const env = new CapturingExecutionEnv({
 			cwd: process.cwd(),
-			shellEnv: { PI_SESSION_FILE: "/stale/parent.jsonl", PI_CODING_AGENT: "true" },
+			shellEnv: { EULER_SESSION_FILE: "/stale/parent.jsonl", EULER_CODING_AGENT: "true" },
 		});
 		const created = await createCodingAgentHarness({
 			session,
@@ -149,15 +149,15 @@ describe("coding-agent Harness construction", () => {
 			if (!bash) throw new Error("Expected the default bash tool");
 
 			const result = await bash.execute("bash-call", {
-				command: `printf '%s' "$PI_SESSION_ID|$PI_SESSION_FILE|$PI_PROVIDER|$PI_MODEL|$PI_REASONING_LEVEL|$PI_CODING_AGENT"`,
+				command: `printf '%s' "$EULER_SESSION_ID|$EULER_SESSION_FILE|$EULER_PROVIDER|$EULER_MODEL|$EULER_REASONING_LEVEL|$EULER_CODING_AGENT"`,
 			});
 
 			expect(env.executionOverrides).toEqual({
-				PI_SESSION_ID: "session-file-harness",
-				PI_SESSION_FILE: "/sessions/current.jsonl",
-				PI_PROVIDER: "google",
-				PI_MODEL: "gemini-2.5-flash",
-				PI_REASONING_LEVEL: "high",
+				EULER_SESSION_ID: "session-file-harness",
+				EULER_SESSION_FILE: "/sessions/current.jsonl",
+				EULER_PROVIDER: "google",
+				EULER_MODEL: "gemini-2.5-flash",
+				EULER_REASONING_LEVEL: "high",
 			});
 			expect(result.content).toEqual([
 				{
@@ -175,7 +175,7 @@ describe("coding-agent Harness construction", () => {
 		const session = new Session(new InMemorySessionStorage({ id: "dynamic-bash-session", createdAt: 1 }));
 		const env = new CapturingExecutionEnv({
 			cwd: process.cwd(),
-			shellEnv: { PI_SESSION_FILE: "/stale/parent.jsonl", PI_CODING_AGENT: "true" },
+			shellEnv: { EULER_SESSION_FILE: "/stale/parent.jsonl", EULER_CODING_AGENT: "true" },
 		});
 		const created = await createCodingAgentHarness({
 			session,
@@ -191,18 +191,18 @@ describe("coding-agent Harness construction", () => {
 			if (!bash) throw new Error("Expected the default bash tool");
 
 			const result = await bash.execute("bash-call", {
-				command: `printf '%s:%s' "\${PI_SESSION_FILE+x}" "$PI_SESSION_ID|$PI_PROVIDER|$PI_MODEL|$PI_REASONING_LEVEL|$PI_CODING_AGENT"`,
+				command: `printf '%s:%s' "\${EULER_SESSION_FILE+x}" "$EULER_SESSION_ID|$EULER_PROVIDER|$EULER_MODEL|$EULER_REASONING_LEVEL|$EULER_CODING_AGENT"`,
 			});
 
 			expect(env.executionOverrides).toEqual({
-				PI_SESSION_ID: "dynamic-bash-session",
-				PI_SESSION_FILE: "",
-				PI_PROVIDER: "anthropic",
-				PI_MODEL: "claude-sonnet-4-5",
-				PI_REASONING_LEVEL: "low",
+				EULER_SESSION_ID: "dynamic-bash-session",
+				EULER_SESSION_FILE: "",
+				EULER_PROVIDER: "anthropic",
+				EULER_MODEL: "claude-sonnet-4-5",
+				EULER_REASONING_LEVEL: "low",
 			});
-			expect(Object.hasOwn(env.executionOverrides ?? {}, "PI_SESSION_FILE")).toBe(true);
-			expect(env.executionOverrides?.PI_SESSION_FILE).toBe("");
+			expect(Object.hasOwn(env.executionOverrides ?? {}, "EULER_SESSION_FILE")).toBe(true);
+			expect(env.executionOverrides?.EULER_SESSION_FILE).toBe("");
 			expect(result.content).toEqual([
 				{
 					type: "text",
@@ -290,7 +290,7 @@ describe("coding-agent Harness construction", () => {
 		[
 			"bash",
 			"Execute bash commands (ls, grep, find, etc.)",
-			"You can inspect PI_* environment variables for current model and session details.",
+			"You can inspect EULER_* environment variables for current model and session details.",
 		],
 		["read", "Read file contents", "Use read to examine files instead of cat or sed."],
 		[
@@ -342,7 +342,7 @@ describe("coding-agent Harness construction", () => {
 		expect(prompt).toContain("- write: Create or overwrite files");
 		expect(prompt).toContain("- read: Read file contents");
 		expect(prompt).not.toContain("- bash:");
-		expect(prompt).not.toContain("You can inspect PI_* environment variables");
+		expect(prompt).not.toContain("You can inspect EULER_* environment variables");
 		expect(prompt).toContain('<project_instructions path="/workspace/AGENTS.md">');
 		expect(prompt).toContain("<name>review</name>");
 		expect(prompt.indexOf("Use write only for new files or complete rewrites.")).toBeLessThan(
