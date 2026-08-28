@@ -10,8 +10,8 @@ import { configureHttpDispatcher } from "./core/http-dispatcher.ts";
 import { main } from "./main.ts";
 
 process.title = APP_NAME;
-process.env.PI_CODING_AGENT = "true";
-process.env.AI_AGENT = "pi";
+process.env.EULER_CODING_AGENT = "true";
+process.env.AI_AGENT = APP_NAME;
 process.emitWarning = (() => {}) as typeof process.emitWarning;
 
 // Configure undici's global dispatcher before provider SDKs issue requests.

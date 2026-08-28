@@ -481,6 +481,7 @@ interface PackageJson {
 	version?: string;
 	piConfig?: {
 		name?: string;
+		title?: string;
 		configDir?: string;
 	};
 }
@@ -496,7 +497,7 @@ try {
 const piConfigName: string | undefined = pkg.piConfig?.name;
 export const PACKAGE_NAME: string = pkg.name || "@earendil-works/pi-coding-agent";
 export const APP_NAME: string = piConfigName || "pi";
-export const APP_TITLE: string = piConfigName ? APP_NAME : "π";
+export const APP_TITLE: string = pkg.piConfig?.title || (piConfigName ? APP_NAME : "π");
 export const CONFIG_DIR_NAME: string = pkg.piConfig?.configDir || ".pi";
 export const VERSION: string = pkg.version || "0.0.0";
 
