@@ -1,6 +1,6 @@
 # Euler Agent 产品方案与已确认决策
 
-> 状态：讨论稿（持续更新）  
+> 状态：历史决策记录；正式实现以已批准设计规格为准
 > 日期：2026-08-28  
 > 基础项目：[PI](https://github.com/earendil-works/pi)
 
