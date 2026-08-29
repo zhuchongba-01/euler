@@ -12,13 +12,9 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
 `--ignore-scripts` disables dependency lifecycle scripts during install. Euler does not require install scripts for normal npm installs.
 
-On Linux or macOS, you can also use the installer:
+Standalone executables (no Node.js required) are published on the GitHub Releases page.
 
-```bash
-curl -fsSL https://github.com/euler-agent/euler | sh
-```
-
-To uninstall Euler itself, use npm for curl and npm installs:
+To uninstall Euler itself, use npm:
 
 ```bash
 npm uninstall -g @earendil-works/pi-coding-agent

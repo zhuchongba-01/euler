@@ -14,10 +14,10 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
 ### Uninstall
 
-Use the package manager that installed euler. The curl installer uses npm globally, so curl and npm installs are removed with npm:
+Use the package manager that installed euler. npm installs are removed with npm:
 
 ```bash
-# curl installer or npm install -g
+# npm install -g
 npm uninstall -g @earendil-works/pi-coding-agent
 
 # pnpm
