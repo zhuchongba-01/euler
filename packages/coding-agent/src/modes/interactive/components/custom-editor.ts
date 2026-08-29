@@ -1,5 +1,14 @@
-import { Editor, type EditorOptions, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
+import {
+	Editor,
+	type EditorOptions,
+	type EditorTheme,
+	type TUI,
+	truncateToWidth,
+	visibleWidth,
+} from "@earendil-works/pi-tui";
 import type { AppKeybinding, KeybindingsManager } from "../../../core/keybindings.ts";
+import { stripAnsi } from "../../../utils/ansi.ts";
+import { getLineDrawingCharacters } from "./dynamic-border.ts";
 
 /**
  * Custom editor that handles app-level keybindings for coding-agent.
@@ -18,6 +27,38 @@ export class CustomEditor extends Editor {
 	constructor(tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager, options?: EditorOptions) {
 		super(tui, theme, options);
 		this.keybindings = keybindings;
+	}
+
+	override render(width: number): string[] {
+		if (width < 3) {
+			return super.render(width);
+		}
+
+		const innerWidth = Math.max(1, width - 2);
+		const innerLines = super.render(innerWidth);
+		if (innerLines.length === 0) {
+			return [];
+		}
+
+		const chars = getLineDrawingCharacters();
+		const bottomBorderIndex = innerLines.findIndex(
+			(line, index) => index > 0 && isEditorBorderLine(line, innerWidth),
+		);
+
+		return innerLines.map((line, index) => {
+			if (index === 0) {
+				return this.borderColor(chars.topLeft + chars.horizontal.repeat(innerWidth) + chars.topRight);
+			}
+			if (index === bottomBorderIndex) {
+				return this.borderColor(chars.bottomLeft + chars.horizontal.repeat(innerWidth) + chars.bottomRight);
+			}
+
+			const content = fitLineToWidth(line, innerWidth);
+			if (bottomBorderIndex !== -1 && index > bottomBorderIndex) {
+				return ` ${content}`;
+			}
+			return this.borderColor(chars.vertical) + content + this.borderColor(chars.vertical);
+		});
 	}
 
 	/**
@@ -87,4 +128,23 @@ export class CustomEditor extends Editor {
 		// Pass to parent for editor handling
 		super.handleInput(data);
 	}
+}
+
+function isEditorBorderLine(line: string, width: number): boolean {
+	if (visibleWidth(line) !== width) {
+		return false;
+	}
+	const stripped = stripAnsi(line);
+	return /^─+$/.test(stripped) || /^─── [↑↓] /.test(stripped);
+}
+
+function fitLineToWidth(line: string, width: number): string {
+	const lineWidth = visibleWidth(line);
+	if (lineWidth === width) {
+		return line;
+	}
+	if (lineWidth > width) {
+		return truncateToWidth(line, width, "");
+	}
+	return line + " ".repeat(width - lineWidth);
 }

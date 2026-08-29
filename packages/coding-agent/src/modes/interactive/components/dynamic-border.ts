@@ -1,6 +1,42 @@
 import type { Component } from "@earendil-works/pi-tui";
 import { theme } from "../theme/theme.ts";
 
+export interface LineDrawingCharacters {
+	horizontal: string;
+	vertical: string;
+	topLeft: string;
+	topRight: string;
+	bottomLeft: string;
+	bottomRight: string;
+}
+
+const UNICODE_LINE_DRAWING: LineDrawingCharacters = {
+	horizontal: "─",
+	vertical: "│",
+	topLeft: "╭",
+	topRight: "╮",
+	bottomLeft: "╰",
+	bottomRight: "╯",
+};
+
+const ASCII_LINE_DRAWING: LineDrawingCharacters = {
+	horizontal: "-",
+	vertical: "|",
+	topLeft: "+",
+	topRight: "+",
+	bottomLeft: "+",
+	bottomRight: "+",
+};
+
+export function shouldUseAsciiLineDrawing(env: NodeJS.ProcessEnv = process.env): boolean {
+	const term = env.TERM?.toLowerCase();
+	return term === "dumb" || term === "unknown" || env.LC_ALL === "C" || env.LANG === "C";
+}
+
+export function getLineDrawingCharacters(env: NodeJS.ProcessEnv = process.env): LineDrawingCharacters {
+	return shouldUseAsciiLineDrawing(env) ? ASCII_LINE_DRAWING : UNICODE_LINE_DRAWING;
+}
+
 /**
  * Dynamic border component that adjusts to viewport width.
  *
@@ -20,6 +56,7 @@ export class DynamicBorder implements Component {
 	}
 
 	render(width: number): string[] {
-		return [this.color("─".repeat(Math.max(1, width)))];
+		const { horizontal } = getLineDrawingCharacters();
+		return [this.color(horizontal.repeat(Math.max(1, width)))];
 	}
 }

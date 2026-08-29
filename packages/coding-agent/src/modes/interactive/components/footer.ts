@@ -3,6 +3,7 @@ import { type Component, truncateToWidth, visibleWidth } from "@earendil-works/p
 import type { AgentSession } from "../../../core/agent-session.ts";
 import { areExperimentalFeaturesEnabled } from "../../../core/experimental.ts";
 import type { ReadonlyFooterDataProvider } from "../../../core/footer-data-provider.ts";
+import type { TuiMode } from "../../../core/settings-manager.ts";
 import { addUsageToTotals, createUsageTotals } from "../../../core/usage-totals.ts";
 import { theme } from "../theme/theme.ts";
 
@@ -40,7 +41,7 @@ export function formatCwdForFooter(cwd: string, home: string | undefined): strin
 		(relativeToHome !== ".." && !relativeToHome.startsWith(`..${sep}`) && !isAbsolute(relativeToHome));
 
 	if (!isInsideHome) return cwd;
-	return relativeToHome === "" ? "~" : `~${sep}${relativeToHome}`;
+	return relativeToHome === "" ? "~" : `~/${relativeToHome.split(sep).join("/")}`;
 }
 
 /**
@@ -51,14 +52,20 @@ export class FooterComponent implements Component {
 	private autoCompactEnabled = true;
 	private session: AgentSession;
 	private footerData: ReadonlyFooterDataProvider;
+	private tuiMode: TuiMode;
 
-	constructor(session: AgentSession, footerData: ReadonlyFooterDataProvider) {
+	constructor(session: AgentSession, footerData: ReadonlyFooterDataProvider, tuiMode: TuiMode = "regular") {
 		this.session = session;
 		this.footerData = footerData;
+		this.tuiMode = tuiMode;
 	}
 
 	setSession(session: AgentSession): void {
 		this.session = session;
+	}
+
+	setTuiMode(mode: TuiMode): void {
+		this.tuiMode = mode;
 	}
 
 	setAutoCompactEnabled(enabled: boolean): void {
@@ -126,7 +133,7 @@ export class FooterComponent implements Component {
 		}
 
 		// Build stats line
-		const statsParts = [];
+		const statsParts = [`mode:${this.tuiMode}`];
 		if (usageTotals.input) statsParts.push(`↑${formatTokens(usageTotals.input)}`);
 		if (usageTotals.output) statsParts.push(`↓${formatTokens(usageTotals.output)}`);
 		if (usageTotals.cacheRead) statsParts.push(`R${formatTokens(usageTotals.cacheRead)}`);
