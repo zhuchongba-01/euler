@@ -26,6 +26,8 @@ import { CONFIG_DIR_NAME, getAgentDir, isBunBinary } from "../../config.ts";
 // avoiding a circular dependency. Extensions can import from @earendil-works/pi-coding-agent.
 import * as _bundledPiCodingAgent from "../../index.ts";
 import { resolvePath } from "../../utils/paths.ts";
+import type { ResourceDiagnostic } from "../diagnostics.ts";
+import { createPiCompatDiagnostic } from "../euler-compat.ts";
 import { createEventBus, type EventBus } from "../event-bus.ts";
 import type { ExecOptions } from "../exec.ts";
 import { execCommand } from "../exec.ts";
@@ -614,6 +616,7 @@ async function loadExtensionsInternal(
 ): Promise<LoadExtensionsResult> {
 	const extensions: Extension[] = [];
 	const errors: Array<{ path: string; error: string }> = [];
+	const diagnostics: ResourceDiagnostic[] = [];
 	const cacheToken = useCache ? useExtensionCacheCwd(cwd) : undefined;
 	const resolvedCwd = cacheToken?.cwd ?? resolvePath(cwd);
 	const resolvedEventBus = eventBus ?? createEventBus();
@@ -635,14 +638,36 @@ async function loadExtensionsInternal(
 
 		if (extension) {
 			extensions.push(extension);
+			const compatDiagnostic = scanExtensionForPiCompat(extPath, resolvedCwd);
+			if (compatDiagnostic) {
+				diagnostics.push(compatDiagnostic);
+			}
 		}
 	}
 
 	return {
 		extensions,
 		errors,
+		diagnostics,
 		runtime: resolvedRuntime,
 	};
+}
+
+/**
+ * Scan a file-based extension's entry source for PI-specific configuration
+ * references. Inline and synthetic extensions are skipped.
+ */
+function scanExtensionForPiCompat(extensionPath: string, cwd: string): ResourceDiagnostic | undefined {
+	if (extensionPath.startsWith("<")) return undefined;
+	try {
+		const resolvedPath = resolvePath(extensionPath, cwd, { normalizeUnicodeSpaces: true });
+		if (!fs.existsSync(resolvedPath)) return undefined;
+		const stat = fs.statSync(resolvedPath);
+		if (!stat.isFile() || stat.size > 1024 * 1024) return undefined;
+		return createPiCompatDiagnostic(extensionPath, fs.readFileSync(resolvedPath, "utf-8"));
+	} catch {
+		return undefined;
+	}
 }
 
 export async function loadExtensions(
