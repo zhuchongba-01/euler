@@ -4,5 +4,68 @@
 import values from "./data/cloudflare-ai-gateway.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const CLOUDFLARE_AI_GATEWAY_MODELS: ModelCatalog<typeof values, "cloudflare-ai-gateway"> =
-	flattenModelCatalog("cloudflare-ai-gateway", values);
+type CatalogGroups = {
+	"anthropic-messages": Record<
+		| "claude-fable-5"
+		| "claude-haiku-4.5"
+		| "claude-opus-4.5"
+		| "claude-opus-4.6"
+		| "claude-opus-4.7"
+		| "claude-opus-4.8"
+		| "claude-opus-5"
+		| "claude-sonnet-4.5"
+		| "claude-sonnet-4.6"
+		| "claude-sonnet-5"
+		, object
+	>;
+	"openai-completions": Record<
+		| "workers-ai/@cf/deepseek-ai/deepseek-v4-flash-0731"
+		| "workers-ai/@cf/deepseek-ai/deepseek-v4-pro-0813"
+		| "workers-ai/@cf/google/gemma-4-26b-a4b-it"
+		| "workers-ai/@cf/ibm-granite/granite-4.0-h-micro"
+		| "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+		| "workers-ai/@cf/meta/llama-4-scout-17b-16e-instruct"
+		| "workers-ai/@cf/mistralai/mistral-small-3.1-24b-instruct"
+		| "workers-ai/@cf/moonshotai/kimi-k2.6"
+		| "workers-ai/@cf/moonshotai/kimi-k2.7-code"
+		| "workers-ai/@cf/nvidia/nemotron-3-120b-a12b"
+		| "workers-ai/@cf/openai/gpt-oss-120b"
+		| "workers-ai/@cf/openai/gpt-oss-20b"
+		| "workers-ai/@cf/qwen/qwen3-30b-a3b-fp8"
+		| "workers-ai/@cf/qwen/qwen3.8-27b"
+		| "workers-ai/@cf/zai-org/glm-4.7-flash"
+		| "workers-ai/@cf/zai-org/glm-5.2"
+		| "workers-ai/@cf/zai-org/glm-5.3"
+		| "workers-ai/@cf/zai-org/glm-5.3-flash"
+		, object
+	>;
+	"openai-responses": Record<
+		| "gpt-4.1"
+		| "gpt-4.1-mini"
+		| "gpt-4.1-nano"
+		| "gpt-4o"
+		| "gpt-4o-mini"
+		| "gpt-5"
+		| "gpt-5-mini"
+		| "gpt-5-nano"
+		| "gpt-5.1"
+		| "gpt-5.4"
+		| "gpt-5.4-mini"
+		| "gpt-5.4-nano"
+		| "gpt-5.4-pro"
+		| "gpt-5.5"
+		| "gpt-5.5-pro"
+		| "gpt-5.6-luna"
+		| "gpt-5.6-sol"
+		| "gpt-5.6-terra"
+		| "o3"
+		| "o3-mini"
+		| "o4-mini"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const CLOUDFLARE_AI_GATEWAY_MODELS: ModelCatalog<CatalogGroups, "cloudflare-ai-gateway"> =
+	flattenModelCatalog("cloudflare-ai-gateway", typedValues);

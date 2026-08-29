@@ -4,5 +4,83 @@
 import values from "./data/opencode.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const OPENCODE_MODELS: ModelCatalog<typeof values, "opencode"> =
-	flattenModelCatalog("opencode", values);
+type CatalogGroups = {
+	"anthropic-messages": Record<
+		| "claude-fable-5"
+		| "claude-haiku-4-5"
+		| "claude-opus-4-5"
+		| "claude-opus-4-6"
+		| "claude-opus-4-7"
+		| "claude-opus-4-8"
+		| "claude-opus-5"
+		| "claude-sonnet-4"
+		| "claude-sonnet-4-5"
+		| "claude-sonnet-4-6"
+		| "claude-sonnet-5"
+		| "qwen3.5-plus"
+		| "qwen3.6-plus"
+		, object
+	>;
+	"google-generative-ai": Record<
+		| "gemini-3-flash"
+		| "gemini-3.1-pro"
+		| "gemini-3.5-flash"
+		| "gemini-3.5-flash-lite"
+		| "gemini-3.6-flash"
+		| "gemini-3.7-flash"
+		, object
+	>;
+	"openai-completions": Record<
+		| "big-pickle"
+		| "deepseek-v4-flash"
+		| "deepseek-v4-pro"
+		| "glm-5"
+		| "glm-5.1"
+		| "glm-5.2"
+		| "hy3-free"
+		| "kimi-k2.5"
+		| "kimi-k2.6"
+		| "kimi-k2.7-code"
+		| "kimi-k3"
+		| "ling-3.0-flash-fin-free"
+		| "mimo-v2.5-free"
+		| "minimax-m2.5"
+		| "minimax-m2.7"
+		| "minimax-m3"
+		| "nemotron-3-ultra-free"
+		| "nemotron-3.5-lightning-free"
+		, object
+	>;
+	"openai-responses": Record<
+		| "gpt-5"
+		| "gpt-5-codex"
+		| "gpt-5-nano"
+		| "gpt-5.1"
+		| "gpt-5.1-codex"
+		| "gpt-5.1-codex-max"
+		| "gpt-5.1-codex-mini"
+		| "gpt-5.2"
+		| "gpt-5.2-codex"
+		| "gpt-5.3-codex"
+		| "gpt-5.4"
+		| "gpt-5.4-mini"
+		| "gpt-5.4-nano"
+		| "gpt-5.4-pro"
+		| "gpt-5.5"
+		| "gpt-5.5-pro"
+		| "gpt-5.6-luna"
+		| "gpt-5.6-sol"
+		| "gpt-5.6-terra"
+		| "grok-4.5"
+		| "grok-4.6"
+		| "grok-build-0.1"
+		| "muse-spark-1.2"
+		| "muse-spark-1.2-contributor-free"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const OPENCODE_MODELS: ModelCatalog<CatalogGroups, "opencode"> =
+	flattenModelCatalog("opencode", typedValues);

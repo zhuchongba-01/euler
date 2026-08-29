@@ -4,5 +4,16 @@
 import values from "./data/minimax.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const MINIMAX_MODELS: ModelCatalog<typeof values, "minimax"> =
-	flattenModelCatalog("minimax", values);
+type CatalogGroups = {
+	"anthropic-messages": Record<
+		| "MiniMax-M2.7"
+		| "MiniMax-M2.7-highspeed"
+		| "MiniMax-M3"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const MINIMAX_MODELS: ModelCatalog<CatalogGroups, "minimax"> =
+	flattenModelCatalog("minimax", typedValues);

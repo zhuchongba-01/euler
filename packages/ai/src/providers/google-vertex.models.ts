@@ -4,5 +4,26 @@
 import values from "./data/google-vertex.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const GOOGLE_VERTEX_MODELS: ModelCatalog<typeof values, "google-vertex"> =
-	flattenModelCatalog("google-vertex", values);
+type CatalogGroups = {
+	"google-vertex": Record<
+		| "gemini-2.5-flash"
+		| "gemini-2.5-flash-lite"
+		| "gemini-2.5-pro"
+		| "gemini-3-flash-preview"
+		| "gemini-3.1-flash-lite"
+		| "gemini-3.1-pro-preview"
+		| "gemini-3.1-pro-preview-customtools"
+		| "gemini-3.5-flash"
+		| "gemini-3.5-flash-lite"
+		| "gemini-3.6-flash"
+		| "gemini-3.7-flash"
+		| "gemini-flash-latest"
+		| "gemini-flash-lite-latest"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const GOOGLE_VERTEX_MODELS: ModelCatalog<CatalogGroups, "google-vertex"> =
+	flattenModelCatalog("google-vertex", typedValues);

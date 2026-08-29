@@ -4,5 +4,17 @@
 import values from "./data/kimi-coding.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const KIMI_CODING_MODELS: ModelCatalog<typeof values, "kimi-coding"> =
-	flattenModelCatalog("kimi-coding", values);
+type CatalogGroups = {
+	"anthropic-messages": Record<
+		| "k3"
+		| "k3-256k"
+		| "kimi-for-coding"
+		| "kimi-for-coding-highspeed"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const KIMI_CODING_MODELS: ModelCatalog<CatalogGroups, "kimi-coding"> =
+	flattenModelCatalog("kimi-coding", typedValues);

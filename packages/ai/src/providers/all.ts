@@ -47,6 +47,10 @@ import { zaiCodingCnProvider } from "./zai-coding-cn.ts";
 
 export { radiusProvider };
 
+interface ModelDataManifest {
+	generatedAt: string;
+}
+
 /** Providers present in the generated catalog. `KnownProvider` additionally
  * includes purely dynamic providers (e.g. "radius") that have no static
  * catalog entry. */
@@ -72,7 +76,7 @@ export function getBuiltinProviders(): BuiltinProvider[] {
 
 /** Generation timestamp shared by all built-in provider catalogs. */
 export function getBuiltinModelDataGeneratedAt(): number | undefined {
-	const generatedAt = Date.parse(modelDataManifest.generatedAt);
+	const generatedAt = Date.parse((modelDataManifest as ModelDataManifest).generatedAt);
 	return Number.isNaN(generatedAt) ? undefined : generatedAt;
 }
 

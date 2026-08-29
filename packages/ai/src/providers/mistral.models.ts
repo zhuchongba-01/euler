@@ -4,5 +4,45 @@
 import values from "./data/mistral.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const MISTRAL_MODELS: ModelCatalog<typeof values, "mistral"> =
-	flattenModelCatalog("mistral", values);
+type CatalogGroups = {
+	"mistral-conversations": Record<
+		| "codestral-latest"
+		| "devstral-2512"
+		| "devstral-latest"
+		| "devstral-medium-2507"
+		| "devstral-medium-latest"
+		| "devstral-small-2505"
+		| "devstral-small-2507"
+		| "labs-devstral-small-2512"
+		| "magistral-medium-latest"
+		| "magistral-small"
+		| "ministral-3b-latest"
+		| "ministral-8b-latest"
+		| "mistral-large-2411"
+		| "mistral-large-2512"
+		| "mistral-large-latest"
+		| "mistral-medium-2505"
+		| "mistral-medium-2508"
+		| "mistral-medium-2604"
+		| "mistral-medium-3.5"
+		| "mistral-medium-latest"
+		| "mistral-nemo"
+		| "mistral-small-2506"
+		| "mistral-small-2603"
+		| "mistral-small-latest"
+		| "open-mistral-7b"
+		| "open-mistral-nemo"
+		| "open-mixtral-8x22b"
+		| "open-mixtral-8x7b"
+		| "pixtral-12b"
+		| "pixtral-large-latest"
+		| "voxtral-small-latest"
+		| "zai-glm-5-2"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const MISTRAL_MODELS: ModelCatalog<CatalogGroups, "mistral"> =
+	flattenModelCatalog("mistral", typedValues);

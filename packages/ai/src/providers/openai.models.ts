@@ -4,5 +4,51 @@
 import values from "./data/openai.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const OPENAI_MODELS: ModelCatalog<typeof values, "openai"> =
-	flattenModelCatalog("openai", values);
+type CatalogGroups = {
+	"openai-responses": Record<
+		| "gpt-4"
+		| "gpt-4-turbo"
+		| "gpt-4.1"
+		| "gpt-4.1-mini"
+		| "gpt-4.1-nano"
+		| "gpt-4o"
+		| "gpt-4o-2024-05-13"
+		| "gpt-4o-2024-08-06"
+		| "gpt-4o-2024-11-20"
+		| "gpt-4o-mini"
+		| "gpt-5"
+		| "gpt-5-chat-latest"
+		| "gpt-5-mini"
+		| "gpt-5-nano"
+		| "gpt-5-pro"
+		| "gpt-5.1"
+		| "gpt-5.2"
+		| "gpt-5.2-chat-latest"
+		| "gpt-5.2-pro"
+		| "gpt-5.3-chat-latest"
+		| "gpt-5.3-codex"
+		| "gpt-5.3-codex-spark"
+		| "gpt-5.4"
+		| "gpt-5.4-mini"
+		| "gpt-5.4-nano"
+		| "gpt-5.4-pro"
+		| "gpt-5.5"
+		| "gpt-5.5-pro"
+		| "gpt-5.6-luna"
+		| "gpt-5.6-sol"
+		| "gpt-5.6-terra"
+		| "gpt-realtime-2.1"
+		| "o1"
+		| "o1-pro"
+		| "o3"
+		| "o3-mini"
+		| "o3-pro"
+		| "o4-mini"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const OPENAI_MODELS: ModelCatalog<CatalogGroups, "openai"> =
+	flattenModelCatalog("openai", typedValues);

@@ -4,5 +4,31 @@
 import values from "./data/cloudflare-workers-ai.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const CLOUDFLARE_WORKERS_AI_MODELS: ModelCatalog<typeof values, "cloudflare-workers-ai"> =
-	flattenModelCatalog("cloudflare-workers-ai", values);
+type CatalogGroups = {
+	"openai-completions": Record<
+		| "@cf/deepseek-ai/deepseek-v4-flash-0731"
+		| "@cf/deepseek-ai/deepseek-v4-pro-0813"
+		| "@cf/google/gemma-4-26b-a4b-it"
+		| "@cf/ibm-granite/granite-4.0-h-micro"
+		| "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+		| "@cf/meta/llama-4-scout-17b-16e-instruct"
+		| "@cf/mistralai/mistral-small-3.1-24b-instruct"
+		| "@cf/moonshotai/kimi-k2.6"
+		| "@cf/moonshotai/kimi-k2.7-code"
+		| "@cf/nvidia/nemotron-3-120b-a12b"
+		| "@cf/openai/gpt-oss-120b"
+		| "@cf/openai/gpt-oss-20b"
+		| "@cf/qwen/qwen3-30b-a3b-fp8"
+		| "@cf/qwen/qwen3.8-27b"
+		| "@cf/zai-org/glm-4.7-flash"
+		| "@cf/zai-org/glm-5.2"
+		| "@cf/zai-org/glm-5.3"
+		| "@cf/zai-org/glm-5.3-flash"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const CLOUDFLARE_WORKERS_AI_MODELS: ModelCatalog<CatalogGroups, "cloudflare-workers-ai"> =
+	flattenModelCatalog("cloudflare-workers-ai", typedValues);

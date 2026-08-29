@@ -4,5 +4,35 @@
 import values from "./data/nvidia.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const NVIDIA_MODELS: ModelCatalog<typeof values, "nvidia"> =
-	flattenModelCatalog("nvidia", values);
+type CatalogGroups = {
+	"openai-completions": Record<
+		| "deepseek-ai/deepseek-v4-flash-0731"
+		| "deepseek-ai/deepseek-v4-pro-0813"
+		| "google/gemma-3-12b-it"
+		| "google/gemma-3-4b-it"
+		| "meta/llama-3.2-11b-vision-instruct"
+		| "meta/llama-3.2-90b-vision-instruct"
+		| "meta/muse-glimmer-30b"
+		| "minimaxai/minimax-m3"
+		| "mistralai/mistral-7b-instruct-v0.3"
+		| "moonshotai/kimi-k2.6"
+		| "moonshotai/kimi-k3"
+		| "nvidia/cosmos-reason2-8b"
+		| "nvidia/llama-3.1-nemotron-70b-instruct"
+		| "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+		| "nvidia/nemotron-3-nano-30b-a3b"
+		| "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+		| "nvidia/nemotron-3-super-120b-a12b"
+		| "nvidia/nemotron-3-ultra-550b-a55b"
+		| "nvidia/nemotron-3.5-lightning-30b-a3b"
+		| "openai/gpt-oss-120b"
+		| "openai/gpt-oss-20b"
+		| "poolside/laguna-xs-2.1"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const NVIDIA_MODELS: ModelCatalog<CatalogGroups, "nvidia"> =
+	flattenModelCatalog("nvidia", typedValues);

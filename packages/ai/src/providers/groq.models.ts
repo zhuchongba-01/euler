@@ -4,5 +4,19 @@
 import values from "./data/groq.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const GROQ_MODELS: ModelCatalog<typeof values, "groq"> =
-	flattenModelCatalog("groq", values);
+type CatalogGroups = {
+	"openai-completions": Record<
+		| "llama-3.1-8b-instant"
+		| "llama-3.3-70b-versatile"
+		| "openai/gpt-oss-120b"
+		| "openai/gpt-oss-20b"
+		| "openai/gpt-oss-safeguard-20b"
+		| "qwen/qwen3.6-27b"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const GROQ_MODELS: ModelCatalog<CatalogGroups, "groq"> =
+	flattenModelCatalog("groq", typedValues);

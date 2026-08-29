@@ -4,5 +4,33 @@
 import values from "./data/together.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const TOGETHER_MODELS: ModelCatalog<typeof values, "together"> =
-	flattenModelCatalog("together", values);
+type CatalogGroups = {
+	"openai-completions": Record<
+		| "MiniMaxAI/MiniMax-M2.7"
+		| "MiniMaxAI/MiniMax-M3"
+		| "Qwen/Qwen2.5-7B-Instruct-Turbo"
+		| "Qwen/Qwen3.5-9B"
+		| "Qwen/Qwen3.6-Plus"
+		| "Qwen/Qwen3.7-Max"
+		| "deepseek-ai/DeepSeek-V4-Flash-0731"
+		| "deepseek-ai/DeepSeek-V4-Pro"
+		| "deepseek-ai/DeepSeek-V4-Pro-0813"
+		| "google/gemma-4-31B-it"
+		| "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+		| "moonshotai/Kimi-K2.6"
+		| "moonshotai/Kimi-K2.7-Code"
+		| "moonshotai/Kimi-K3"
+		| "nvidia/nemotron-3-ultra-550b-a55b"
+		| "openai/gpt-oss-120b"
+		| "openai/gpt-oss-20b"
+		| "thinkingmachines/Inkling"
+		| "zai-org/GLM-5.2"
+		| "zai-org/GLM-5.3-Flash"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const TOGETHER_MODELS: ModelCatalog<CatalogGroups, "together"> =
+	flattenModelCatalog("together", typedValues);

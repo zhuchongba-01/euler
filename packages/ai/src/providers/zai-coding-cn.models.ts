@@ -4,5 +4,23 @@
 import values from "./data/zai-coding-cn.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const ZAI_CODING_CN_MODELS: ModelCatalog<typeof values, "zai-coding-cn"> =
-	flattenModelCatalog("zai-coding-cn", values);
+type CatalogGroups = {
+	"openai-completions": Record<
+		| "glm-4.6v"
+		| "glm-4.7"
+		| "glm-5-turbo"
+		| "glm-5.1"
+		| "glm-5.2"
+		| "glm-5.2-highspeed"
+		| "glm-5.3"
+		| "glm-5.3-flash"
+		| "glm-5.3-highspeed"
+		| "glm-5v-turbo"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const ZAI_CODING_CN_MODELS: ModelCatalog<CatalogGroups, "zai-coding-cn"> =
+	flattenModelCatalog("zai-coding-cn", typedValues);

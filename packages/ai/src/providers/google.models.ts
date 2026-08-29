@@ -4,5 +4,35 @@
 import values from "./data/google.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const GOOGLE_MODELS: ModelCatalog<typeof values, "google"> =
-	flattenModelCatalog("google", values);
+type CatalogGroups = {
+	"google-generative-ai": Record<
+		| "deep-research-max-preview-04-2026"
+		| "deep-research-preview-04-2026"
+		| "gemini-2.5-computer-use-preview-10-2025"
+		| "gemini-2.5-flash"
+		| "gemini-2.5-flash-lite"
+		| "gemini-2.5-pro"
+		| "gemini-3-flash-preview"
+		| "gemini-3.1-flash-lite"
+		| "gemini-3.1-flash-lite-image"
+		| "gemini-3.1-flash-lite-preview"
+		| "gemini-3.1-flash-live-preview"
+		| "gemini-3.1-pro-preview"
+		| "gemini-3.1-pro-preview-customtools"
+		| "gemini-3.5-flash"
+		| "gemini-3.5-flash-lite"
+		| "gemini-3.6-flash"
+		| "gemini-3.7-flash"
+		| "gemini-flash-latest"
+		| "gemini-flash-lite-latest"
+		| "gemini-robotics-er-1.6-preview"
+		| "gemma-4-26b-a4b-it"
+		| "gemma-4-31b-it"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const GOOGLE_MODELS: ModelCatalog<CatalogGroups, "google"> =
+	flattenModelCatalog("google", typedValues);

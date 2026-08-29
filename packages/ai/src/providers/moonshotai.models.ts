@@ -4,5 +4,23 @@
 import values from "./data/moonshotai.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const MOONSHOTAI_MODELS: ModelCatalog<typeof values, "moonshotai"> =
-	flattenModelCatalog("moonshotai", values);
+type CatalogGroups = {
+	"openai-completions": Record<
+		| "kimi-k2-0711-preview"
+		| "kimi-k2-0905-preview"
+		| "kimi-k2-thinking"
+		| "kimi-k2-thinking-turbo"
+		| "kimi-k2-turbo-preview"
+		| "kimi-k2.5"
+		| "kimi-k2.6"
+		| "kimi-k2.7-code"
+		| "kimi-k2.7-code-highspeed"
+		| "kimi-k3"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const MOONSHOTAI_MODELS: ModelCatalog<CatalogGroups, "moonshotai"> =
+	flattenModelCatalog("moonshotai", typedValues);

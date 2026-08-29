@@ -4,5 +4,33 @@
 import values from "./data/fireworks.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const FIREWORKS_MODELS: ModelCatalog<typeof values, "fireworks"> =
-	flattenModelCatalog("fireworks", values);
+type CatalogGroups = {
+	"anthropic-messages": Record<
+		| "accounts/fireworks/models/deepseek-v4-flash-0731"
+		| "accounts/fireworks/models/deepseek-v4-pro-0813"
+		| "accounts/fireworks/models/glm-5p3"
+		| "accounts/fireworks/models/gpt-oss-120b"
+		| "accounts/fireworks/models/inkling"
+		| "accounts/fireworks/models/kimi-k2p6"
+		| "accounts/fireworks/models/kimi-k2p7-code"
+		| "accounts/fireworks/models/minimax-m3"
+		| "accounts/fireworks/models/muse-glimmer-30b"
+		| "accounts/fireworks/models/nemotron-3-ultra-nvfp4"
+		| "accounts/fireworks/models/nemotron-lightning-3p5-30b-a3b"
+		| "accounts/fireworks/models/qwen3p7-plus"
+		| "accounts/fireworks/models/qwen3p8-max"
+		, object
+	>;
+	"openai-completions": Record<
+		| "accounts/fireworks/models/glm-5p2"
+		| "accounts/fireworks/models/kimi-k3"
+		| "accounts/fireworks/routers/glm-5p2-fast"
+		| "accounts/fireworks/routers/kimi-k3-fast"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const FIREWORKS_MODELS: ModelCatalog<CatalogGroups, "fireworks"> =
+	flattenModelCatalog("fireworks", typedValues);

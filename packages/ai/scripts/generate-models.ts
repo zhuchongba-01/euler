@@ -2915,6 +2915,24 @@ async function generateModels() {
 
 	const serializeJson = (value: unknown) => `${JSON.stringify(value, null, generatorOptions.pretty ? 2 : undefined)}\n`;
 	const writeJson = (path: string, value: unknown) => writeFileSync(path, serializeJson(value));
+	const formatCatalogGroupsType = (providerId: string): string => {
+		const modelsByApi = new Map<string, string[]>();
+		for (const [modelId, api] of Object.entries(modelDataStructure[providerId] ?? {})) {
+			modelsByApi.set(api, [...(modelsByApi.get(api) ?? []), modelId]);
+		}
+
+		let output = "type CatalogGroups = {\n";
+		for (const [api, modelIds] of Array.from(modelsByApi.entries()).sort(([a], [b]) => a.localeCompare(b))) {
+			output += `\t${JSON.stringify(api)}: Record<\n`;
+			for (const modelId of modelIds.sort()) {
+				output += `\t\t| ${JSON.stringify(modelId)}\n`;
+			}
+			output += "\t\t, object\n";
+			output += "\t>;\n";
+		}
+		output += "};\n";
+		return output;
+	};
 	const generatedDataProviderIds = generatorOptions.dataOnly
 		? readModelDataProviderIds(packageRoot)
 		: sortedProviderIds;
@@ -2995,8 +3013,10 @@ async function generateModels() {
 					let output = generatedHeader;
 					output += `import values from "./data/${providerId}.json" with { type: "json" };\n`;
 					output += `import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";\n\n`;
-					output += `export const ${catalogConstName(providerId)}: ModelCatalog<typeof values, ${JSON.stringify(providerId)}> =\n`;
-					output += `\tflattenModelCatalog(${JSON.stringify(providerId)}, values);\n`;
+					output += `${formatCatalogGroupsType(providerId)}\n`;
+					output += "const typedValues = values as CatalogGroups;\n\n";
+					output += `export const ${catalogConstName(providerId)}: ModelCatalog<CatalogGroups, ${JSON.stringify(providerId)}> =\n`;
+					output += `\tflattenModelCatalog(${JSON.stringify(providerId)}, typedValues);\n`;
 					const filename = `${providerId}.models.ts`;
 					generatedShardFiles.add(filename);
 					writeFileSync(join(providersDir, filename), output);

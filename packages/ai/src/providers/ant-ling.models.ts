@@ -4,5 +4,16 @@
 import values from "./data/ant-ling.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const ANT_LING_MODELS: ModelCatalog<typeof values, "ant-ling"> =
-	flattenModelCatalog("ant-ling", values);
+type CatalogGroups = {
+	"openai-completions": Record<
+		| "Ling-2.6-1T"
+		| "Ling-2.6-flash"
+		| "Ring-2.6-1T"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const ANT_LING_MODELS: ModelCatalog<CatalogGroups, "ant-ling"> =
+	flattenModelCatalog("ant-ling", typedValues);

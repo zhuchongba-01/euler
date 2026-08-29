@@ -4,5 +4,31 @@
 import values from "./data/qwen-token-plan.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const QWEN_TOKEN_PLAN_MODELS: ModelCatalog<typeof values, "qwen-token-plan"> =
-	flattenModelCatalog("qwen-token-plan", values);
+type CatalogGroups = {
+	"openai-completions": Record<
+		| "MiniMax-M2.5"
+		| "deepseek-v3.2"
+		| "deepseek-v4-flash"
+		| "deepseek-v4-flash-0731"
+		| "deepseek-v4-pro"
+		| "deepseek-v4-pro-0813"
+		| "glm-5"
+		| "glm-5.1"
+		| "glm-5.2"
+		| "kimi-k2.5"
+		| "kimi-k2.6"
+		| "kimi-k2.7-code"
+		| "qwen3.6-flash"
+		| "qwen3.6-plus"
+		| "qwen3.7-max"
+		| "qwen3.7-plus"
+		| "qwen3.8-flash"
+		| "qwen3.8-max"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const QWEN_TOKEN_PLAN_MODELS: ModelCatalog<CatalogGroups, "qwen-token-plan"> =
+	flattenModelCatalog("qwen-token-plan", typedValues);

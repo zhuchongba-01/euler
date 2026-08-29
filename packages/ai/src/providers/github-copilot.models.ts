@@ -4,5 +4,52 @@
 import values from "./data/github-copilot.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const GITHUB_COPILOT_MODELS: ModelCatalog<typeof values, "github-copilot"> =
-	flattenModelCatalog("github-copilot", values);
+type CatalogGroups = {
+	"anthropic-messages": Record<
+		| "claude-haiku-4.5"
+		| "claude-opus-4.5"
+		| "claude-opus-4.6"
+		| "claude-opus-4.7"
+		| "claude-opus-4.8"
+		| "claude-opus-5"
+		| "claude-sonnet-4"
+		| "claude-sonnet-4.5"
+		| "claude-sonnet-4.6"
+		| "claude-sonnet-5"
+		, object
+	>;
+	"openai-completions": Record<
+		| "claude-fable-5"
+		| "gemini-3.1-pro-preview"
+		| "gemini-3.5-flash"
+		| "gemini-3.6-flash"
+		| "gemini-3.7-flash"
+		| "gpt-4.1"
+		| "kimi-k2.7-code"
+		| "kimi-k3"
+		, object
+	>;
+	"openai-responses": Record<
+		| "gpt-5-mini"
+		| "gpt-5.2"
+		| "gpt-5.2-codex"
+		| "gpt-5.3-codex"
+		| "gpt-5.4"
+		| "gpt-5.4-mini"
+		| "gpt-5.4-nano"
+		| "gpt-5.5"
+		| "gpt-5.6-luna"
+		| "gpt-5.6-sol"
+		| "gpt-5.6-terra"
+		| "grok-4.5"
+		| "grok-4.6"
+		| "mai-code-1-flash-picker"
+		| "mai-code-1.1-flash"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const GITHUB_COPILOT_MODELS: ModelCatalog<CatalogGroups, "github-copilot"> =
+	flattenModelCatalog("github-copilot", typedValues);

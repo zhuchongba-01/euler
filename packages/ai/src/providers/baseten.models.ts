@@ -4,5 +4,32 @@
 import values from "./data/baseten.json" with { type: "json" };
 import { flattenModelCatalog, type ModelCatalog } from "../model-catalog.ts";
 
-export const BASETEN_MODELS: ModelCatalog<typeof values, "baseten"> =
-	flattenModelCatalog("baseten", values);
+type CatalogGroups = {
+	"openai-completions": Record<
+		| "deepseek-ai/DeepSeek-V4-Flash-0731"
+		| "deepseek-ai/DeepSeek-V4-Pro"
+		| "deepseek-ai/DeepSeek-V4-Pro-0813"
+		| "moonshotai/Kimi-K2.5"
+		| "moonshotai/Kimi-K2.6"
+		| "moonshotai/Kimi-K2.7-Code"
+		| "moonshotai/Kimi-K3"
+		| "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B"
+		| "nvidia/Nemotron-120B-A12B"
+		| "openai/gpt-oss-120b"
+		| "thinkingmachines/inkling"
+		| "thinkingmachines/inkling-small"
+		| "zai-org/GLM-4.7"
+		| "zai-org/GLM-5"
+		| "zai-org/GLM-5.1"
+		| "zai-org/GLM-5.2"
+		| "zai-org/GLM-5.2-Fast"
+		| "zai-org/GLM-5.3"
+		| "zai-org/GLM-5.3-Flash"
+		, object
+	>;
+};
+
+const typedValues = values as CatalogGroups;
+
+export const BASETEN_MODELS: ModelCatalog<CatalogGroups, "baseten"> =
+	flattenModelCatalog("baseten", typedValues);
