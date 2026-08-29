@@ -181,13 +181,13 @@ export class ModelRuntime implements Models {
 				? new FileModelsStore(options.modelsStorePath ?? join(dirname(modelsPath), "models-store.json"))
 				: new InMemoryCodingAgentModelsStore());
 		const builtinModelDataGeneratedAt = builtinProviderCatalog.getBuiltinModelDataGeneratedAt();
-		const providers = builtinProviderCatalog
-			.builtinProviders()
-			.map((provider) =>
-				provider.id === "radius"
-					? provider
-					: withRemoteCatalog(provider, options.catalogBaseUrl, builtinModelDataGeneratedAt),
-			);
+		const providers = builtinProviderCatalog.builtinProviders().map((provider) =>
+			// Euler has no default provider-catalog service; remote overlays are
+			// opt-in via an explicitly configured catalog base URL.
+			options.catalogBaseUrl && provider.id !== "radius"
+				? withRemoteCatalog(provider, options.catalogBaseUrl, builtinModelDataGeneratedAt)
+				: provider,
+		);
 		const runtime = new ModelRuntime(
 			credentials,
 			config,

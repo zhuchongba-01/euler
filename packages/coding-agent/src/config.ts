@@ -498,7 +498,7 @@ try {
 const piConfigName: string | undefined = pkg.piConfig?.name;
 export const PACKAGE_NAME: string = pkg.name || "@earendil-works/pi-coding-agent";
 export const APP_NAME: string = piConfigName || "pi";
-export const APP_TITLE: string = pkg.piConfig?.title || (piConfigName ? APP_NAME : "π");
+export const APP_TITLE: string = pkg.piConfig?.title || (piConfigName ? APP_NAME : "Euler");
 export const CONFIG_DIR_NAME: string = pkg.piConfig?.configDir || ".pi";
 export const VERSION: string = pkg.version || "0.0.0";
 
@@ -509,12 +509,10 @@ export function expandTildePath(path: string): string {
 	return normalizePath(path);
 }
 
-const DEFAULT_SHARE_VIEWER_URL = "https://pi.dev/session/";
-
-/** Get the share viewer URL for a gist ID. */
-export function getShareViewerUrl(gistId: string): string {
-	const baseUrl = getEulerEnv("shareViewerUrl") || DEFAULT_SHARE_VIEWER_URL;
-	return `${baseUrl}#${gistId}`;
+/** Get the share viewer URL for a gist ID, or undefined until a viewer is configured. */
+export function getShareViewerUrl(gistId: string): string | undefined {
+	const baseUrl = getEulerEnv("shareViewerUrl");
+	return baseUrl ? `${baseUrl}#${gistId}` : undefined;
 }
 
 // =============================================================================

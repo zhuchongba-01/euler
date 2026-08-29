@@ -193,7 +193,11 @@ async function shareViaGist(tmpFile: string, context: SessionShareContext): Prom
 		}
 
 		const previewUrl = getShareViewerUrl(gistId);
-		context.showStatus(`Share URL: ${hyperlink(previewUrl, previewUrl)}\nGist: ${hyperlink(gistUrl, gistUrl)}`);
+		context.showStatus(
+			previewUrl
+				? `Share URL: ${hyperlink(previewUrl, previewUrl)}\nGist: ${hyperlink(gistUrl, gistUrl)}`
+				: `Gist: ${hyperlink(gistUrl, gistUrl)}\n(Set EULER_SHARE_VIEWER_URL to enable a web preview.)`,
+		);
 	} catch (error: unknown) {
 		if (!loader.signal.aborted) {
 			restoreEditor(loader, context);
