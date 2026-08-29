@@ -674,7 +674,9 @@ export function hyperlink(text: string, url: string): string {
 function shortenImagePath(filename: string): string {
 	const home = homedir();
 	if (home && (filename === home || filename.startsWith(`${home}/`) || filename.startsWith(`${home}\\`))) {
-		return `~${filename.slice(home.length)}`;
+		// Normalize to forward slashes: `~` is a shell-style abbreviation and is
+		// conventionally rendered with `/` even on Windows.
+		return `~${filename.slice(home.length)}`.replace(/\\/g, "/");
 	}
 	return filename;
 }

@@ -1,11 +1,13 @@
 import { setKeybindings } from "@earendil-works/pi-tui";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+// Fixtures use synthetic POSIX paths (/project, /parent); Windows path resolution
+// gives them the current drive root, so these rendering tests stay POSIX-only.
 import { KeybindingsManager } from "../src/core/keybindings.ts";
 import { TrustSelectorComponent } from "../src/modes/interactive/components/trust-selector.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
 import { stripAnsi } from "../src/utils/ansi.ts";
 
-describe("TrustSelectorComponent", () => {
+describe.skipIf(process.platform === "win32")("TrustSelectorComponent", () => {
 	beforeAll(() => {
 		initTheme("dark");
 	});

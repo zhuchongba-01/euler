@@ -3,7 +3,16 @@ import { createModelRegistry, getModelRuntime } from "./model-runtime-test-utils
  * Shared test utilities for coding-agent tests.
  */
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { Agent } from "@earendil-works/pi-agent-core";
@@ -24,6 +33,7 @@ import type { ResourceLoader } from "../src/core/resource-loader.ts";
 import { SessionManager } from "../src/core/session-manager.ts";
 import { SettingsManager } from "../src/core/settings-manager.ts";
 import { createCodingTools } from "../src/index.ts";
+import { spawnProcessSync } from "../src/utils/child-process.ts";
 
 /**
  * API key for authenticated tests. Tests using this should be wrapped in
@@ -318,4 +328,24 @@ export function buildTestTree(
 	}
 
 	return ids;
+}
+
+// Windows requires Developer Mode or elevated rights to create symlinks;
+// probe once so symlink-specific tests can skip gracefully instead of
+// failing with EPERM.
+export const canSymlink: boolean = (() => {
+	const link = join(tmpdir(), `euler-symprobe-${process.pid}`);
+	try {
+		symlinkSync(tmpdir(), link, "dir");
+		unlinkSync(link);
+		return true;
+	} catch {
+		return false;
+	}
+})();
+
+/** Check whether an external binary is on PATH (used by tests that shell out to fd/fswatch). */
+export function hasBinary(command: string, args: string[] = ["--version"]): boolean {
+	const result = spawnProcessSync(command, args, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+	return result.status === 0;
 }

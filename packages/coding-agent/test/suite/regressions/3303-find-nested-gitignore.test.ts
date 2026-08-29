@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createFindToolDefinition } from "../../../src/core/tools/find.ts";
+import { hasBinary } from "../../utilities.ts";
 
 /**
  * Regression test for https://github.com/earendil-works/pi-mono/issues/3303
@@ -14,7 +15,7 @@ import { createFindToolDefinition } from "../../../src/core/tools/find.ts";
  * hierarchical `.gitignore` handling via `--no-require-git` and drops the
  * manual collection.
  */
-describe("issue #3303 nested .gitignore rules leak into sibling directories", () => {
+describe.skipIf(!hasBinary("fd"))("issue #3303 nested .gitignore rules leak into sibling directories", () => {
 	let tempRoot: string;
 
 	async function runFind(pattern: string): Promise<string[]> {

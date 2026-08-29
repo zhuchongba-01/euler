@@ -114,7 +114,10 @@ describe("AuthStorage", () => {
 	});
 
 	test("keeps a coalesced reload alive while another credential reader is waiting", async () => {
-		writeAuthJson({ anthropic: { type: "api_key", key: "old" } });
+		// Windows file timestamps only advance every ~15.6ms, and "old"/"new" have the
+		// same byte length, so pretty-print the first write to guarantee the file
+		// revision (size:mtime) differs and the external rewrite is detected.
+		writeFileSync(authJsonPath, JSON.stringify({ anthropic: { type: "api_key", key: "old" } }, null, "\t"));
 		const storage = AuthStorage.create(authJsonPath);
 		writeAuthJson({ anthropic: { type: "api_key", key: "new" } });
 		let grantLock: (() => void) | undefined;

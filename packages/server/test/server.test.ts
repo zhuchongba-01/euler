@@ -42,16 +42,19 @@ test("rejects an overlong derived private Unix bind path", async () => {
 	await expect(server.start()).rejects.toThrow(/private Unix bind path.*too long/);
 });
 
-test("rejects concurrent start calls without leaking the Unix listener", async () => {
-	const path = await makeSocketPath();
-	server = createUnixServer(service, { path });
-	const starting = server.start();
-	await expect(server.start()).rejects.toThrow(/starting/);
-	await starting;
-	await server.close();
-	expect(server.addresses[0]).toBeUndefined();
-	await expect(lstat(path)).rejects.toMatchObject({ code: "ENOENT" });
-});
+test.skipIf(process.platform === "win32")(
+	"rejects concurrent start calls without leaking the Unix listener",
+	async () => {
+		const path = await makeSocketPath();
+		server = createUnixServer(service, { path });
+		const starting = server.start();
+		await expect(server.start()).rejects.toThrow(/starting/);
+		await starting;
+		await server.close();
+		expect(server.addresses[0]).toBeUndefined();
+		await expect(lstat(path)).rejects.toMatchObject({ code: "ENOENT" });
+	},
+);
 
 test("handshake timeout cleanup does not wait for a blocked output queue", async () => {
 	class BlockedConnection implements ByteConnection {

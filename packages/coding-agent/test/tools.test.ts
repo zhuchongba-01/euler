@@ -15,6 +15,11 @@ import {
 	createWriteTool,
 } from "../src/index.ts";
 import * as shellModule from "../src/utils/shell.ts";
+import { hasBinary } from "./utilities.ts";
+
+// POSIX-only semantics: chmod read-only errors (EACCES), and rg/fd pattern
+// handling with POSIX temp paths. Windows gate keeps the suite honest.
+const skipOnWindows = process.platform === "win32";
 
 const readTool = createReadTool(process.cwd());
 const writeTool = createWriteTool(process.cwd());
@@ -421,7 +426,7 @@ describe("Coding Agent Tools", () => {
 			expect(readFileSync(testFile, "utf-8")).toBe(originalContent);
 		});
 
-		it("should include EACCES for read-only files", async () => {
+		it.skipIf(skipOnWindows)("should include EACCES for read-only files", async () => {
 			const testFile = join(testDir, "edit-readonly.txt");
 			writeFileSync(testFile, "hello\n");
 			chmodSync(testFile, 0o444);
@@ -460,7 +465,7 @@ describe("Coding Agent Tools", () => {
 			expect(result).toEqual({ error: `Could not edit file: ${missingFile}. Error code: ENOENT.` });
 		});
 
-		it("should include EACCES in diff preview for unreadable files", async () => {
+		it.skipIf(skipOnWindows)("should include EACCES in diff preview for unreadable files", async () => {
 			const unreadableFile = join(testDir, "unreadable-preview.txt");
 			writeFileSync(unreadableFile, "hello\n");
 			chmodSync(unreadableFile, 0o222);
@@ -803,7 +808,7 @@ describe("Coding Agent Tools", () => {
 			expect(output).not.toContain("match two");
 		});
 
-		it("should treat flag-like patterns as search text", async () => {
+		it.skipIf(skipOnWindows)("should treat flag-like patterns as search text", async () => {
 			const marker = join(testDir, "grep-injection-marker");
 			const payload = join(testDir, "payload.sh");
 			const testFile = join(testDir, "target.txt");
@@ -822,7 +827,7 @@ describe("Coding Agent Tools", () => {
 	});
 
 	describe("find tool", () => {
-		it("should include hidden files that are not gitignored", async () => {
+		it.skipIf(skipOnWindows)("should include hidden files that are not gitignored", async () => {
 			const hiddenDir = join(testDir, ".secret");
 			mkdirSync(hiddenDir);
 			writeFileSync(join(hiddenDir, "hidden.txt"), "hidden");
@@ -842,7 +847,7 @@ describe("Coding Agent Tools", () => {
 			expect(outputLines).toContain(".secret/hidden.txt");
 		});
 
-		it("should respect .gitignore", async () => {
+		it.skipIf(skipOnWindows)("should respect .gitignore", async () => {
 			writeFileSync(join(testDir, ".gitignore"), "ignored.txt\n");
 			writeFileSync(join(testDir, "ignored.txt"), "ignored");
 			writeFileSync(join(testDir, "kept.txt"), "kept");
@@ -857,7 +862,9 @@ describe("Coding Agent Tools", () => {
 			expect(output).not.toContain("ignored.txt");
 		});
 
-		it("should surface fd glob parse errors", async () => {
+		// Requires the fd binary; without it the find tool reports
+		// "fd is not available" instead of surfacing a glob parse error.
+		it.skipIf(!hasBinary("fd"))("should surface fd glob parse errors", async () => {
 			await expect(
 				findTool.execute("test-call-15", {
 					pattern: "[",
@@ -866,7 +873,7 @@ describe("Coding Agent Tools", () => {
 			).rejects.toThrow(/error parsing glob|fd exited with code 1|fd error/i);
 		});
 
-		it("should treat flag-like patterns as search text", async () => {
+		it.skipIf(skipOnWindows)("should treat flag-like patterns as search text", async () => {
 			const result = await findTool.execute("test-call-find-flag-pattern", {
 				pattern: "--help",
 				path: testDir,

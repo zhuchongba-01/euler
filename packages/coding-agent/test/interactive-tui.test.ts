@@ -102,6 +102,7 @@ describe("createInteractiveTui", () => {
 			fullscreenLayoutRoot: component,
 			options: { tuiMode: "regular" as TuiMode },
 			themeController: { rebindTui: () => {} },
+			footer: { setTuiMode: () => {} },
 			extensionTerminalInputSubscriptions: new Set<never>(),
 		}) as SwitchContext;
 		stableUi = createInteractiveTuiReference(() => context.renderer);

@@ -7,6 +7,7 @@ import { KeybindingsManager } from "../src/core/keybindings.ts";
 import type { SessionInfo } from "../src/core/session-manager.ts";
 import { SessionSelectorComponent } from "../src/modes/interactive/components/session-selector.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
+import { canSymlink } from "./utilities.ts";
 
 type Deferred<T> = {
 	promise: Promise<T>;
@@ -246,7 +247,7 @@ describe("session selector path/delete interactions", () => {
 		await flushPromises();
 	});
 
-	it("threads sessions when parent and child paths use different symlink aliases", async () => {
+	it.skipIf(!canSymlink)("threads sessions when parent and child paths use different symlink aliases", async () => {
 		const paths = createSymlinkedSessionPaths();
 		tempDirs.push(paths.baseDir);
 
@@ -321,7 +322,7 @@ describe("session selector path/delete interactions", () => {
 		expect(parentOneIndex).toBeGreaterThan(childTwoIndex);
 	});
 
-	it("treats the current session as active across symlink aliases", async () => {
+	it.skipIf(!canSymlink)("treats the current session as active across symlink aliases", async () => {
 		const paths = createSymlinkedSessionPaths();
 		tempDirs.push(paths.baseDir);
 

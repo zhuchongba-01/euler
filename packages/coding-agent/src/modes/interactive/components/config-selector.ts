@@ -797,7 +797,8 @@ class ResourceList implements Component, Focusable {
 		const sourceScope = this.getItemScope(item);
 		if (scope !== sourceScope) return item.path;
 		const baseDir = item.metadata.baseDir ?? this.getTopLevelBaseDir(sourceScope);
-		return relative(baseDir, item.path);
+		// Settings stay portable: store override patterns with forward slashes.
+		return relative(baseDir, item.path).replaceAll("\\", "/");
 	}
 
 	private createPackageOverrideSource(item: ResourceItem): PackageSource {
@@ -854,12 +855,13 @@ class ResourceList implements Component, Focusable {
 	private getResourcePattern(item: ResourceItem): string {
 		const scope = item.metadata.scope as "user" | "project";
 		const baseDir = item.metadata.baseDir ?? this.getTopLevelBaseDir(scope);
-		return relative(baseDir, item.path);
+		// Settings stay portable: store override patterns with forward slashes.
+		return relative(baseDir, item.path).replaceAll("\\", "/");
 	}
 
 	private getPackageResourcePattern(item: ResourceItem): string {
 		const baseDir = item.metadata.baseDir ?? dirname(item.path);
-		return relative(baseDir, item.path);
+		return relative(baseDir, item.path).replaceAll("\\", "/");
 	}
 }
 

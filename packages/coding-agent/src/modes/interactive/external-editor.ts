@@ -16,7 +16,10 @@ export async function editInExternalEditor(options: ExternalEditorOptions): Prom
 	const filePath = join(directory, "prompt.md");
 	try {
 		writeFileSync(filePath, options.content, "utf-8");
-		const [editor, ...editorArgs] = options.command.split(" ");
+		// On Windows the command runs through cmd.exe, which resolves quoted
+		// paths itself; keep the raw command string intact so editors installed
+		// under "Program Files" work. POSIX keeps the historical word-split.
+		const [editor, ...editorArgs] = process.platform === "win32" ? [options.command] : options.command.split(" ");
 		process.stdout.write(`Launching external editor: ${options.command}\nPi will resume when the editor exits.\n`);
 
 		// Do not use spawnSync here. On Windows, synchronous child_process calls can keep

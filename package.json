@@ -1,5 +1,5 @@
 {
-	"name": "pi-monorepo",
+	"name": "euler-monorepo",
 	"private": true,
 	"type": "module",
 	"workspaces": [

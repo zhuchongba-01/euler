@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
 import { loadSkills, loadSourcedSkills } from "../../src/harness/skills.ts";
+import { canSymlink } from "./capabilities.ts";
 import { createTempDir } from "./session-test-utils.ts";
 
 describe("loadSkills", () => {
@@ -35,7 +36,7 @@ Use this skill.
 		]);
 	});
 
-	it("loads skills through symlinked directories", async () => {
+	it.skipIf(!canSymlink)("loads skills through symlinked directories", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		await env.createDir("actual/example", { recursive: true });

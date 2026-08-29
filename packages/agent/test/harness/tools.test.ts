@@ -16,6 +16,7 @@ import {
 	type ShellExecOptions,
 } from "../../src/harness/types.ts";
 import { DEFAULT_MAX_LINES } from "../../src/harness/utils/truncate.ts";
+import { canSymlink } from "./capabilities.ts";
 import { createTempDir } from "./session-test-utils.ts";
 
 function textOutput(result: { content: Array<{ type: string; text?: string }> }): string {
@@ -404,7 +405,7 @@ describe("AgentHarness tools", () => {
 			expect(getOrThrow(await env.readTextFile("file.txt"))).toBe("ALPHA\nBETA\n");
 		});
 
-		it("serializes concurrent edits through canonical and symlink paths", async () => {
+		it.skipIf(!canSymlink)("serializes concurrent edits through canonical and symlink paths", async () => {
 			const env = new SlowReadExecutionEnv({ cwd: createTempDir() });
 			getOrThrow(await env.writeFile("target.txt", "alpha\nbeta\ngamma\n"));
 			await symlink("target.txt", `${env.cwd}/link.txt`);
@@ -430,7 +431,7 @@ describe("AgentHarness tools", () => {
 			expect(getOrThrow(await env.readTextFile("target.txt"))).toBe("ALPHA\nBETA\ngamma\n");
 		});
 
-		it("edits regular files through symlinks", async () => {
+		it.skipIf(!canSymlink)("edits regular files through symlinks", async () => {
 			const context = createContext();
 			getOrThrow(await context.env.writeFile("target.txt", "before\n"));
 			await symlink("target.txt", `${context.env.cwd}/link.txt`);
@@ -543,7 +544,7 @@ describe("AgentHarness tools", () => {
 			expect(textOutput(result)).toMatch(/Showing last 50\.0KB of line 1 \(line is 58\.6KB\)\. Full output:/);
 		});
 
-		it("prepares command, cwd, and an explicit environment with the turn context", async () => {
+		it.skipIf(!canSymlink)("prepares command, cwd, and an explicit environment with the turn context", async () => {
 			const env = new NodeExecutionEnv({
 				cwd: createTempDir(),
 				shellEnv: { PI_BASH_PREPARE_INHERITED: "inherited" },

@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { NodeExecutionEnv } from "../../src/harness/env/nodejs.ts";
 import { FileError, getOrThrow } from "../../src/harness/types.ts";
 import { executeShellWithCapture } from "../../src/harness/utils/shell-output.ts";
+import { canSymlink } from "./capabilities.ts";
 import { createTempDir } from "./session-test-utils.ts";
 
 const chmodRestorePaths: string[] = [];
@@ -103,39 +104,42 @@ describe("NodeExecutionEnv", () => {
 		expect(getOrThrow(await env.absolutePath(pathToFileURL(filePath).href))).toBe(filePath);
 	});
 
-	it("returns fileInfo for files, directories, and symlinks without following symlinks", async () => {
-		const root = createTempDir();
-		const env = new NodeExecutionEnv({ cwd: root });
-		getOrThrow(await env.createDir("dir", { recursive: true }));
-		getOrThrow(await env.writeFile("dir/file.txt", "hello"));
-		await symlink(join(root, "dir/file.txt"), join(root, "file-link"));
-		await symlink(join(root, "dir"), join(root, "dir-link"));
+	it.skipIf(!canSymlink)(
+		"returns fileInfo for files, directories, and symlinks without following symlinks",
+		async () => {
+			const root = createTempDir();
+			const env = new NodeExecutionEnv({ cwd: root });
+			getOrThrow(await env.createDir("dir", { recursive: true }));
+			getOrThrow(await env.writeFile("dir/file.txt", "hello"));
+			await symlink(join(root, "dir/file.txt"), join(root, "file-link"));
+			await symlink(join(root, "dir"), join(root, "dir-link"));
 
-		expect(getOrThrow(await env.fileInfo("dir"))).toMatchObject({
-			name: "dir",
-			path: join(root, "dir"),
-			kind: "directory",
-		});
-		expect(getOrThrow(await env.fileInfo("dir/file.txt"))).toMatchObject({
-			name: "file.txt",
-			path: join(root, "dir/file.txt"),
-			kind: "file",
-			size: 5,
-		});
-		expect(getOrThrow(await env.fileInfo("file-link"))).toMatchObject({
-			name: "file-link",
-			path: join(root, "file-link"),
-			kind: "symlink",
-		});
-		expect(getOrThrow(await env.fileInfo("dir-link"))).toMatchObject({
-			name: "dir-link",
-			path: join(root, "dir-link"),
-			kind: "symlink",
-		});
-		expect(getOrThrow(await env.canonicalPath("file-link"))).toBe(await realpath(join(root, "dir/file.txt")));
-	});
+			expect(getOrThrow(await env.fileInfo("dir"))).toMatchObject({
+				name: "dir",
+				path: join(root, "dir"),
+				kind: "directory",
+			});
+			expect(getOrThrow(await env.fileInfo("dir/file.txt"))).toMatchObject({
+				name: "file.txt",
+				path: join(root, "dir/file.txt"),
+				kind: "file",
+				size: 5,
+			});
+			expect(getOrThrow(await env.fileInfo("file-link"))).toMatchObject({
+				name: "file-link",
+				path: join(root, "file-link"),
+				kind: "symlink",
+			});
+			expect(getOrThrow(await env.fileInfo("dir-link"))).toMatchObject({
+				name: "dir-link",
+				path: join(root, "dir-link"),
+				kind: "symlink",
+			});
+			expect(getOrThrow(await env.canonicalPath("file-link"))).toBe(await realpath(join(root, "dir/file.txt")));
+		},
+	);
 
-	it("lists symlinks as symlinks", async () => {
+	it.skipIf(!canSymlink)("lists symlinks as symlinks", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		getOrThrow(await env.writeFile("target.txt", "hello"));
@@ -278,7 +282,7 @@ describe("NodeExecutionEnv", () => {
 		await expect(env.cleanup()).resolves.toBeUndefined();
 	});
 
-	it("executes commands in cwd with env overrides", async () => {
+	it.skipIf(!canSymlink)("executes commands in cwd with env overrides", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		const result = getOrThrow(

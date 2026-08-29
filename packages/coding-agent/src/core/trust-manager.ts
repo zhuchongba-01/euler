@@ -198,6 +198,11 @@ export function hasTrustRequiringProjectResources(cwd: string): boolean {
 			return true;
 		}
 
+		if (currentDir === homeDir) {
+			// cwd lives inside $HOME; nothing above $HOME is an ancestor project.
+			return false;
+		}
+
 		const parentDir = dirname(currentDir);
 		if (parentDir === currentDir) {
 			return false;

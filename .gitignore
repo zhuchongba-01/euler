@@ -40,6 +40,6 @@ out.html
 packages/coding-agent/binaries/
 todo.md
 plans/
-.pi/hf-sessions/
-.pi/hf-sessions-backup/
+.euler/hf-sessions/
+.euler/hf-sessions-backup/
 collect.sh

@@ -69,6 +69,11 @@ describe("InteractiveMode.handleCtrlZ", () => {
 			requestRender: vi.fn(),
 		};
 		const context: HandleCtrlZThis = { ui };
+		const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+		Object.defineProperty(process, "platform", {
+			configurable: true,
+			value: "linux",
+		});
 		const keepAliveHandle = setTimeout(() => undefined, 0);
 		clearTimeout(keepAliveHandle);
 
@@ -110,6 +115,10 @@ describe("InteractiveMode.handleCtrlZ", () => {
 		expect(removeListenerSpy).toHaveBeenCalledWith("SIGINT", sigintHandler);
 		expect(ui.start).toHaveBeenCalledTimes(1);
 		expect(ui.requestRender).toHaveBeenCalledWith(true);
+
+		if (platformDescriptor) {
+			Object.defineProperty(process, "platform", platformDescriptor);
+		}
 	});
 
 	test("cleans up the temporary handlers if suspension fails", () => {
@@ -119,6 +128,11 @@ describe("InteractiveMode.handleCtrlZ", () => {
 			requestRender: vi.fn(),
 		};
 		const context: HandleCtrlZThis = { ui };
+		const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+		Object.defineProperty(process, "platform", {
+			configurable: true,
+			value: "linux",
+		});
 		const keepAliveHandle = setTimeout(() => undefined, 0);
 		clearTimeout(keepAliveHandle);
 		const suspendError = new Error("suspend failed");
@@ -143,6 +157,10 @@ describe("InteractiveMode.handleCtrlZ", () => {
 		expect(setIntervalSpy).toHaveBeenCalledTimes(1);
 		expect(clearIntervalSpy).toHaveBeenCalledWith(keepAliveHandle);
 		expect(removeListenerSpy).toHaveBeenCalledWith("SIGINT", expect.any(Function));
+
+		if (platformDescriptor) {
+			Object.defineProperty(process, "platform", platformDescriptor);
+		}
 		expect(ui.start).not.toHaveBeenCalled();
 		expect(ui.requestRender).not.toHaveBeenCalled();
 	});

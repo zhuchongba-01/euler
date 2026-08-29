@@ -76,7 +76,8 @@ afterEach(async () => {
 	tempDirectories.clear();
 });
 
-describe("PiServer Unix integration", () => {
+const describeUnix = process.platform === "win32" ? describe.skip : describe;
+describeUnix("PiServer Unix integration", () => {
 	test("serializes server snapshot revisions", async () => {
 		const service = new OrderedSnapshotService();
 		const { server } = await startServer(service);

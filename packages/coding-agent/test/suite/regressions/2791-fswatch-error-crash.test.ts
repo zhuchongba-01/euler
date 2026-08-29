@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { hasBinary } from "../../utilities.ts";
 
 /**
  * Regression test for https://github.com/earendil-works/pi-mono/issues/2791
@@ -38,7 +39,7 @@ describe("issue #2791 fs.watch error event crashes process", () => {
 		rmSync(tempRoot, { recursive: true, force: true });
 	});
 
-	it("process should survive an error event on the theme FSWatcher", () => {
+	it.skipIf(!hasBinary("fswatch"))("process should survive an error event on the theme FSWatcher", () => {
 		const themeModulePath = join(__dirname, "../../../src/modes/interactive/theme/theme.ts").replace(/\\/g, "/");
 		const agentDir = join(tempRoot, "agent").replace(/\\/g, "/");
 

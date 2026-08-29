@@ -7,6 +7,7 @@ import {
 	loadPromptTemplates,
 	loadSourcedPromptTemplates,
 } from "../../src/harness/prompt-templates.ts";
+import { canSymlink } from "./capabilities.ts";
 import { createTempDir } from "./session-test-utils.ts";
 
 describe("loadPromptTemplates", () => {
@@ -65,7 +66,7 @@ describe("loadPromptTemplates", () => {
 		});
 	});
 
-	it("loads explicit markdown files and symlinked files", async () => {
+	it.skipIf(!canSymlink)("loads explicit markdown files and symlinked files", async () => {
 		const root = createTempDir();
 		const env = new NodeExecutionEnv({ cwd: root });
 		await env.writeFile("target.md", "---\ndescription: Target\n---\nTarget body");
