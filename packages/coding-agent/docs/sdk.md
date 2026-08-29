@@ -1,8 +1,8 @@
-> pi can help you use the SDK. Ask it to build an integration for your use case.
+> euler can help you use the SDK. Ask it to build an integration for your use case.
 
 # SDK
 
-The SDK provides programmatic access to pi's agent capabilities. Use it to embed pi in other applications, build custom interfaces, or integrate with automated workflows.
+The SDK provides programmatic access to euler's agent capabilities. Use it to embed euler in other applications, build custom interfaces, or integrate with automated workflows.
 
 **Example use cases:**
 - Build a custom UI (web, desktop, mobile)
@@ -215,7 +215,7 @@ await session.prompt("After you're done, also check X", { streamingBehavior: "fo
 ```
 
 **Behavior:**
-- **Extension commands** (e.g., `/mycommand`): Execute immediately, even during streaming. They manage their own LLM interaction via `pi.sendMessage()`.
+- **Extension commands** (e.g., `/mycommand`): Execute immediately, even during streaming. They manage their own LLM interaction via `euler.sendMessage()`.
 - **File-based prompt templates** (from `.md` files): Expanded to their content before sending or queueing.
 - **During streaming without `streamingBehavior`**: Throws an error. Use `steer()` or `followUp()` directly, or specify the option.
 - **`preflightResult(true)`**: Means the prompt was accepted, queued, or handled immediately.
@@ -337,23 +337,23 @@ const { session } = await createAgentSession({
   cwd: process.cwd(), // default
   
   // Global config directory
-  agentDir: "~/.pi/agent", // default (expands ~)
+  agentDir: "~/.euler/agent", // default (expands ~)
 });
 ```
 
 `cwd` is used by `DefaultResourceLoader` for:
-- Project extensions (`.pi/extensions/`)
+- Project extensions (`.euler/extensions/`)
 - Project skills:
-  - `.pi/skills/`
+  - `.euler/skills/`
   - `.agents/skills/` in `cwd` and ancestor directories (up to git repo root, or filesystem root when not in a repo)
-- Project prompts (`.pi/prompts/`)
+- Project prompts (`.euler/prompts/`)
 - Context files (`AGENTS.md` walking up from cwd)
 - Session directory naming
 
 `agentDir` is used by `DefaultResourceLoader` for:
 - Global extensions (`extensions/`)
 - Global skills:
-  - `skills/` under `agentDir` (for example `~/.pi/agent/skills/`)
+  - `skills/` under `agentDir` (for example `~/.euler/agent/skills/`)
   - `~/.agents/skills/`
 - Global prompts (`prompts/`)
 - Global context file (`AGENTS.md`)
@@ -372,7 +372,7 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 const modelRuntime = await ModelRuntime.create();
 
-// create() restores cached catalogs but does not refresh them from pi.dev by default.
+// create() restores cached catalogs but does not refresh them from the remote provider catalog by default.
 // Opt in to a create-time network refresh and bound how long it may take:
 const refreshedRuntime = await ModelRuntime.create({
   allowModelNetwork: true,
@@ -409,7 +409,7 @@ If no model is provided:
 2. Uses default from settings
 3. Falls back to first available model
 
-Remote catalogs are persisted locally so later runtimes can restore them without a network request. The default file is `~/.pi/agent/models-store.json`; set `modelsStorePath` to choose another location, or inject `modelsStore` to control persistence. Network refreshes are throttled to once per provider every four hours unless forced. To force an immediate refresh, call `await modelRuntime.refresh({ allowNetwork: true, force: true, signal })`. Setting `PI_OFFLINE` disables model network access.
+Remote catalogs are persisted locally so later runtimes can restore them without a network request. The default file is `~/.euler/agent/models-store.json`; set `modelsStorePath` to choose another location, or inject `modelsStore` to control persistence. Network refreshes are throttled to once per provider every four hours unless forced. To force an immediate refresh, call `await modelRuntime.refresh({ allowNetwork: true, force: true, signal })`. Setting `EULER_OFFLINE` disables model network access.
 
 To match CLI model parsing, use the exported resolver helpers:
 
@@ -451,7 +451,7 @@ Authentication resolution priority (handled by `ModelRuntime`):
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { createAgentSession, ModelRuntime } from "@earendil-works/pi-coding-agent";
 
-// Default: uses ~/.pi/agent/auth.json and ~/.pi/agent/models.json
+// Default: uses ~/.euler/agent/auth.json and ~/.euler/agent/models.json
 const modelRuntime = await ModelRuntime.create();
 
 // Provider-owned auth methods and current status
@@ -525,7 +525,7 @@ Specify which built-in tools to enable:
 - `noTools: "builtin"` disables default built-ins while keeping extension and custom tools enabled
 - `excludeTools` disables specific built-in, extension, or custom tool names after any `tools` allowlist is applied
 
-The `edit` tool returns `details.diff` for Pi's TUI display and `details.patch` as a standard unified patch for SDK consumers.
+The `edit` tool returns `details.diff` for Euler's TUI display and `details.patch` as a standard unified patch for SDK consumers.
 
 ```typescript
 import { createAgentSession } from "@earendil-works/pi-coding-agent";
@@ -602,9 +602,9 @@ const { session } = await createAgentSession({
 });
 ```
 
-Use `defineTool()` for standalone definitions and arrays like `customTools: [myTool]`. Inline `pi.registerTool({ ... })` already infers parameter types correctly.
+Use `defineTool()` for standalone definitions and arrays like `customTools: [myTool]`. Inline `euler.registerTool({ ... })` already infers parameter types correctly.
 
-Custom tools passed via `customTools` are combined with extension-registered tools. Extensions loaded by the ResourceLoader can also register tools via `pi.registerTool()`.
+Custom tools passed via `customTools` are combined with extension-registered tools. Extensions loaded by the ResourceLoader can also register tools via `euler.registerTool()`.
 
 If you pass `tools`, include each custom or extension tool name you want enabled, for example `tools: ["read", "bash", "my_tool"]`.
 
@@ -612,7 +612,7 @@ If you pass `tools`, include each custom or extension tool name you want enabled
 
 ### Extensions
 
-Extensions are loaded by the `ResourceLoader`. `DefaultResourceLoader` discovers extensions from `~/.pi/agent/extensions/`, `.pi/extensions/`, and settings.json extension sources.
+Extensions are loaded by the `ResourceLoader`. `DefaultResourceLoader` discovers extensions from `~/.euler/agent/extensions/`, `.euler/extensions/`, and settings.json extension sources.
 
 ```typescript
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
@@ -620,8 +620,8 @@ import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-co
 const loader = new DefaultResourceLoader({
   additionalExtensionPaths: ["/path/to/my-extension.ts"],
   extensionFactories: [
-    (pi) => {
-      pi.on("agent_start", () => {
+    (euler) => {
+      euler.on("agent_start", () => {
         console.log("[Inline Extension] Agent starting");
       });
     },
@@ -641,8 +641,8 @@ import type { InlineExtension } from "@earendil-works/pi-coding-agent";
 
 const myProvider: InlineExtension = {
   name: "my-provider",
-  factory: (pi) => {
-    pi.on("agent_start", () => {
+  factory: (euler) => {
+    euler.on("agent_start", () => {
       console.log("[my-provider] Agent starting");
     });
   },
@@ -655,7 +655,7 @@ const loader = new DefaultResourceLoader({
 
 This displays as `<inline:my-provider>` instead of `<inline:1>`. Bare factory functions are still accepted for backward compatibility.
 
-**Event Bus:** Extensions can communicate via `pi.events`. Pass a shared `eventBus` to `DefaultResourceLoader` if you need to emit or listen from outside:
+**Event Bus:** Extensions can communicate via `euler.events`. Pass a shared `eventBus` to `DefaultResourceLoader` if you need to emit or listen from outside:
 
 ```typescript
 import { createEventBus, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
@@ -891,8 +891,8 @@ const { session } = await createAgentSession({
 **Project-specific settings:**
 
 Settings load from two locations and merge:
-1. Global: `~/.pi/agent/settings.json`
-2. Project: `<cwd>/.pi/settings.json`
+1. Global: `~/.euler/agent/settings.json`
+2. Project: `<cwd>/.euler/settings.json`
 
 Project overrides global. Nested objects merge keys. Setters modify global settings by default.
 
@@ -1147,7 +1147,7 @@ See [RPC documentation](rpc.md) for the JSON protocol.
 For subprocess-based integration without building with the SDK, use the CLI directly:
 
 ```bash
-pi --mode rpc --no-session
+euler --mode rpc --no-session
 ```
 
 See [RPC documentation](rpc.md) for the JSON protocol.
