@@ -127,6 +127,18 @@ function applyExtensionFlagValues(
 	return diagnostics;
 }
 
+function formatSystemPromptDiagnostic(input: {
+	type: "warning" | "error" | "collision";
+	message: string;
+	path?: string;
+}): AgentSessionRuntimeDiagnostic {
+	const location = input.path ? ` (${input.path})` : "";
+	return {
+		type: input.type === "error" ? "error" : "warning",
+		message: `${input.message}${location}`,
+	};
+}
+
 /**
  * Create cwd-bound runtime services.
  *
@@ -180,6 +192,7 @@ export async function createAgentSessionServices(
 	}
 	extensionsResult.runtime.pendingNativeProviderRegistrations = [];
 	await modelRuntime.refresh({ allowNetwork: false });
+	diagnostics.push(...resourceLoader.getSystemPromptDiagnostics().map(formatSystemPromptDiagnostic));
 	diagnostics.push(...applyExtensionFlagValues(resourceLoader, options.extensionFlagValues));
 
 	return {
