@@ -9,12 +9,25 @@ import {
 	getSelfUpdateUnavailableInstruction,
 	getUpdateInstruction,
 } from "../src/config.ts";
+import { spawnProcessSync } from "../src/utils/child-process.ts";
 
 const execPathDescriptor = Object.getOwnPropertyDescriptor(process, "execPath");
 const originalPath = process.env.PATH;
 const originalPiPackageDir = process.env.EULER_PACKAGE_DIR;
 const originalArgv1 = process.argv[1];
 let tempDir: string | undefined;
+
+function queryNpmGlobalRoot(argv: string[]): string {
+	const result = spawnProcessSync(argv[0], argv.slice(1), {
+		encoding: "utf-8",
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+	const stdout = result.stdout.trim();
+	if (result.status !== 0 || !stdout) {
+		throw new Error(`Failed to run ${argv.join(" ")}: exit ${result.status}`);
+	}
+	return stdout;
+}
 
 function setExecPath(value: string): void {
 	Object.defineProperty(process, "execPath", {
@@ -124,7 +137,8 @@ function createBunGlobalInstall(): { packageDir: string } {
 
 function createFakePnpmScript(root: string): string {
 	if (process.platform === "win32") {
-		return `@echo off\r\nif "%1"=="root" if "%2"=="-g" echo ${root}\r\n`;
+		// cross-spawn quotes .cmd arguments, so compare with %~1 (unquoted).
+		return `@echo off\r\nif "%~1"=="root" if "%~2"=="-g" echo ${root}\r\n`;
 	}
 	const escapedRoot = root.replaceAll("'", "'\\''");
 	return `#!/bin/sh\nif [ "$1" = "root" ] && [ "$2" = "-g" ]; then\n\tprintf '%s\\n' '${escapedRoot}'\n\texit 0\nfi\nexit 1\n`;
@@ -132,7 +146,7 @@ function createFakePnpmScript(root: string): string {
 
 function createFakeYarnScript(globalDir: string): string {
 	if (process.platform === "win32") {
-		return `@echo off\r\nif "%1"=="global" if "%2"=="dir" echo ${globalDir}\r\n`;
+		return `@echo off\r\nif "%~1"=="global" if "%~2"=="dir" echo ${globalDir}\r\n`;
 	}
 	const escapedGlobalDir = globalDir.replaceAll("'", "'\\''");
 	return `#!/bin/sh\nif [ "$1" = "global" ] && [ "$2" = "dir" ]; then\n\tprintf '%s\\n' '${escapedGlobalDir}'\n\texit 0\nfi\nexit 1\n`;
@@ -140,7 +154,7 @@ function createFakeYarnScript(globalDir: string): string {
 
 function createFakeBunScript(bunBin: string): string {
 	if (process.platform === "win32") {
-		return `@echo off\r\nif "%1"=="pm" if "%2"=="bin" if "%3"=="-g" echo ${bunBin}\r\n`;
+		return `@echo off\r\nif "%~1"=="pm" if "%~2"=="bin" if "%~3"=="-g" echo ${bunBin}\r\n`;
 	}
 	const escapedBunBin = bunBin.replaceAll("'", "'\\''");
 	return `#!/bin/sh\nif [ "$1" = "pm" ] && [ "$2" = "bin" ] && [ "$3" = "-g" ]; then\n\tprintf '%s\\n' '${escapedBunBin}'\n\texit 0\nfi\nexit 1\n`;
@@ -251,6 +265,15 @@ describe("detectInstallMethod", () => {
 
 	test("self-update respects configured npmCommand", () => {
 		const { prefix } = createNpmPrefixInstall();
+		// `npm root -g` with a configured prefix reports <prefix>\node_modules on
+		// Windows and <prefix>\lib\node_modules elsewhere; place the fake install
+		// where the real package manager reports it.
+		const reportedRoot = queryNpmGlobalRoot(["npm", "--prefix", prefix, "root", "-g"]);
+		const scopeDir = join(reportedRoot, "@earendil-works");
+		const packageDir = join(scopeDir, "pi-coding-agent");
+		mkdirSync(packageDir, { recursive: true });
+		process.env.EULER_PACKAGE_DIR = packageDir;
+		setExecPath(join(packageDir, "dist", "cli.js"));
 
 		const command = getSelfUpdateCommand("@earendil-works/pi-coding-agent", ["npm", "--prefix", prefix]);
 
@@ -439,7 +462,9 @@ describe("detectInstallMethod", () => {
 		});
 	});
 
-	test("does not self-update when npm install path is not writable", () => {
+	// POSIX read-only directories cannot be simulated on Windows: chmod is a
+	// no-op for directory write access there, so the precondition is unreachable.
+	test.skipIf(process.platform === "win32")("does not self-update when npm install path is not writable", () => {
 		const { packageDir } = createNpmPrefixInstall();
 		chmodSync(packageDir, 0o500);
 

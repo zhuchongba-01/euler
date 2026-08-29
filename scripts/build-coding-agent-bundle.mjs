@@ -23,6 +23,8 @@ const allowedExternalPackages = new Set([
 	"utf-8-validate",
 	// Optional debug output coloring.
 	"supports-color",
+	// Optional native image backend behind linkedom's canvas shim fallback.
+	"canvas",
 ]);
 
 const lazyJitiPlugin = {
@@ -79,7 +81,11 @@ function commonBuildOptions() {
 		banner,
 		bundle: true,
 		define: { EULER_BUNDLED_NODE: "true" },
-		external: ["@silvia-odwyer/photon-node"],
+		// canvas is an optional native dependency reached through linkedom's
+		// try/catch fallback; keeping it external avoids baking a
+		// platform-specific binary into the cross-platform bundle. linkedom
+		// falls back to its canvas shim at runtime when canvas is absent.
+		external: ["@silvia-odwyer/photon-node", "canvas"],
 		format: "esm",
 		legalComments: "none",
 		logLevel: "warning",
