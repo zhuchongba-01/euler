@@ -1,9 +1,7 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
-import { DefaultResourceLoader } from "../src/core/resource-loader.ts";
-import { SettingsManager } from "../src/core/settings-manager.ts";
 import {
 	getEulerDefaultSystemPromptTemplate,
 	renderEulerSystemPromptTemplate,
@@ -97,49 +95,37 @@ describe("SystemPromptManager", () => {
 		expect(readFileSync(secondSave.backupPath ?? "", "utf8")).toBe("First valid prompt.");
 	});
 
-	test("loads damaged SYSTEM.md as default fallback with a warning", async () => {
-		const cwd = makeTempDir();
-		const configDir = join(cwd, ".euler");
-		mkdirSync(configDir);
-		writeFileSync(join(configDir, "SYSTEM.md"), "Broken \uFFFD text");
+	test("loads damaged SYSTEM.md as default fallback with a warning", () => {
+		const dir = makeTempDir();
+		const promptPath = join(dir, "SYSTEM.md");
+		writeFileSync(promptPath, "Broken \uFFFD text");
 
-		const loader = new DefaultResourceLoader({
-			agentDir: makeTempDir(),
-			cwd,
-			settingsManager: SettingsManager.inMemory({}, { projectTrusted: true }),
-		});
-		await loader.reload();
+		const result = new SystemPromptManager().loadPromptFile(promptPath, "override");
 
-		expect(loader.getSystemPrompt()).toBeUndefined();
-		expect(loader.getSystemPromptDiagnostics()).toEqual(
+		expect(result.content).toBeUndefined();
+		expect(result.diagnostics).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
 					type: "warning",
-					path: join(configDir, "SYSTEM.md"),
+					path: promptPath,
 				}),
 			]),
 		);
 	});
 
-	test("reports a risk diagnostic when SYSTEM.md fully overrides the default", async () => {
-		const cwd = makeTempDir();
-		const configDir = join(cwd, ".euler");
-		mkdirSync(configDir);
-		writeFileSync(join(configDir, "SYSTEM.md"), "Custom full override.");
+	test("reports a risk diagnostic when SYSTEM.md fully overrides the default", () => {
+		const dir = makeTempDir();
+		const promptPath = join(dir, "SYSTEM.md");
+		writeFileSync(promptPath, "Custom full override.");
 
-		const loader = new DefaultResourceLoader({
-			agentDir: makeTempDir(),
-			cwd,
-			settingsManager: SettingsManager.inMemory({}, { projectTrusted: true }),
-		});
-		await loader.reload();
+		const result = new SystemPromptManager().loadPromptFile(promptPath, "override");
 
-		expect(loader.getSystemPrompt()).toBe("Custom full override.");
-		expect(loader.getSystemPromptDiagnostics()).toEqual(
+		expect(result.content).toBe("Custom full override.");
+		expect(result.diagnostics).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
 					type: "warning",
-					path: join(configDir, "SYSTEM.md"),
+					path: promptPath,
 				}),
 			]),
 		);
