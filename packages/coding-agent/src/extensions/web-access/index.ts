@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { platform } from "node:os";
 import { join } from "node:path";
-import { type ImageContent, StringEnum, type TextContent } from "@earendil-works/pi-ai/compat";
+import { type ImageContent, StringEnum, type TextContent } from "@earendil-works/pi-ai";
 import { Box, type KeyId, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import type { AgentToolResult, ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";

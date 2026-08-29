@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../src/extensions/llama/index.ts", () => ({ default: vi.fn() }));
+
 import { builtInExtensions } from "../src/extensions/index.ts";
 import {
 	EULER_WEB_ACCESS_COMMAND_NAMES,

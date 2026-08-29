@@ -1,4 +1,4 @@
-import { type Api, complete, type Model, type ProviderHeaders } from "@earendil-works/pi-ai/compat";
+import type { Api, Model, ProviderHeaders } from "@earendil-works/pi-ai";
 import {
 	findModelWithProviderRouting,
 	loadEnabledModelPatterns,
@@ -27,15 +27,12 @@ export async function rewriteSearchQuery(
 	ctx: SummaryGenerationContext,
 	signal: AbortSignal,
 ): Promise<string> {
-	const { model, apiKey, headers } = await resolveFirstAvailableModel(ctx, [
+	const { model } = await resolveFirstAvailableModel(ctx, [
 		{ provider: "anthropic", id: "claude-haiku-4-5" },
 		{ provider: "google", id: "gemini-3.6-flash" },
 		{ provider: "openai", id: "gpt-5-mini" },
 	]);
-	const registry = ctx.modelRegistry as typeof ctx.modelRegistry & { complete?: typeof complete };
-	const usesRegistryComplete = typeof registry.complete === "function";
-	const completeFn = usesRegistryComplete ? registry.complete!.bind(registry) : complete;
-	const response = await completeFn(
+	const response = await ctx.modelRegistry.complete(
 		model,
 		{
 			messages: [
@@ -51,7 +48,7 @@ export async function rewriteSearchQuery(
 				},
 			],
 		},
-		usesRegistryComplete ? { signal } : { apiKey, headers, signal },
+		{ signal },
 	);
 	if (response.stopReason === "aborted") throw new Error("Aborted");
 	const contentParts = Array.isArray(response.content) ? response.content : [];

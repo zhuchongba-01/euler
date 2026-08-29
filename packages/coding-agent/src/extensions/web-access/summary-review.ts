@@ -1,5 +1,11 @@
-import { clampThinkingLevel, type ModelThinkingLevel, type ThinkingLevel } from "@earendil-works/pi-ai";
-import { type Api, complete, completeSimple, type Message, type Model } from "@earendil-works/pi-ai/compat";
+import {
+	type Api,
+	clampThinkingLevel,
+	type Message,
+	type Model,
+	type ModelThinkingLevel,
+	type ThinkingLevel,
+} from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "../../core/extensions/types.ts";
 import type { QueryResultData } from "./storage.ts";
 import {
@@ -11,8 +17,7 @@ import {
 } from "./summary-model-scope.ts";
 
 type ProviderHeaders = Record<string, string | null>;
-type CompleteFunction = typeof complete;
-type SummaryModelRegistry = SummaryGenerationContext["modelRegistry"] & { complete?: CompleteFunction };
+type CompleteFunction = SummaryGenerationContext["modelRegistry"]["complete"];
 
 const PREFERRED_SUMMARY_MODELS = [
 	{ provider: "anthropic", id: "claude-haiku-4-5" },
@@ -310,10 +315,10 @@ export async function generateSummaryDraft(
 		throw new Error("Summary generation context unavailable");
 	}
 
-	const registry = ctx.modelRegistry as SummaryModelRegistry;
+	const registry = ctx.modelRegistry;
 	const customCompleteFn = completeFn !== undefined;
-	const usesRegistryComplete = !customCompleteFn && typeof registry.complete === "function";
-	completeFn ??= usesRegistryComplete ? (registry.complete!.bind(registry) as CompleteFunction) : complete;
+	const usesRegistryComplete = !customCompleteFn;
+	completeFn ??= registry.complete.bind(registry) as CompleteFunction;
 
 	const generationStartedAt = Date.now();
 	const deadlineController = new AbortController();
@@ -394,19 +399,7 @@ export async function generateSummaryDraft(
 					...(requestedThinkingLevel ? { reasoning: requestedThinkingLevel } : {}),
 					...(enabledThinkingLevel ? { reasoningEffort: enabledThinkingLevel } : {}),
 				};
-				const completion =
-					thinkingLevel !== undefined && !customCompleteFn && !usesRegistryComplete
-						? completeSimple(
-								model,
-								{ messages: [userMessage] },
-								{
-									apiKey,
-									headers,
-									signal: completionSignal,
-									...(enabledThinkingLevel ? { reasoning: enabledThinkingLevel } : {}),
-								},
-							)
-						: completeFn(model, { messages: [userMessage] }, completionOptions);
+				const completion = completeFn(model, { messages: [userMessage] }, completionOptions);
 
 				const response = await raceSummaryOperation(Promise.resolve(completion));
 				if (response.stopReason === "aborted") {
