@@ -1,23 +1,12 @@
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-	type Api,
-	type AssistantMessage,
-	createAssistantMessageEventStream,
-	type Model,
-	type ProviderHeaders,
-	type SimpleStreamOptions,
-} from "@earendil-works/pi-ai";
+import type { Api, Model, ProviderHeaders } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AuthStorage } from "../src/core/auth-storage.ts";
-import { createAgentSession } from "../src/core/sdk.ts";
-import { SessionManager } from "../src/core/session-manager.ts";
+import { mergeProviderAttributionHeaders } from "../src/core/provider-attribution.ts";
 import { SettingsManager } from "../src/core/settings-manager.ts";
 
-import { createInMemoryModelRegistry, getModelRuntime } from "./model-runtime-test-utils.ts";
-
-describe("createAgentSession provider attribution headers", () => {
+describe("provider attribution headers", () => {
 	let tempDir: string;
 	let cwd: string;
 	let agentDir: string;
@@ -51,108 +40,47 @@ describe("createAgentSession provider attribution headers", () => {
 		};
 	}
 
-	function createDoneStream() {
-		const stream = createAssistantMessageEventStream();
-		const message: AssistantMessage = {
-			role: "assistant",
-			content: [{ type: "text", text: "ok" }],
-			api: "openai-completions",
-			provider: "capture-provider",
-			model: "capture-model",
-			usage: {
-				input: 0,
-				output: 0,
-				cacheRead: 0,
-				cacheWrite: 0,
-				totalTokens: 0,
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-			},
-			stopReason: "stop",
-			timestamp: Date.now(),
-		};
-		stream.end(message);
-		return stream;
-	}
-
-	async function captureHeaders(
+	function captureHeaders(
 		model: Model<Api>,
 		options: {
 			providerHeaders?: Record<string, string>;
 			requestHeaders?: Record<string, string>;
 			sessionId?: string;
 		} = {},
-	): Promise<ProviderHeaders | undefined> {
+	): ProviderHeaders | undefined {
 		const settingsManager = SettingsManager.create(cwd, agentDir);
 
-		const authStorage = AuthStorage.inMemory({
-			[model.provider]: { type: "api_key", key: "test-api-key" },
-		});
-		const modelRegistry = await createInMemoryModelRegistry(authStorage);
-		let capturedOptions: SimpleStreamOptions | undefined;
-
-		modelRegistry.registerProvider(model.provider, {
-			api: model.api,
-			headers: options.providerHeaders,
-			streamSimple: (_model, _context, providerOptions) => {
-				capturedOptions = providerOptions;
-				return createDoneStream();
-			},
-		});
-
-		const modelRuntime = getModelRuntime(modelRegistry);
-		const sessionManager = SessionManager.inMemory(cwd);
-		if (options.sessionId) {
-			sessionManager.newSession({ id: options.sessionId });
-		}
-
-		const { session } = await createAgentSession({
-			cwd,
-			agentDir,
+		return mergeProviderAttributionHeaders(
 			model,
-			modelRuntime,
 			settingsManager,
-			sessionManager,
-		});
-
-		try {
-			const stream = await session.agent.streamFunction(
-				model,
-				{ messages: [] },
-				{
-					sessionId: session.sessionId,
-					...(options.requestHeaders ? { headers: options.requestHeaders } : {}),
-				},
-			);
-			await stream.result();
-			return capturedOptions?.headers;
-		} finally {
-			session.dispose();
-			modelRegistry.unregisterProvider(model.provider);
-		}
+			options.sessionId,
+			options.providerHeaders,
+			options.requestHeaders,
+		);
 	}
 
-	it("does not add product attribution headers for OpenRouter models", async () => {
-		const headers = await captureHeaders(createModel("openrouter", "https://openrouter.ai/api/v1"));
+	it("does not add product attribution headers for OpenRouter models", () => {
+		const headers = captureHeaders(createModel("openrouter", "https://openrouter.ai/api/v1"));
 
 		expect(headers?.["HTTP-Referer"]).toBeUndefined();
 		expect(headers?.["X-OpenRouter-Title"]).toBeUndefined();
 		expect(headers?.["X-OpenRouter-Categories"]).toBeUndefined();
 	});
 
-	it("does not add product attribution headers for custom providers routed through OpenRouter", async () => {
-		const headers = await captureHeaders(createModel("custom-openrouter", "https://openrouter.ai/api/v1"));
+	it("does not add product attribution headers for custom providers routed through OpenRouter", () => {
+		const headers = captureHeaders(createModel("custom-openrouter", "https://openrouter.ai/api/v1"));
 
 		expect(headers ?? {}).toEqual({});
 	});
 
-	it("does not infer product attribution from a legacy OpenRouter URL substring", async () => {
-		const headers = await captureHeaders(createModel("custom-openrouter", "not-a-url-openrouter.ai"));
+	it("does not infer product attribution from a legacy OpenRouter URL substring", () => {
+		const headers = captureHeaders(createModel("custom-openrouter", "not-a-url-openrouter.ai"));
 
 		expect(headers ?? {}).toEqual({});
 	});
 
-	it("lets provider and request headers override the defaults", async () => {
-		const headers = await captureHeaders(createModel("openrouter", "https://openrouter.ai/api/v1"), {
+	it("preserves provider and request headers", () => {
+		const headers = captureHeaders(createModel("openrouter", "https://openrouter.ai/api/v1"), {
 			providerHeaders: {
 				"HTTP-Referer": "https://provider.example",
 				"X-OpenRouter-Categories": "provider-category",
@@ -167,20 +95,20 @@ describe("createAgentSession provider attribution headers", () => {
 		expect(headers?.["X-OpenRouter-Categories"]).toBe("provider-category");
 	});
 
-	it("does not add product attribution headers for direct NVIDIA NIM endpoints", async () => {
-		const headers = await captureHeaders(createModel("custom-nim", "https://integrate.api.nvidia.com/v1"));
+	it("does not add product attribution headers for direct NVIDIA NIM endpoints", () => {
+		const headers = captureHeaders(createModel("custom-nim", "https://integrate.api.nvidia.com/v1"));
 
 		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBeUndefined();
 	});
 
-	it("does not add product attribution headers for the NVIDIA provider", async () => {
-		const headers = await captureHeaders(createModel("nvidia", "https://example.test/v1"));
+	it("does not add product attribution headers for the NVIDIA provider", () => {
+		const headers = captureHeaders(createModel("nvidia", "https://example.test/v1"));
 
 		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBeUndefined();
 	});
 
-	it("lets provider and request headers override NVIDIA NIM defaults", async () => {
-		const headers = await captureHeaders(createModel("nvidia", "https://integrate.api.nvidia.com/v1"), {
+	it("preserves NVIDIA NIM provider and request headers", () => {
+		const headers = captureHeaders(createModel("nvidia", "https://integrate.api.nvidia.com/v1"), {
 			providerHeaders: {
 				"X-BILLING-INVOKE-ORIGIN": "Provider",
 			},
@@ -192,8 +120,8 @@ describe("createAgentSession provider attribution headers", () => {
 		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBe("Request");
 	});
 
-	it("does not add NVIDIA NIM attribution headers for NVIDIA models routed through OpenRouter", async () => {
-		const headers = await captureHeaders(
+	it("does not add NVIDIA NIM attribution headers for NVIDIA models routed through OpenRouter", () => {
+		const headers = captureHeaders(
 			createModel("openrouter", "https://openrouter.ai/api/v1", "nvidia/nemotron-3-super-120b-a12b"),
 		);
 
@@ -201,16 +129,16 @@ describe("createAgentSession provider attribution headers", () => {
 		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBeUndefined();
 	});
 
-	it("does not add NVIDIA NIM attribution headers for NVIDIA models routed through Vercel AI Gateway", async () => {
-		const headers = await captureHeaders(
+	it("does not add NVIDIA NIM attribution headers for NVIDIA models routed through Vercel AI Gateway", () => {
+		const headers = captureHeaders(
 			createModel("vercel-ai-gateway", "https://ai-gateway.vercel.sh/v1", "nvidia/nemotron-3-super-120b-a12b"),
 		);
 
 		expect(headers?.["X-BILLING-INVOKE-ORIGIN"]).toBeUndefined();
 	});
 
-	it("adds OpenCode session headers", async () => {
-		const headers = await captureHeaders(createModel("opencode", "https://opencode.ai/zen/v1"), {
+	it("adds OpenCode session headers", () => {
+		const headers = captureHeaders(createModel("opencode", "https://opencode.ai/zen/v1"), {
 			sessionId: "opencode-session",
 		});
 
@@ -218,8 +146,8 @@ describe("createAgentSession provider attribution headers", () => {
 		expect(headers?.["x-opencode-client"]).toBe("pi");
 	});
 
-	it("lets configured OpenCode headers override the defaults", async () => {
-		const headers = await captureHeaders(createModel("opencode", "https://opencode.ai/zen/v1"), {
+	it("lets configured OpenCode headers override the defaults", () => {
+		const headers = captureHeaders(createModel("opencode", "https://opencode.ai/zen/v1"), {
 			sessionId: "opencode-session",
 			providerHeaders: {
 				"x-opencode-session": "configured-session",
