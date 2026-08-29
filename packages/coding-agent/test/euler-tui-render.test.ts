@@ -7,9 +7,9 @@ import type { ReadonlyFooterDataProvider } from "../src/core/footer-data-provide
 import { KeybindingsManager } from "../src/core/keybindings.ts";
 import { CustomEditor } from "../src/modes/interactive/components/custom-editor.ts";
 import { DynamicBorder, getLineDrawingCharacters } from "../src/modes/interactive/components/dynamic-border.ts";
+import { createEulerWelcomeHeaderText } from "../src/modes/interactive/components/euler-welcome-header.ts";
 import { FooterComponent } from "../src/modes/interactive/components/footer.ts";
 import { ToolExecutionComponent } from "../src/modes/interactive/components/tool-execution.ts";
-import { createEulerWelcomeHeaderText } from "../src/modes/interactive/interactive-mode.ts";
 import { getThemeByName, initTheme, theme } from "../src/modes/interactive/theme/theme.ts";
 import { stripAnsi } from "../src/utils/ansi.ts";
 
