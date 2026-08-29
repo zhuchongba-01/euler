@@ -7,7 +7,7 @@ This page gets you from install to a useful first euler session.
 Euler is distributed as an npm package:
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+npm install -g --ignore-scripts euler-agent
 ```
 
 `--ignore-scripts` disables dependency lifecycle scripts during install. Euler does not require install scripts for normal npm installs.
@@ -18,16 +18,16 @@ Use the package manager that installed euler. npm installs are removed with npm:
 
 ```bash
 # npm install -g
-npm uninstall -g @earendil-works/pi-coding-agent
+npm uninstall -g euler-agent
 
 # pnpm
-pnpm remove -g @earendil-works/pi-coding-agent
+pnpm remove -g euler-agent
 
 # Yarn
-yarn global remove @earendil-works/pi-coding-agent
+yarn global remove euler-agent
 
 # Bun
-bun uninstall -g @earendil-works/pi-coding-agent
+bun uninstall -g euler-agent
 ```
 
 Uninstalling Euler leaves settings, credentials, sessions, and installed Euler packages in `~/.euler/agent/`.

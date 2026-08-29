@@ -7,7 +7,7 @@
 
 | 通道 | 产物 | 来源 |
 |------|------|------|
-| npm 全局安装 | `@earendil-works/pi-coding-agent` tarball，提供 `euler` 命令 | `publish-npm` job（trusted publishing） |
+| npm 全局安装 | `euler-agent` tarball，提供 `euler` 命令 | `publish-npm` job（trusted publishing） |
 | GitHub Release | `euler-<platform>.tar.gz / .zip` 独立可执行文件、source archive、SHA256SUMS | `build` + `stage-github-release` job |
 | 版本检查 | `https://api.github.com/repos/euler-agent/euler/releases/latest`（可用 `EULER_SKIP_VERSION_CHECK` 关闭） | `packages/coding-agent/src/utils/version-check.ts` |
 
@@ -46,6 +46,5 @@ bash scripts/build-binaries.sh --platform windows-x64 --out out  # Windows 产�
 
 ## v0.1.0 发布前待办
 
-1. **npm 包名定稿**：当前沿用上游包名 `@earendil-works/pi-coding-agent`，CLI bin 已是 `euler`。候选名 `euler-agent`（npm 上未被占用，且 GitHub 仓库 `euler-agent/euler` 已用于版本检查）。定稿时需一次性同步：`packages/coding-agent/package.json` 的 `name`、`npm-shrinkwrap.json`、`install-lock/`、扩展虚拟模块别名、`check:pinned-deps` 及相关测试。
-2. **创建公开 GitHub 仓库** `euler-agent/euler`，使版本检查与 bun-binary 下载提示指向有效地址。
-3. 完成实施计划第 12 阶段（Windows x64 真机验收）后确认首个 tag。
+1. **创建公开 GitHub 仓库** `euler-agent/euler`，使版本检查与 bun-binary 下载提示指向有效地址。
+2. 完成实施计划第 12 阶段（Windows x64 真机验收）后确认首个 tag。

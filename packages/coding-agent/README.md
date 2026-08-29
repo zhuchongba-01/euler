@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://www.npmjs.com/package/@earendil-works/euler-coding-agent"><img alt="npm" src="https://img.shields.io/npm/v/@earendil-works/euler-coding-agent?style=flat-square" /></a>
+  <a href="https://www.npmjs.com/package/euler-agent"><img alt="npm" src="https://img.shields.io/npm/v/euler-agent?style=flat-square" /></a>
 </p>
 
 Euler is a terminal coding agent: a downstream distribution of the [Euler agent harness](https://github.com/earendil-works/euler) with its own branding, config root (`~/.euler/agent`), transparent system prompt, zero telemetry, and built-in free web access. See the [repository README](https://github.com/euler-agent/euler) for the distribution-level overview.
@@ -42,7 +42,7 @@ Euler runs in four modes: interactive, print or JSON, RPC for process integratio
 ## Quick Start
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/euler-coding-agent
+npm install -g --ignore-scripts euler-agent
 ```
 
 `--ignore-scripts` disables dependency lifecycle scripts during install. Euler does not require install scripts for normal npm installs.
@@ -435,7 +435,7 @@ See [docs/packages.md](docs/packages.md).
 ### SDK
 
 ```typescript
-import { createAgentSession, ModelRuntime, SessionManager } from "@earendil-works/euler-coding-agent";
+import { createAgentSession, ModelRuntime, SessionManager } from "euler-agent";
 
 const modelRuntime = await ModelRuntime.create();
 const { session } = await createAgentSession({
@@ -678,7 +678,6 @@ MIT
 
 ## See Also
 
-- [@earendil-works/euler-ai](https://www.npmjs.com/package/@earendil-works/euler-ai): Core LLM toolkit
-- [@earendil-works/euler-agent-core](https://www.npmjs.com/package/@earendil-works/euler-agent-core): Agent framework
-- [@earendil-works/euler-tui](https://www.npmjs.com/package/@earendil-works/euler-tui): Terminal UI components
-
+- [@earendil-works/pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai): Core LLM toolkit
+- [@earendil-works/pi-agent-core](https://www.npmjs.com/package/@earendil-works/pi-agent-core): Agent framework
+- [@earendil-works/pi-tui](https://www.npmjs.com/package/@earendil-works/pi-tui): Terminal UI components

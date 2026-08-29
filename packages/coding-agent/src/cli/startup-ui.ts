@@ -29,7 +29,7 @@ import {
 	type Theme,
 } from "../modes/interactive/theme/theme.ts";
 
-const OFFICIAL_PACKAGE_NAME = "@earendil-works/pi-coding-agent";
+const OFFICIAL_PACKAGE_NAME = "euler-agent";
 // Euler is the official distribution of this codebase; match the identity
 // declared in package.json piConfig so first-time setup still runs post-rebrand.
 const OFFICIAL_APP_NAME = "euler";

@@ -15,7 +15,9 @@
  */
 
 import { mkdtemp, writeFile } from "node:fs/promises";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
+import { execSync } from "child_process";
+import type { ExtensionAPI } from "euler-agent";
 import {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
@@ -23,9 +25,7 @@ import {
 	type TruncationResult,
 	truncateHead,
 	withFileMutationQueue,
-} from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
-import { execSync } from "child_process";
+} from "euler-agent";
 import { tmpdir } from "os";
 import { join } from "path";
 import { Type } from "typebox";

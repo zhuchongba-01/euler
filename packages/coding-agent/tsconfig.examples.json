@@ -3,6 +3,8 @@
 	"compilerOptions": {
 		"noEmit": true,
 		"paths": {
+			"euler-agent": ["./src/index.ts"],
+			"euler-agent/hooks": ["./src/core/hooks/index.ts"],
 			"@earendil-works/pi-coding-agent": ["./src/index.ts"],
 			"@earendil-works/pi-coding-agent/hooks": ["./src/core/hooks/index.ts"],
 			"@earendil-works/pi-tui": ["../tui/src/index.ts"],

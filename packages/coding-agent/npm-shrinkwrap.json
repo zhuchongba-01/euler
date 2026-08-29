@@ -1,11 +1,11 @@
 {
-	"name": "@earendil-works/pi-coding-agent",
+	"name": "euler-agent",
 	"version": "0.84.3",
 	"lockfileVersion": 3,
 	"requires": true,
 	"packages": {
 		"": {
-			"name": "@earendil-works/pi-coding-agent",
+			"name": "euler-agent",
 			"version": "0.84.3",
 			"license": "MIT",
 			"dependencies": {

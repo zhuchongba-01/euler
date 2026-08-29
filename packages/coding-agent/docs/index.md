@@ -7,7 +7,7 @@ Euler is a minimal terminal coding harness. It is designed to stay small at the 
 Install Euler with npm:
 
 ```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+npm install -g --ignore-scripts euler-agent
 ```
 
 `--ignore-scripts` disables dependency lifecycle scripts during install. Euler does not require install scripts for normal npm installs.
@@ -17,10 +17,10 @@ Standalone executables (no Node.js required) are published on the GitHub Release
 To uninstall Euler itself, use npm:
 
 ```bash
-npm uninstall -g @earendil-works/pi-coding-agent
+npm uninstall -g euler-agent
 ```
 
-For pnpm, Yarn, or Bun installs, use the matching global remove command: `pnpm remove -g @earendil-works/pi-coding-agent`, `yarn global remove @earendil-works/pi-coding-agent`, or `bun uninstall -g @earendil-works/pi-coding-agent`.
+For pnpm, Yarn, or Bun installs, use the matching global remove command: `pnpm remove -g euler-agent`, `yarn global remove euler-agent`, or `bun uninstall -g euler-agent`.
 
 Then run it in a project directory:
 

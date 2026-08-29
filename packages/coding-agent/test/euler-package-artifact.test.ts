@@ -43,7 +43,7 @@ describe("euler npm package", () => {
 		});
 		const pack = JSON.parse(output).at(-1);
 
-		expect(pack.name).toBe("@earendil-works/pi-coding-agent");
+		expect(pack.name).toBe("euler-agent");
 		const files = pack.files.map((entry: { path: string }) => entry.path);
 		expect(files).toContain("dist/bundle/cli.js");
 		expect(files).toContain("npm-shrinkwrap.json");

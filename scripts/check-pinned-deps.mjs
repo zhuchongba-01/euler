@@ -5,6 +5,7 @@ const dependencySections = ["dependencies", "devDependencies", "optionalDependen
 const exactVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const ignoredDirectories = new Set([".git", "dist", "node_modules"]);
 const packageJsonFiles = [];
+const internalPackageNames = new Set(["euler-agent"]);
 
 function collectPackageJsonFiles(directory) {
 	for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -22,7 +23,7 @@ function collectPackageJsonFiles(directory) {
 }
 
 function isInternalWorkspaceDependency(name) {
-	return name.startsWith("@earendil-works/pi-");
+	return name.startsWith("@earendil-works/pi-") || internalPackageNames.has(name);
 }
 
 function isNonRegistrySpecifier(specifier) {
