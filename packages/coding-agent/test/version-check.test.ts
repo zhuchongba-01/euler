@@ -17,6 +17,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllGlobals();
+	vi.unstubAllEnvs();
 	if (originalSkipVersionCheck === undefined) {
 		delete process.env.EULER_SKIP_VERSION_CHECK;
 	} else {
@@ -35,26 +36,39 @@ describe("version checks", () => {
 	});
 
 	it("returns only newer versions", async () => {
-		const fetchMock = vi.fn(async () => Response.json({ version: "1.2.3" }));
+		const fetchMock = vi.fn(async () => Response.json({ tag_name: "v1.2.3" }));
 		vi.stubGlobal("fetch", fetchMock);
 
 		await expect(checkForNewPiVersion("1.2.3")).resolves.toBeUndefined();
 		await expect(checkForNewPiVersion("1.2.2")).resolves.toEqual({ version: "1.2.3" });
 	});
 
-	it("uses the pi.dev version check api with a pi user agent", async () => {
-		const fetchMock = vi.fn(async () => Response.json({ version: "1.2.4" }));
+	it("uses public GitHub release metadata with static non-identifying headers", async () => {
+		const fetchMock = vi.fn(async () => Response.json({ tag_name: "v1.2.4" }));
 		vi.stubGlobal("fetch", fetchMock);
 
 		await expect(getLatestPiVersion("1.2.3")).resolves.toBe("1.2.4");
 		expect(fetchMock).toHaveBeenCalledWith(
-			"https://pi.dev/api/latest-version",
+			"https://api.github.com/repos/euler-agent/euler/releases/latest",
 			expect.objectContaining({
-				headers: expect.objectContaining({
-					"User-Agent": expect.stringMatching(/^pi\/1\.2\.3 /),
-					accept: "application/json",
-				}),
+				headers: {
+					accept: "application/vnd.github+json",
+					"X-GitHub-Api-Version": "2022-11-28",
+				},
+				signal: expect.any(AbortSignal),
 			}),
+		);
+	});
+
+	it("uses a configured public GitHub release URL", async () => {
+		vi.stubEnv("EULER_RELEASES_API_URL", "https://api.github.com/repos/example/euler/releases/latest");
+		const fetchMock = vi.fn(async () => Response.json({ tag_name: "v1.2.4" }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(getLatestPiVersion("1.2.3")).resolves.toBe("1.2.4");
+		expect(fetchMock).toHaveBeenCalledWith(
+			"https://api.github.com/repos/example/euler/releases/latest",
+			expect.any(Object),
 		);
 	});
 
@@ -63,7 +77,7 @@ describe("version checks", () => {
 			.fn()
 			.mockRejectedValueOnce(new Error("fetch failed"))
 			.mockRejectedValueOnce(new Error("fetch failed"))
-			.mockResolvedValueOnce(Response.json({ version: "1.2.4" }));
+			.mockResolvedValueOnce(Response.json({ tag_name: "v1.2.4" }));
 		vi.stubGlobal("fetch", fetchMock);
 
 		await expect(getLatestPiRelease("1.2.3", { retry: true })).resolves.toEqual({ version: "1.2.4" });
@@ -90,22 +104,14 @@ describe("version checks", () => {
 	});
 
 	it("returns the active package metadata from the version check api", async () => {
-		const fetchMock = vi.fn(async () =>
-			Response.json({
-				packageName: "@new-scope/pi",
-				version: "1.2.4",
-			}),
-		);
+		const fetchMock = vi.fn(async () => Response.json({ tag_name: "v1.2.4" }));
 		vi.stubGlobal("fetch", fetchMock);
 
-		await expect(getLatestPiRelease("1.2.3")).resolves.toEqual({
-			packageName: "@new-scope/pi",
-			version: "1.2.4",
-		});
+		await expect(getLatestPiRelease("1.2.3")).resolves.toEqual({ version: "1.2.4" });
 	});
 
 	it("returns update notes from the version check api", async () => {
-		const fetchMock = vi.fn(async () => Response.json({ note: " **Read this** ", version: "1.2.4" }));
+		const fetchMock = vi.fn(async () => Response.json({ body: " **Read this** ", tag_name: "v1.2.4" }));
 		vi.stubGlobal("fetch", fetchMock);
 
 		await expect(getLatestPiRelease("1.2.3")).resolves.toEqual({ note: "**Read this**", version: "1.2.4" });
@@ -122,10 +128,39 @@ describe("version checks", () => {
 
 	it("allows direct api calls when automatic version checks are disabled", async () => {
 		process.env.EULER_SKIP_VERSION_CHECK = "1";
-		const fetchMock = vi.fn(async () => Response.json({ version: "1.2.4" }));
+		const fetchMock = vi.fn(async () => Response.json({ tag_name: "v1.2.4" }));
 		vi.stubGlobal("fetch", fetchMock);
 
 		await expect(getLatestPiVersion("1.2.3")).resolves.toBe("1.2.4");
 		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
+	it("makes no release request while Euler is offline", async () => {
+		vi.stubEnv("EULER_OFFLINE", "1");
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(getLatestPiRelease("1.2.3")).resolves.toBeUndefined();
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		new Response("missing", { status: 404 }),
+		new Response("server error", { status: 500 }),
+		new Response("not json", { status: 200 }),
+	])("silently degrades for failed release responses", async (response) => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => response),
+		);
+		await expect(getLatestPiRelease("1.2.3")).resolves.toBeUndefined();
+	});
+
+	it("silently degrades for network failures", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => Promise.reject(new Error("network failed"))),
+		);
+		await expect(getLatestPiRelease("1.2.3")).resolves.toBeUndefined();
 	});
 });

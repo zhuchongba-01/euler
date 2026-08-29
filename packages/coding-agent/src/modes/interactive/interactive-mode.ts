@@ -97,7 +97,6 @@ import { type SessionEntry, SessionManager, sessionEntryToContextMessages } from
 import type { FullscreenExitOutput, TuiMode } from "../../core/settings-manager.ts";
 import { BUILTIN_SLASH_COMMANDS } from "../../core/slash-commands.ts";
 import type { SourceInfo } from "../../core/source-info.ts";
-import { isInstallTelemetryEnabled } from "../../core/telemetry.ts";
 import type { TruncationResult } from "../../core/tools/truncate.ts";
 import { hasTrustRequiringProjectResources, ProjectTrustStore } from "../../core/trust-manager.ts";
 import { getUsageCostBreakdown } from "../../core/usage-totals.ts";
@@ -108,7 +107,6 @@ import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipb
 import { parseGitUrl } from "../../utils/git.ts";
 import { openBrowser } from "../../utils/open-browser.ts";
 import { getCwdRelativePath } from "../../utils/paths.ts";
-import { getPiUserAgent } from "../../utils/pi-user-agent.ts";
 import { killTrackedDetachedChildren } from "../../utils/shell.ts";
 import { loadAllHighlightLanguages } from "../../utils/syntax-highlight.ts";
 import { ensureTool, type ToolStatus } from "../../utils/tools-manager.ts";
@@ -1272,39 +1270,18 @@ export class InteractiveMode {
 		const entries = parseChangelog(changelogPath);
 
 		if (!lastVersion) {
-			// Fresh install - record the version, send telemetry, don't show changelog
+			// Fresh install - record the version and don't show changelog.
 			this.settingsManager.setLastChangelogVersion(VERSION);
-			this.reportInstallTelemetry(VERSION);
 			return undefined;
 		}
 
 		const newEntries = getNewEntries(entries, lastVersion);
 		if (newEntries.length > 0) {
 			this.settingsManager.setLastChangelogVersion(VERSION);
-			this.reportInstallTelemetry(VERSION);
 			return newEntries.map((e) => normalizeChangelogLinks(e.content, e)).join("\n\n");
 		}
 
 		return undefined;
-	}
-
-	private reportInstallTelemetry(version: string): void {
-		if (getEulerEnv("offline")) {
-			return;
-		}
-
-		if (!isInstallTelemetryEnabled(this.settingsManager)) {
-			return;
-		}
-
-		void fetch(`https://pi.dev/api/report-install?version=${encodeURIComponent(version)}`, {
-			headers: {
-				"User-Agent": getPiUserAgent(version),
-			},
-			signal: AbortSignal.timeout(5000),
-		})
-			.then(() => undefined)
-			.catch(() => undefined);
 	}
 
 	private getMarkdownThemeWithSettings(): MarkdownTheme {
@@ -4564,7 +4541,6 @@ export class InteractiveMode {
 					hideThinkingBlock: this.hideThinkingBlock,
 					mermaidRenderingMode: this.settingsManager.getMermaidRenderingMode(),
 					collapseChangelog: this.settingsManager.getCollapseChangelog(),
-					enableInstallTelemetry: this.settingsManager.getEnableInstallTelemetry(),
 					doubleEscapeAction: this.settingsManager.getDoubleEscapeAction(),
 					treeFilterMode: this.settingsManager.getTreeFilterMode(),
 					showHardwareCursor: this.settingsManager.getShowHardwareCursor(),
@@ -4670,9 +4646,6 @@ export class InteractiveMode {
 					},
 					onCollapseChangelogChange: (collapsed) => {
 						this.settingsManager.setCollapseChangelog(collapsed);
-					},
-					onEnableInstallTelemetryChange: (enabled) => {
-						this.settingsManager.setEnableInstallTelemetry(enabled);
 					},
 					onQuietStartupChange: (enabled) => {
 						this.settingsManager.setQuietStartup(enabled);

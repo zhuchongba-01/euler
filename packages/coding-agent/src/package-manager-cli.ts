@@ -37,8 +37,7 @@ import { hasTrustRequiringProjectResources, ProjectTrustStore } from "./core/tru
 import { getEulerEnv } from "./euler-env.ts";
 import { spawnProcess, spawnProcessSync, waitForChildProcess } from "./utils/child-process.ts";
 import { canonicalizePath, getCwdRelativePath } from "./utils/paths.ts";
-import { getPiUserAgent } from "./utils/pi-user-agent.ts";
-import { formatVersionCheckError, getLatestPiRelease, isNewerPackageVersion } from "./utils/version-check.ts";
+import { getLatestPiRelease, isNewerPackageVersion } from "./utils/version-check.ts";
 import {
 	cleanupWindowsSelfUpdateQuarantine,
 	quarantineWindowsNativeDependencies,
@@ -48,7 +47,6 @@ export type PackageCommand = "install" | "remove" | "update" | "list";
 
 type UpdateTarget = { type: "all" } | { type: "self" } | { type: "extensions"; source?: string } | { type: "models" };
 
-const DEFAULT_INSTALLER_API_BASE = "https://pi.dev/api/installer/releases";
 const MANAGED_INSTALL_MARKER = "managed-install.json";
 const MANAGED_RELEASE_VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -80,7 +78,7 @@ function getActiveManagedInstallRoot(): string | undefined {
 }
 
 async function fetchInstallerArtifact(url: string, label: string): Promise<string> {
-	const response = await fetch(url, { headers: { "User-Agent": getPiUserAgent(VERSION) } });
+	const response = await fetch(url);
 	if (!response.ok) {
 		throw new Error(`Could not download managed installer ${label} from ${url}: HTTP ${response.status}`);
 	}
@@ -187,10 +185,11 @@ async function runManagedSelfUpdate(managedRoot: string, version: string): Promi
 	let stageDir: string | undefined;
 	try {
 		cleanupManagedStaging(managedRoot);
-		const installerApiBase = (getEulerEnv("installerApiBase")?.trim() || DEFAULT_INSTALLER_API_BASE).replace(
-			/\/+$/,
-			"",
-		);
+		const configuredInstallerApiBase = getEulerEnv("installerApiBase")?.trim();
+		if (!configuredInstallerApiBase) {
+			throw new Error("Managed Euler updates are unavailable until an installer API is configured.");
+		}
+		const installerApiBase = configuredInstallerApiBase.replace(/\/+$/, "");
 		const releaseUrl = `${installerApiBase}/${encodeURIComponent(version)}`;
 		const stagingRoot = join(managedRoot, "staging");
 		const releasesRoot = join(managedRoot, "releases");
@@ -661,28 +660,15 @@ interface SelfUpdatePlan {
 }
 
 async function getSelfUpdatePlan(force: boolean): Promise<SelfUpdatePlan> {
-	let latestRelease: Awaited<ReturnType<typeof getLatestPiRelease>>;
-	try {
-		latestRelease = await getLatestPiRelease(VERSION, { retry: true });
-	} catch (error: unknown) {
-		throw new Error(`Could not determine latest ${APP_NAME} version: ${formatVersionCheckError(error)}`, {
-			cause: error,
-		});
-	}
+	const latestRelease = await getLatestPiRelease(VERSION, { retry: true });
 	if (!latestRelease) {
 		throw new Error(`Could not determine latest ${APP_NAME} version.`);
 	}
 
-	const packageName = latestRelease.packageName ?? PACKAGE_NAME;
+	const packageName = PACKAGE_NAME;
 	const installSpec = `${packageName}@${latestRelease.version}`;
-	if (force || packageName !== PACKAGE_NAME || isNewerPackageVersion(latestRelease.version, VERSION)) {
-		return {
-			packageName,
-			installSpec,
-			version: latestRelease.version,
-			...(latestRelease.note ? { note: latestRelease.note } : {}),
-			shouldRun: true,
-		};
+	if (force || isNewerPackageVersion(latestRelease.version, VERSION)) {
+		throw new Error(`${APP_NAME} self-update is unavailable until Euler release artifacts are configured.`);
 	}
 
 	console.log(chalk.green(`${APP_NAME} is already up to date (v${VERSION})`));

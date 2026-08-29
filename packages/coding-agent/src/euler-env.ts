@@ -5,6 +5,7 @@ export const EULER_ENV = {
 	packageDir: "EULER_PACKAGE_DIR",
 	offline: "EULER_OFFLINE",
 	skipVersionCheck: "EULER_SKIP_VERSION_CHECK",
+	releasesApiUrl: "EULER_RELEASES_API_URL",
 	shareViewerUrl: "EULER_SHARE_VIEWER_URL",
 	managedInstallRoot: "EULER_MANAGED_INSTALL_ROOT",
 	installerApiBase: "EULER_INSTALLER_API_BASE",

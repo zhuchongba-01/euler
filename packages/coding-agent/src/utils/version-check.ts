@@ -1,14 +1,18 @@
 import { compare, valid } from "semver";
 import { getEulerEnv } from "../euler-env.ts";
 import { fetchWithRetry } from "./management-http.ts";
-import { getPiUserAgent } from "./pi-user-agent.ts";
 
-const LATEST_VERSION_URL = "https://pi.dev/api/latest-version";
+const DEFAULT_RELEASES_API_URL = "https://api.github.com/repos/euler-agent/euler/releases/latest";
 const DEFAULT_VERSION_CHECK_TIMEOUT_MS = 10000;
+
+export interface VersionCheckOptions {
+	timeoutMs?: number;
+	retry?: boolean;
+	releaseApiUrl?: string;
+}
 
 export interface LatestPiRelease {
 	version: string;
-	packageName?: string;
 	note?: string;
 }
 
@@ -49,48 +53,72 @@ export function isNewerPackageVersion(candidateVersion: string, currentVersion: 
 	return candidateVersion.trim() !== currentVersion.trim();
 }
 
-export async function getLatestPiRelease(
-	currentVersion: string,
-	options: { timeoutMs?: number; retry?: boolean } = {},
-): Promise<LatestPiRelease | undefined> {
-	if (getEulerEnv("offline")) return undefined;
-
-	const response = await fetchWithRetry(
-		LATEST_VERSION_URL,
-		{
-			headers: {
-				"User-Agent": getPiUserAgent(currentVersion),
-				accept: "application/json",
-			},
-		},
-		{
-			maxRetries: options.retry ? 2 : 0,
-			timeoutMs: options.timeoutMs ?? DEFAULT_VERSION_CHECK_TIMEOUT_MS,
-		},
-	);
-	if (!response.ok) return undefined;
-
-	const data = (await response.json()) as {
-		packageName?: unknown;
-		version?: unknown;
-		note?: unknown;
-	};
-	if (typeof data.version !== "string" || !data.version.trim()) {
+function resolveReleaseApiUrl(configuredUrl: string | undefined): string | undefined {
+	try {
+		const url = new URL(configuredUrl || DEFAULT_RELEASES_API_URL);
+		if (
+			url.protocol !== "https:" ||
+			url.hostname !== "api.github.com" ||
+			url.username ||
+			url.password ||
+			url.search ||
+			url.hash
+		) {
+			return undefined;
+		}
+		if (!/^\/repos\/[^/]+\/[^/]+\/releases\/latest$/.test(url.pathname)) {
+			return undefined;
+		}
+		return url.href;
+	} catch {
 		return undefined;
 	}
-	const packageName =
-		typeof data.packageName === "string" && data.packageName.trim() ? data.packageName.trim() : undefined;
-	const note = typeof data.note === "string" && data.note.trim() ? data.note.trim() : undefined;
-	return {
-		version: data.version.trim(),
-		packageName,
-		...(note ? { note } : {}),
-	};
+}
+
+export async function getLatestPiRelease(
+	_currentVersion: string,
+	options: VersionCheckOptions = {},
+): Promise<LatestPiRelease | undefined> {
+	if (getEulerEnv("offline")) return undefined;
+	const releaseApiUrl = resolveReleaseApiUrl(options.releaseApiUrl || getEulerEnv("releasesApiUrl"));
+	if (!releaseApiUrl) return undefined;
+
+	try {
+		const response = await fetchWithRetry(
+			releaseApiUrl,
+			{
+				headers: {
+					accept: "application/vnd.github+json",
+					"X-GitHub-Api-Version": "2022-11-28",
+				},
+			},
+			{
+				maxRetries: options.retry ? 2 : 0,
+				timeoutMs: options.timeoutMs ?? DEFAULT_VERSION_CHECK_TIMEOUT_MS,
+			},
+		);
+		if (!response.ok) return undefined;
+
+		const data = (await response.json()) as {
+			body?: unknown;
+			tag_name?: unknown;
+		};
+		if (typeof data.tag_name !== "string") return undefined;
+		const version = data.tag_name.trim().replace(/^v/, "");
+		if (!valid(version)) return undefined;
+		const note = typeof data.body === "string" && data.body.trim() ? data.body.trim() : undefined;
+		return {
+			version,
+			...(note ? { note } : {}),
+		};
+	} catch {
+		return undefined;
+	}
 }
 
 export async function getLatestPiVersion(
 	currentVersion: string,
-	options: { timeoutMs?: number; retry?: boolean } = {},
+	options: VersionCheckOptions = {},
 ): Promise<string | undefined> {
 	return (await getLatestPiRelease(currentVersion, options))?.version;
 }
