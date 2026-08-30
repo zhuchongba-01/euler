@@ -43,7 +43,7 @@ function getDefaultAttributionHeaders(
 
 	if (isOpenRouterModel(model)) {
 		return {
-			"HTTP-Referer": "https://github.com/euler-agent/euler",
+			"HTTP-Referer": "https://github.com/zhuchongba-01/euler",
 			"X-OpenRouter-Title": "Euler",
 			"X-OpenRouter-Categories": "cli-agent",
 		};

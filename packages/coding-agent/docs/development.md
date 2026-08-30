@@ -1,11 +1,11 @@
 # Development
 
-See [AGENTS.md](https://github.com/euler-agent/euler/blob/main/AGENTS.md) for additional guidelines.
+See [AGENTS.md](https://github.com/zhuchongba-01/euler/blob/main/AGENTS.md) for additional guidelines.
 
 ## Setup
 
 ```bash
-git clone https://github.com/euler-agent/euler
+git clone https://github.com/zhuchongba-01/euler
 cd euler
 npm install
 npm run build

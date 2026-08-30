@@ -9,7 +9,7 @@
 |------|------|------|
 | npm 全局安装 | `euler-agent` tarball，提供 `euler` 命令 | `publish-npm` job（trusted publishing） |
 | GitHub Release | `euler-<platform>.tar.gz / .zip` 独立可执行文件、source archive、SHA256SUMS | `build` + `stage-github-release` job |
-| 版本检查 | `https://api.github.com/repos/euler-agent/euler/releases/latest`（可用 `EULER_SKIP_VERSION_CHECK` 关闭） | `packages/coding-agent/src/utils/version-check.ts` |
+| 版本检查 | `https://api.github.com/repos/zhuchongba-01/euler/releases/latest`（可用 `EULER_SKIP_VERSION_CHECK` 关闭） | `packages/coding-agent/src/utils/version-check.ts` |
 | 模型目录发布 | Euler model catalog JSON | `publish-model-catalog.yml`，使用 `EULER_ARTIFACTS_R2_*` secrets |
 
 ## 触发方式
@@ -55,6 +55,6 @@ C:\tmp\euler-local-release\node\euler.cmd --version
 
 ## v0.1.0 发布前待办
 
-1. **创建公开 GitHub 仓库** `euler-agent/euler`，使版本检查与 bun-binary 下载提示指向有效地址。
+1. **创建公开 GitHub 仓库** `zhuchongba-01/euler`，使版本检查与 bun-binary 下载提示指向有效地址。
 2. 配置 GitHub environment `euler-model-upload` 及 `EULER_ARTIFACTS_R2_ACCESS_KEY_ID`、`EULER_ARTIFACTS_R2_SECRET_ACCESS_KEY`、`EULER_ARTIFACTS_R2_ENDPOINT` secrets。
 3. 完成实施计划第 12 阶段（Windows x64 真机验收）后确认首个 tag。

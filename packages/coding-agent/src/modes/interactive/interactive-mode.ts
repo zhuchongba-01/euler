@@ -4221,7 +4221,7 @@ export class InteractiveMode {
 	showNewVersionNotification(release: LatestPiRelease): void {
 		const action = theme.fg("accent", `${APP_NAME} update`);
 		const updateInstruction = theme.fg("muted", `New version ${release.version} is available. Run `) + action;
-		const changelogUrl = "https://github.com/euler-agent/euler/blob/main/CHANGELOG.md";
+		const changelogUrl = "https://github.com/zhuchongba-01/euler/blob/main/CHANGELOG.md";
 		const changelogLink = getCapabilities().hyperlinks
 			? hyperlink(theme.fg("accent", changelogUrl), changelogUrl)
 			: theme.fg("accent", changelogUrl);

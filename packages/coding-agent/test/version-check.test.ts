@@ -49,7 +49,7 @@ describe("version checks", () => {
 
 		await expect(getLatestPiVersion("1.2.3")).resolves.toBe("1.2.4");
 		expect(fetchMock).toHaveBeenCalledWith(
-			"https://api.github.com/repos/euler-agent/euler/releases/latest",
+			"https://api.github.com/repos/zhuchongba-01/euler/releases/latest",
 			expect.objectContaining({
 				headers: {
 					accept: "application/vnd.github+json",

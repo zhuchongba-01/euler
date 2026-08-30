@@ -2,7 +2,7 @@ import { compare, valid } from "semver";
 import { getEulerEnv } from "../euler-env.ts";
 import { fetchWithRetry } from "./management-http.ts";
 
-const DEFAULT_RELEASES_API_URL = "https://api.github.com/repos/euler-agent/euler/releases/latest";
+const DEFAULT_RELEASES_API_URL = "https://api.github.com/repos/zhuchongba-01/euler/releases/latest";
 const DEFAULT_VERSION_CHECK_TIMEOUT_MS = 10000;
 
 export interface VersionCheckOptions {

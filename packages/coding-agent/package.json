@@ -107,7 +107,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/euler-agent/euler.git",
+		"url": "git+https://github.com/zhuchongba-01/euler.git",
 		"directory": "packages/coding-agent"
 	},
 	"engines": {

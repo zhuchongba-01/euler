@@ -134,7 +134,7 @@ Paths are relative to the package root. Arrays support glob patterns and `!exclu
 
 ### Gallery Metadata
 
-The [package gallery](https://github.com/euler-agent/euler) displays packages tagged with `pi-package`. Add `video` or `image` fields to show a preview:
+The [package gallery](https://github.com/zhuchongba-01/euler) displays packages tagged with `pi-package`. Add `video` or `image` fields to show a preview:
 
 ```json
 {

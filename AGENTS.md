@@ -121,8 +121,8 @@ Rules:
 
 Attribution:
 
-- Internal (from issues): `Fixed foo bar ([#123](https://github.com/euler-agent/euler/issues/123))`
-- External contributions: `Added feature X ([#456](https://github.com/euler-agent/euler/pull/456) by [@username](https://github.com/username))`
+- Internal (from issues): `Fixed foo bar ([#123](https://github.com/zhuchongba-01/euler/issues/123))`
+- External contributions: `Added feature X ([#456](https://github.com/zhuchongba-01/euler/pull/456) by [@username](https://github.com/username))`
 
 ## Releasing
 

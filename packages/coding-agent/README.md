@@ -2,7 +2,7 @@
   <a href="https://www.npmjs.com/package/euler-agent"><img alt="npm" src="https://img.shields.io/npm/v/euler-agent?style=flat-square" /></a>
 </p>
 
-Euler is a terminal coding agent: a downstream distribution of the [Euler agent harness](https://github.com/earendil-works/euler) with its own branding, config root (`~/.euler/agent`), transparent system prompt, zero telemetry, and built-in free web access. See the [repository README](https://github.com/euler-agent/euler) for the distribution-level overview.
+Euler is a terminal coding agent: a downstream distribution of the [Euler agent harness](https://github.com/earendil-works/euler) with its own branding, config root (`~/.euler/agent`), transparent system prompt, zero telemetry, and built-in free web access. See the [repository README](https://github.com/zhuchongba-01/euler) for the distribution-level overview.
 
 ---
 

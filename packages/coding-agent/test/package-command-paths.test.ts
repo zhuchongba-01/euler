@@ -89,7 +89,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 			"fetch",
 			vi.fn(async (input: string | URL | Request) => {
 				const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-				if (url === "https://api.github.com/repos/euler-agent/euler/releases/latest") {
+				if (url === "https://api.github.com/repos/zhuchongba-01/euler/releases/latest") {
 					return Response.json({ tag_name: `v${targetVersion}` });
 				}
 				const releaseUrl = `https://example.test/api/installer/releases/${targetVersion}`;

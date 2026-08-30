@@ -73,7 +73,7 @@ if (!versionUrl) {
 	offenders.push("version-check.ts: DEFAULT_RELEASES_API_URL is missing");
 } else {
 	const url = new URL(versionUrl[1]);
-	if (url.hostname !== "api.github.com" || !url.pathname.startsWith("/repos/euler-agent/euler/")) {
+	if (url.hostname !== "api.github.com" || !url.pathname.startsWith("/repos/zhuchongba-01/euler/")) {
 		offenders.push(`version-check.ts: unexpected release API endpoint ${versionUrl[1]}`);
 	}
 }

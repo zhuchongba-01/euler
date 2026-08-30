@@ -81,7 +81,7 @@ For VS Code, include `--wait` so euler resumes after the editor exits:
 
 ### Telemetry and update checks
 
-`enableInstallTelemetry` only controls the anonymous install/update ping to `https://github.com/euler-agent/euler`. Opting out of telemetry does not disable update checks; Euler can still fetch `https://github.com/euler-agent/euler` to look for the latest version.
+`enableInstallTelemetry` only controls the anonymous install/update ping to `https://github.com/zhuchongba-01/euler`. Opting out of telemetry does not disable update checks; Euler can still fetch `https://github.com/zhuchongba-01/euler` to look for the latest version.
 
 Set `EULER_SKIP_VERSION_CHECK=1` to disable the Euler version update check. Use `--offline` or `EULER_OFFLINE=1` to disable all startup network operations described here, including update checks, package update checks, and install/update telemetry.
 
