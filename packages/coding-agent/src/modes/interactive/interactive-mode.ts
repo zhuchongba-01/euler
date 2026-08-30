@@ -1283,8 +1283,11 @@ export class InteractiveMode {
 		return shortenHomePath(p);
 	}
 
-	private formatExtensionDisplayPath(path: string): string {
-		let result = this.formatDisplayPath(path);
+	private formatExtensionDisplayPath(extensionPath: string): string {
+		// Package extension paths are intentionally relative to their package root.
+		// Resolving them here turns e.g. "extensions/index.ts" into a path under
+		// Euler's current working directory before it is shown to the user.
+		let result = path.isAbsolute(extensionPath) ? this.formatDisplayPath(extensionPath) : extensionPath;
 		result = result.replace(/\/index\.ts$/, "").replace(/\/index\.js$/, "");
 		return result;
 	}
