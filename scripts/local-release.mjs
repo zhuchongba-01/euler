@@ -28,6 +28,7 @@ Options:
   --force              Remove --out first if it already exists
   --skip-check         Do not run npm run check before building
   --skip-test          Do not run ./test.sh before building
+  --skip-binary        Do not build the standalone Bun binary release
   --skip-install       Only create tarballs; do not create isolated installs
   --skip-bun-install   Do not create the isolated Bun install
   --help               Show this help
@@ -39,6 +40,7 @@ function parseArgs() {
 		force: false,
 		outDir: undefined,
 		skipBunInstall: false,
+		skipBinary: false,
 		skipCheck: false,
 		skipInstall: false,
 		skipTest: false,
@@ -61,6 +63,10 @@ function parseArgs() {
 		}
 		if (arg === "--skip-test") {
 			options.skipTest = true;
+			continue;
+		}
+		if (arg === "--skip-binary") {
+			options.skipBinary = true;
 			continue;
 		}
 		if (arg === "--skip-install") {
@@ -99,6 +105,16 @@ function run(command, args, options = {}) {
 	}
 
 	return result.stdout ?? "";
+}
+
+function runShellScript(script, args, options = {}) {
+	if (process.platform === "win32") {
+		if (!commandExists("bash")) {
+			throw new Error(`Bash is required to run ${script} on Windows. Install Git Bash or use --skip-test/--skip-binary when appropriate.`);
+		}
+		return run("bash", [script, ...args], options);
+	}
+	return run(script, args, options);
 }
 
 function readPackageJson(directory) {
@@ -154,7 +170,7 @@ function buildBunBinaryRelease(targetDirectory, archiveDirectory) {
 	}
 	const platform = currentBinaryPlatform();
 	const binaryBuildDirectory = join(archiveDirectory, "binary-build");
-	run("./scripts/build-binaries.sh", [
+	runShellScript("./scripts/build-binaries.sh", [
 		"--skip-install",
 		"--skip-deps",
 		"--skip-build",
@@ -230,7 +246,7 @@ for (const pkg of packages) {
 }
 
 if (!options.skipTest) {
-	run("./test.sh", [], { cwd: repoRoot });
+	runShellScript("./test.sh", [], { cwd: repoRoot });
 }
 
 const tarballs = new Map();
@@ -241,7 +257,9 @@ for (const pkg of packages) {
 
 let binaryPlatform;
 if (!options.skipInstall) {
-	binaryPlatform = buildBunBinaryRelease(binaryDirectory, outDir);
+	if (!options.skipBinary) {
+		binaryPlatform = buildBunBinaryRelease(binaryDirectory, outDir);
+	}
 
 	mkdirSync(nodeInstallDirectory, { recursive: true });
 	const dependencies = Object.fromEntries(
@@ -275,11 +293,15 @@ for (const tarball of tarballs.values()) {
 }
 
 if (!options.skipInstall) {
-	console.log("\nLocal Bun binary release:");
-	console.log(`  ${binaryDirectory}`);
-	console.log(`  ${join(outDir, `euler-${binaryPlatform}.${String(binaryPlatform).startsWith("windows-") ? "zip" : "tar.gz"}`)}`);
-	console.log("\nRun the local Bun binary release from outside the repository:");
-	console.log(`  ${join(binaryDirectory, String(binaryPlatform).startsWith("windows-") ? "euler.exe" : "euler")} --help`);
+	if (!options.skipBinary) {
+		console.log("\nLocal Bun binary release:");
+		console.log(`  ${binaryDirectory}`);
+		console.log(
+			`  ${join(outDir, `euler-${binaryPlatform}.${String(binaryPlatform).startsWith("windows-") ? "zip" : "tar.gz"}`)}`,
+		);
+		console.log("\nRun the local Bun binary release from outside the repository:");
+		console.log(`  ${join(binaryDirectory, String(binaryPlatform).startsWith("windows-") ? "euler.exe" : "euler")} --help`);
+	}
 
 	console.log("\nIsolated npm install:");
 	console.log(`  ${nodeInstallDirectory}`);
