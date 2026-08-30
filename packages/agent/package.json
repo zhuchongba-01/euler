@@ -1,6 +1,6 @@
 {
 	"name": "@zhongchongba/euler-agent-core",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "General-purpose Euler agent runtime with transport abstraction and state management.",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -35,8 +35,8 @@
 		"prepublishOnly": "npm run build"
 	},
 	"dependencies": {
-		"@zhongchongba/euler-ai": "^0.1.0",
-		"@zhongchongba/euler-telemetry": "^0.1.0",
+		"@zhongchongba/euler-ai": "^0.1.1",
+		"@zhongchongba/euler-telemetry": "^0.1.1",
 		"diff": "8.0.4",
 		"ignore": "7.0.5",
 		"typebox": "1.3.7",

@@ -1,4 +1,5 @@
 import { rmSync } from "node:fs";
+import { platform } from "node:os";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI, ExtensionCommandContext, RegisteredCommand } from "../src/core/extensions/types.ts";
 import {
@@ -99,7 +100,11 @@ describe("Euler curator browser boundary", () => {
 		await commands.get("websearch")?.handler("", commandContext());
 
 		expect(curatorTestState.startServer).toHaveBeenCalledTimes(1);
-		expect(exec).toHaveBeenCalledTimes(1);
-		expect(exec).toHaveBeenCalledWith("cmd", ["/c", "start", "", "http://127.0.0.1:43123/"]);
+		if (platform() === "win32") {
+			expect(exec).toHaveBeenCalledTimes(1);
+			expect(exec).toHaveBeenCalledWith("cmd", ["/c", "start", "", "http://127.0.0.1:43123/"]);
+		} else {
+			expect(exec).not.toHaveBeenCalled();
+		}
 	});
 });

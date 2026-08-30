@@ -15,6 +15,7 @@ const execPathDescriptor = Object.getOwnPropertyDescriptor(process, "execPath");
 const originalPath = process.env.PATH;
 const originalPiPackageDir = process.env.EULER_PACKAGE_DIR;
 const originalArgv1 = process.argv[1];
+const isRoot = process.platform !== "win32" && process.getuid?.() === 0;
 let tempDir: string | undefined;
 
 function queryNpmGlobalRoot(argv: string[]): string {
@@ -443,11 +444,14 @@ describe("detectInstallMethod", () => {
 
 	// POSIX read-only directories cannot be simulated on Windows: chmod is a
 	// no-op for directory write access there, so the precondition is unreachable.
-	test.skipIf(process.platform === "win32")("does not self-update when npm install path is not writable", () => {
-		const { packageDir } = createNpmPrefixInstall();
-		chmodSync(packageDir, 0o500);
+	test.skipIf(process.platform === "win32" || isRoot)(
+		"does not self-update when npm install path is not writable",
+		() => {
+			const { packageDir } = createNpmPrefixInstall();
+			chmodSync(packageDir, 0o500);
 
-		expect(getSelfUpdateCommand("euler-agent")).toBeUndefined();
-		expect(getSelfUpdateUnavailableInstruction("euler-agent")).toContain("the install path is not writable");
-	});
+			expect(getSelfUpdateCommand("euler-agent")).toBeUndefined();
+			expect(getSelfUpdateUnavailableInstruction("euler-agent")).toContain("the install path is not writable");
+		},
+	);
 });

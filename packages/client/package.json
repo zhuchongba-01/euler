@@ -1,6 +1,6 @@
 {
 	"name": "@zhongchongba/euler-client",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Transport-neutral client for remote Euler sessions over framed CBOR bytes.",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -47,7 +47,7 @@
 		"node": ">=22.19.0"
 	},
 	"dependencies": {
-		"@zhongchongba/euler-protocol": "^0.1.0"
+		"@zhongchongba/euler-protocol": "^0.1.1"
 	},
 	"devDependencies": {
 		"shx": "0.4.0",

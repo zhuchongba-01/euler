@@ -44,6 +44,10 @@ npm test              # Full test suite (skips LLM-dependent tests without API k
 ./euler-test.sh       # Run Euler from sources (can be run from any directory)
 ```
 
+For the full Linux suite, run as a non-root user and install `rg` plus `fd`
+first. On Ubuntu, `sudo apt install ripgrep fd-find` installs `fdfind`; add an
+`fd` symlink on your `PATH` before running `./test.sh`.
+
 ## Building standalone binaries from release source
 
 GitHub releases include a versioned source archive covered by the release's `SHA256SUMS` file. Extract it and run the same build script used for the official standalone binaries:

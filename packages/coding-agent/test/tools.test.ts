@@ -20,6 +20,7 @@ import { hasBinary } from "./utilities.ts";
 // POSIX-only semantics: chmod read-only errors (EACCES), and rg/fd pattern
 // handling with POSIX temp paths. Windows gate keeps the suite honest.
 const skipOnWindows = process.platform === "win32";
+const skipPermissionTests = skipOnWindows || process.getuid?.() === 0;
 
 const readTool = createReadTool(process.cwd());
 const writeTool = createWriteTool(process.cwd());
@@ -426,7 +427,7 @@ describe("Coding Agent Tools", () => {
 			expect(readFileSync(testFile, "utf-8")).toBe(originalContent);
 		});
 
-		it.skipIf(skipOnWindows)("should include EACCES for read-only files", async () => {
+		it.skipIf(skipPermissionTests)("should include EACCES for read-only files", async () => {
 			const testFile = join(testDir, "edit-readonly.txt");
 			writeFileSync(testFile, "hello\n");
 			chmodSync(testFile, 0o444);
@@ -465,7 +466,7 @@ describe("Coding Agent Tools", () => {
 			expect(result).toEqual({ error: `Could not edit file: ${missingFile}. Error code: ENOENT.` });
 		});
 
-		it.skipIf(skipOnWindows)("should include EACCES in diff preview for unreadable files", async () => {
+		it.skipIf(skipPermissionTests)("should include EACCES in diff preview for unreadable files", async () => {
 			const unreadableFile = join(testDir, "unreadable-preview.txt");
 			writeFileSync(unreadableFile, "hello\n");
 			chmodSync(unreadableFile, 0o222);

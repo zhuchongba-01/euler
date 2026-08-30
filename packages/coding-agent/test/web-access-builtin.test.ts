@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../src/extensions/llama/index.ts", () => ({ default: vi.fn() }));
@@ -29,8 +30,8 @@ describe("Euler built-in web access", () => {
 			PI_CODING_AGENT_DIR: "C:\\legacy\\.pi\\agent",
 		};
 
-		expect(getEulerWebSearchConfigPath(env, "C:\\home")).toBe("C:\\isolated\\.euler\\agent\\web-search.json");
+		expect(getEulerWebSearchConfigPath(env, "C:\\home")).toBe(join("C:\\isolated\\.euler\\agent", "web-search.json"));
 		delete env.EULER_CODING_AGENT_DIR;
-		expect(getEulerWebSearchConfigPath(env, "C:\\home")).toBe("C:\\home\\.euler\\agent\\web-search.json");
+		expect(getEulerWebSearchConfigPath(env, "C:\\home")).toBe(join("C:\\home", ".euler", "agent", "web-search.json"));
 	});
 });
