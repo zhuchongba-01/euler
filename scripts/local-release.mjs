@@ -96,7 +96,7 @@ function run(command, args, options = {}) {
 	const result = spawnSync(command, args, {
 		cwd: options.cwd,
 		encoding: "utf8",
-		shell: process.platform === "win32",
+		shell: options.shell ?? process.platform === "win32",
 		stdio: options.capture ? ["inherit", "pipe", "inherit"] : "inherit",
 	});
 
@@ -109,10 +109,11 @@ function run(command, args, options = {}) {
 
 function runShellScript(script, args, options = {}) {
 	if (process.platform === "win32") {
-		if (!commandExists("bash")) {
+		const bash = findWindowsBashExecutable();
+		if (!bash) {
 			throw new Error(`Bash is required to run ${script} on Windows. Install Git Bash or use --skip-test/--skip-binary when appropriate.`);
 		}
-		return run("bash", [script, ...args], options);
+		return run(bash, [script, ...args], { ...options, shell: false });
 	}
 	return run(script, args, options);
 }
@@ -122,7 +123,25 @@ function readPackageJson(directory) {
 }
 
 function commandExists(command) {
-	return spawnSync(command, ["--version"], { stdio: "ignore" }).status === 0;
+	return spawnSync(command, ["--version"], {
+		shell: process.platform === "win32" && !isAbsolute(command),
+		stdio: "ignore",
+	}).status === 0;
+}
+
+function findWindowsBashExecutable() {
+	const candidates = [
+		process.env.ProgramFiles ? join(process.env.ProgramFiles, "Git", "bin", "bash.exe") : undefined,
+		process.env["ProgramFiles(x86)"] ? join(process.env["ProgramFiles(x86)"], "Git", "bin", "bash.exe") : undefined,
+		"C:\\Program Files\\Git\\bin\\bash.exe",
+		"C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+	].filter((candidate) => candidate !== undefined);
+
+	for (const candidate of candidates) {
+		if (existsSync(candidate)) return candidate;
+	}
+
+	return commandExists("bash") ? "bash" : undefined;
 }
 
 function isInsidePath(child, parent) {
@@ -132,7 +151,7 @@ function isInsidePath(child, parent) {
 
 function prepareOutputDirectory(options, repoRoot) {
 	if (!options.outDir) {
-		return mkdtempSync(join(tmpdir(), "pi-local-release-"));
+		return mkdtempSync(join(tmpdir(), "euler-local-release-"));
 	}
 
 	const outDir = resolve(options.outDir);

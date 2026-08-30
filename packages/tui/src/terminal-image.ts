@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
-import { isAbsolute } from "node:path";
+import { isAbsolute, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export type ImageProtocol = "kitty" | "iterm2" | null;
@@ -672,11 +672,22 @@ export function hyperlink(text: string, url: string): string {
 
 /** Shorten home-prefixed absolute paths to ~/... for compact display. */
 function shortenImagePath(filename: string): string {
-	const home = homedir();
-	if (home && (filename === home || filename.startsWith(`${home}/`) || filename.startsWith(`${home}\\`))) {
-		// Normalize to forward slashes: `~` is a shell-style abbreviation and is
-		// conventionally rendered with `/` even on Windows.
-		return `~${filename.slice(home.length)}`.replace(/\\/g, "/");
+	const homes = Array.from(new Set([process.env.HOME, process.env.USERPROFILE, homedir()].filter(Boolean)))
+		.map((home) => normalize(home!))
+		.sort((a, b) => b.length - a.length);
+	const normalizedFilename = normalize(filename);
+	const comparableFilename = process.platform === "win32" ? normalizedFilename.toLowerCase() : normalizedFilename;
+	for (const home of homes) {
+		const comparableHome = process.platform === "win32" ? home.toLowerCase() : home;
+		if (
+			comparableFilename === comparableHome ||
+			comparableFilename.startsWith(`${comparableHome}/`) ||
+			comparableFilename.startsWith(`${comparableHome}\\`)
+		) {
+			// Normalize to forward slashes: `~` is a shell-style abbreviation and is
+			// conventionally rendered with `/` even on Windows.
+			return `~${normalizedFilename.slice(home.length)}`.replace(/\\/g, "/");
+		}
 	}
 	return filename;
 }

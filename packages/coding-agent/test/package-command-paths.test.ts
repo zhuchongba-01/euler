@@ -42,7 +42,7 @@ describe("package commands", () => {
 		writeFileSync(join(managedRoot, "current-version"), `${VERSION}\n`);
 		writeFileSync(
 			join(managedRoot, "managed-install.json"),
-			`${JSON.stringify({ kind: "pi-managed-install", schemaVersion: 1, layout: "releases-v1" })}\n`,
+			`${JSON.stringify({ kind: "euler-managed-install", schemaVersion: 1, layout: "releases-v1" })}\n`,
 		);
 
 		const binDir = join(tempDir, "managed-bin");
@@ -676,7 +676,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 		mkdirSync(join(inheritedManagedRoot, "releases"), { recursive: true });
 		writeFileSync(
 			join(inheritedManagedRoot, "managed-install.json"),
-			JSON.stringify({ kind: "pi-managed-install", schemaVersion: 1, layout: "releases-v1" }),
+			JSON.stringify({ kind: "euler-managed-install", schemaVersion: 1, layout: "releases-v1" }),
 		);
 		vi.stubEnv("EULER_MANAGED_INSTALL_ROOT", inheritedManagedRoot);
 		const fakeNpmPath = join(tempDir, "fake-npm.cjs");

@@ -497,9 +497,9 @@ try {
 
 const piConfigName: string | undefined = pkg.piConfig?.name;
 export const PACKAGE_NAME: string = pkg.name || "euler-agent";
-export const APP_NAME: string = piConfigName || "pi";
+export const APP_NAME: string = piConfigName || "euler";
 export const APP_TITLE: string = pkg.piConfig?.title || (piConfigName ? APP_NAME : "Euler");
-export const CONFIG_DIR_NAME: string = pkg.piConfig?.configDir || ".pi";
+export const CONFIG_DIR_NAME: string = pkg.piConfig?.configDir || ".euler";
 export const VERSION: string = pkg.version || "0.0.0";
 
 export const ENV_AGENT_DIR = EULER_ENV.agentDir;

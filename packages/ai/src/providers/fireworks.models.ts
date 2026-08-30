@@ -9,6 +9,7 @@ type CatalogGroups = {
 		| "accounts/fireworks/models/deepseek-v4-flash-0731"
 		| "accounts/fireworks/models/deepseek-v4-pro-0813"
 		| "accounts/fireworks/models/glm-5p3"
+		| "accounts/fireworks/models/glm-5p3-flash"
 		| "accounts/fireworks/models/gpt-oss-120b"
 		| "accounts/fireworks/models/inkling"
 		| "accounts/fireworks/models/kimi-k2p6"

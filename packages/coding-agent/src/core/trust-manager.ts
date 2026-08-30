@@ -41,6 +41,19 @@ function normalizeCwd(cwd: string): string {
 	return canonicalizePath(resolvePath(cwd));
 }
 
+function getUserHomeDirs(): string[] {
+	const candidates = [process.env.HOME, process.env.USERPROFILE, homedir()];
+	const homeDirs: string[] = [];
+	for (const candidate of candidates) {
+		if (!candidate) continue;
+		const homeDir = canonicalizePath(resolvePath(candidate));
+		if (!homeDirs.includes(homeDir)) {
+			homeDirs.push(homeDir);
+		}
+	}
+	return homeDirs;
+}
+
 function findNearestTrustEntry(data: TrustFile, cwd: string): ProjectTrustStoreEntry | null {
 	let currentDir = normalizeCwd(cwd);
 	while (true) {
@@ -177,14 +190,14 @@ function withTrustFileLock<T>(path: string, fn: () => T): T {
 
 /**
  * Returns true when cwd has project-local resources that must be gated by
- * project trust: trust-requiring entries under cwd/.pi, or .agents/skills in
+ * project trust: trust-requiring entries under the project config dir, or .agents/skills in
  * cwd or one of its ancestors. Returns false when no such project resources
- * exist. The user/global ~/.agents/skills directory is always treated as a
+ * exist. User/global ~/.agents/skills directories are always treated as
  * trusted user resource and is ignored here, even when cwd is $HOME.
  */
 export function hasTrustRequiringProjectResources(cwd: string): boolean {
-	const homeDir = canonicalizePath(resolvePath(process.env.HOME || homedir()));
-	const userAgentsSkillsDir = join(homeDir, ".agents", "skills");
+	const homeDirs = getUserHomeDirs();
+	const userAgentsSkillsDirs = new Set(homeDirs.map((homeDir) => join(homeDir, ".agents", "skills")));
 	let currentDir = canonicalizePath(resolvePath(cwd));
 
 	const configDir = join(currentDir, CONFIG_DIR_NAME);
@@ -194,12 +207,12 @@ export function hasTrustRequiringProjectResources(cwd: string): boolean {
 
 	while (true) {
 		const agentsSkillsDir = join(currentDir, ".agents", "skills");
-		if (agentsSkillsDir !== userAgentsSkillsDir && existsSync(agentsSkillsDir)) {
+		if (!userAgentsSkillsDirs.has(agentsSkillsDir) && existsSync(agentsSkillsDir)) {
 			return true;
 		}
 
-		if (currentDir === homeDir) {
-			// cwd lives inside $HOME; nothing above $HOME is an ancestor project.
+		if (homeDirs.includes(currentDir)) {
+			// cwd lives inside a user home; nothing above that home is an ancestor project.
 			return false;
 		}
 

@@ -41,16 +41,19 @@ function forbidToken(relPath, text, pattern, reason) {
 const srcRoot = join(repoRoot, "packages/coding-agent/src");
 for (const file of walk(srcRoot)) {
 	const text = readFileSync(file, "utf-8");
+	forbidToken(relative(repoRoot, file), text, /pi\.dev/gi, "PI service reference");
 	forbidToken(relative(repoRoot, file), text, /report-install/g, "install telemetry call");
 	forbidToken(relative(repoRoot, file), text, /enableInstallTelemetry/g, "telemetry setting");
 	forbidToken(relative(repoRoot, file), text, /PI_TELEMETRY/g, "PI telemetry env");
 }
-for (const workflow of ["build-binaries.yml", "ci.yml"]) {
+for (const workflow of ["build-binaries.yml", "ci.yml", "publish-model-catalog.yml"]) {
 	const path = join(repoRoot, ".github/workflows", workflow);
 	try {
 		const text = readFileSync(path, "utf-8");
 		forbidToken(relative(repoRoot, path), text, /pi\.dev/gi, "PI service reference");
 		forbidToken(relative(repoRoot, path), text, /PI_ARTIFACTS_R2/g, "PI R2 secret");
+		forbidToken(relative(repoRoot, path), text, /pi-artifacts/g, "PI R2 bucket");
+		forbidToken(relative(repoRoot, path), text, /pi-model-upload/g, "PI R2 environment");
 		forbidToken(relative(repoRoot, path), text, /announce-pi-dev/g, "PI announcement job");
 	} catch {
 		offenders.push(`.github/workflows/${workflow}: missing`);

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import * as fs from "fs";
+import { homedir } from "os";
 import * as path from "path";
 
 // Parse args
@@ -35,7 +36,7 @@ function encodeSessionDir(dir: string): string {
 	return "--" + normalized.replace(/\//g, "-") + "--";
 }
 
-const sessionsBase = path.join(process.env.HOME!, ".pi/agent/sessions");
+const sessionsBase = path.join(homedir(), ".euler/agent/sessions");
 const encodedDir = encodeSessionDir(directory);
 const sessionsDir = path.join(sessionsBase, encodedDir);
 

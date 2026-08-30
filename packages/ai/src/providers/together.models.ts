@@ -25,6 +25,7 @@ type CatalogGroups = {
 		| "openai/gpt-oss-20b"
 		| "thinkingmachines/Inkling"
 		| "zai-org/GLM-5.2"
+		| "zai-org/GLM-5.3"
 		| "zai-org/GLM-5.3-Flash"
 		, object
 	>;

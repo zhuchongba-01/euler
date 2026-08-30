@@ -252,6 +252,28 @@ function quoteIfNeeded(value: string): string {
 	return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+function getHomePathCandidates(): string[] {
+	return Array.from(new Set([process.env.HOME, process.env.USERPROFILE, os.homedir()].filter(Boolean)))
+		.map((home) => path.resolve(home!))
+		.sort((a, b) => b.length - a.length);
+}
+
+function shortenHomePath(p: string): string {
+	const resolvedPath = path.resolve(p);
+	const comparablePath = process.platform === "win32" ? resolvedPath.toLowerCase() : resolvedPath;
+	for (const home of getHomePathCandidates()) {
+		const comparableHome = process.platform === "win32" ? home.toLowerCase() : home;
+		if (
+			comparablePath === comparableHome ||
+			comparablePath.startsWith(`${comparableHome}/`) ||
+			comparablePath.startsWith(`${comparableHome}\\`)
+		) {
+			return `~${resolvedPath.slice(home.length)}`;
+		}
+	}
+	return p;
+}
+
 export function formatResumeCommand(sessionManager: SessionManager): string | undefined {
 	if (!process.stdout.isTTY) return undefined;
 	if (!sessionManager.isPersisted()) return undefined;
@@ -1211,7 +1233,7 @@ export class InteractiveMode {
 		}
 
 		if (extendedKeysFormat === "xterm") {
-			return "tmux extended-keys-format is xterm. Pi works best with csi-u. Add `set -g extended-keys-format csi-u` to ~/.tmux.conf and restart tmux.";
+			return `tmux extended-keys-format is xterm. ${APP_NAME} works best with csi-u. Add \`set -g extended-keys-format csi-u\` to ~/.tmux.conf and restart tmux.`;
 		}
 
 		return undefined;
@@ -1258,15 +1280,7 @@ export class InteractiveMode {
 	// =========================================================================
 
 	private formatDisplayPath(p: string): string {
-		const home = os.homedir();
-		let result = p;
-
-		// Replace home directory with ~
-		if (result.startsWith(home)) {
-			result = `~${result.slice(home.length)}`;
-		}
-
-		return result;
+		return shortenHomePath(p);
 	}
 
 	private formatExtensionDisplayPath(path: string): string {

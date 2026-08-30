@@ -25,6 +25,7 @@ const SCAN_TARGETS = [
 	"packages/coding-agent/src/cli",
 	"packages/coding-agent/src/modes",
 	"packages/coding-agent/package.json",
+	".github/ISSUE_TEMPLATE",
 ];
 
 // Tokens that must never reach a user in Euler surfaces.

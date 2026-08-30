@@ -38,12 +38,16 @@ describe("ProjectTrustStore", () => {
 
 	it("detects trust-requiring project resources", () => {
 		const originalHome = process.env.HOME;
+		const originalUserProfile = process.env.USERPROFILE;
 		process.env.HOME = tempDir;
+		process.env.USERPROFILE = join(tempDir, "profile");
 		try {
 			mkdirSync(join(tempDir, ".euler", "agent"), { recursive: true });
 			mkdirSync(join(tempDir, ".agents", "skills"), { recursive: true });
+			mkdirSync(join(tempDir, "profile", ".agents", "skills"), { recursive: true });
 			expect(hasTrustRequiringProjectResources(tempDir)).toBe(false);
 			expect(hasTrustRequiringProjectResources(cwd)).toBe(false);
+			expect(hasTrustRequiringProjectResources(join(tempDir, "profile", "nested"))).toBe(false);
 
 			writeFileSync(join(tempDir, ".euler", "settings.json"), "{}");
 			expect(hasTrustRequiringProjectResources(tempDir)).toBe(true);
@@ -61,6 +65,11 @@ describe("ProjectTrustStore", () => {
 				delete process.env.HOME;
 			} else {
 				process.env.HOME = originalHome;
+			}
+			if (originalUserProfile === undefined) {
+				delete process.env.USERPROFILE;
+			} else {
+				process.env.USERPROFILE = originalUserProfile;
 			}
 		}
 	});
