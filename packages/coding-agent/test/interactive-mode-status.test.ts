@@ -1129,14 +1129,16 @@ describe("InteractiveMode.showLoadedResources", () => {
 	});
 
 	test("captures mixed extension layouts in expanded output", () => {
+		const extensions = createExtensionFixtures();
 		const fakeThis = createShowLoadedResourcesThis({
 			quietStartup: false,
 			toolOutputExpanded: true,
-			extensions: createExtensionFixtures(),
+			extensions,
 			useRealScopeGroups: true,
 		});
 
 		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+			extensions,
 			force: false,
 		});
 
