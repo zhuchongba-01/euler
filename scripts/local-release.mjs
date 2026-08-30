@@ -6,14 +6,14 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const packages = [
-	{ directory: "packages/telemetry", name: "@earendil-works/pi-telemetry" },
-	{ directory: "packages/ai", name: "@earendil-works/pi-ai" },
-	{ directory: "packages/tui", name: "@earendil-works/pi-tui" },
-	{ directory: "packages/agent", name: "@earendil-works/pi-agent-core" },
-	{ directory: "packages/protocol", name: "@earendil-works/pi-protocol" },
-	{ directory: "packages/client", name: "@earendil-works/pi-client" },
-	{ directory: "packages/session-backends/sqlite-node", name: "@earendil-works/pi-session-backend-sqlite-node" },
-	{ directory: "packages/server", name: "@earendil-works/pi-server" },
+	{ directory: "packages/telemetry", name: "@zhongchongba/euler-telemetry" },
+	{ directory: "packages/ai", name: "@zhongchongba/euler-ai" },
+	{ directory: "packages/tui", name: "@zhongchongba/euler-tui" },
+	{ directory: "packages/agent", name: "@zhongchongba/euler-agent-core" },
+	{ directory: "packages/protocol", name: "@zhongchongba/euler-protocol" },
+	{ directory: "packages/client", name: "@zhongchongba/euler-client" },
+	{ directory: "packages/session-backends/sqlite-node", name: "@zhongchongba/euler-session-backend-sqlite-node" },
+	{ directory: "packages/server", name: "@zhongchongba/euler-server" },
 	{ directory: "packages/coding-agent", name: "euler-agent" },
 ];
 

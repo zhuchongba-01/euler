@@ -13,7 +13,7 @@
  *   pi --extension examples/extensions/custom-compaction.ts
  */
 
-import { uuidv7 } from "@earendil-works/pi-ai";
+import { uuidv7 } from "@zhongchongba/euler-ai";
 import type { ExtensionAPI } from "euler-agent";
 import { convertToLlm, serializeConversation } from "euler-agent";
 

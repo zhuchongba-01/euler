@@ -1,5 +1,5 @@
-import { uuidv7 } from "@earendil-works/pi-ai";
-import { Container, Markdown, matchesKey, Text } from "@earendil-works/pi-tui";
+import { uuidv7 } from "@zhongchongba/euler-ai";
+import { Container, Markdown, matchesKey, Text } from "@zhongchongba/euler-tui";
 import type { ExtensionAPI, ExtensionCommandContext } from "euler-agent";
 import { DynamicBorder, getMarkdownTheme } from "euler-agent";
 

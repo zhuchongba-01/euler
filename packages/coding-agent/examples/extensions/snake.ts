@@ -2,7 +2,7 @@
  * Snake game extension - play snake with /snake command
  */
 
-import { matchesKey, visibleWidth } from "@earendil-works/pi-tui";
+import { matchesKey, visibleWidth } from "@zhongchongba/euler-tui";
 import type { ExtensionAPI } from "euler-agent";
 
 const GAME_WIDTH = 40;

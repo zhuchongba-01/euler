@@ -24,6 +24,7 @@ function run(command, args, options = {}) {
 	const result = spawnSync(commandForPlatform(command), args, {
 		cwd: options.cwd,
 		encoding: "utf8",
+		shell: process.platform === "win32",
 		stdio: options.capture ? ["inherit", "pipe", "pipe"] : "inherit",
 	});
 
@@ -50,6 +51,7 @@ function validatePack(directory) {
 function isPublished(name, version) {
 	const result = spawnSync(commandForPlatform("npm"), ["view", `${name}@${version}`, "version", "--json"], {
 		encoding: "utf8",
+		shell: process.platform === "win32",
 		stdio: ["inherit", "pipe", "pipe"],
 	});
 
@@ -72,7 +74,7 @@ if (versions.length !== 1) {
 	throw new Error(`Publish packages are not lockstep versioned: ${versions.join(", ")}`);
 }
 
-console.log(`Publishing pi packages at ${versions[0]}${dryRun ? " (dry run)" : ""}\n`);
+console.log(`Publishing Euler packages at ${versions[0]}${dryRun ? " (dry run)" : ""}\n`);
 
 const packageStates = packages.map((pkg) => ({
 	...pkg,

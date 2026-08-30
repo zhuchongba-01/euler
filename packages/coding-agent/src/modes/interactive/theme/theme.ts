@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import type { ThinkingLevel } from "@zhongchongba/euler-agent-core";
 import {
 	type EditorTheme,
 	getCapabilities,
@@ -8,7 +8,7 @@ import {
 	type RgbColor,
 	type SelectListTheme,
 	type SettingsListTheme,
-} from "@earendil-works/pi-tui";
+} from "@zhongchongba/euler-tui";
 import chalk from "chalk";
 import { type Static, Type } from "typebox";
 import { Compile } from "typebox/compile";

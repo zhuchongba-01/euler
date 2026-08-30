@@ -1,4 +1,4 @@
-import { setKeybindings, TuiMainScreen, visibleWidth } from "@earendil-works/pi-tui";
+import { setKeybindings, TuiMainScreen, visibleWidth } from "@zhongchongba/euler-tui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultEditorTheme } from "../../tui/test/test-themes.ts";
 import { VirtualTerminal } from "../../tui/test/virtual-terminal.ts";

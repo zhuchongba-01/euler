@@ -2,14 +2,14 @@
  * Model resolution, scoping, and initial selection
  */
 
-import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import type { ThinkingLevel } from "@zhongchongba/euler-agent-core";
 import {
 	type Api,
 	type AuthOperationOptions,
 	type KnownProvider,
 	type Model,
 	modelsAreEqual,
-} from "@earendil-works/pi-ai";
+} from "@zhongchongba/euler-ai";
 import chalk from "chalk";
 import { minimatch } from "minimatch";
 import { isValidThinkingLevel } from "../cli/args.ts";

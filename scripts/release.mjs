@@ -5,10 +5,12 @@
  * Usage:
  *   node scripts/release.mjs <major|minor|patch>
  *   node scripts/release.mjs <x.y.z>
+ *   node scripts/release.mjs <x.y.z> --initial
  *
  * Steps:
  * 1. Check for uncommitted changes
- * 2. Verify every public workspace package is registered on npm
+ * 2. Verify every public workspace package is registered on npm, or that the
+ *    requested initial-release version is available
  * 3. Bump version via npm run version:xxx or set an explicit version
  * 4. Update CHANGELOG.md files: [Unreleased] -> [version] - date
  * 5. Regenerate release artifacts
@@ -25,12 +27,18 @@ import { join } from "node:path";
 import { findPackageDirectories } from "./package-workspaces.mjs";
 import { getPublicWorkspacePackages } from "./release-packages.mjs";
 
-const RELEASE_TARGET = process.argv[2];
+const [RELEASE_TARGET, ...releaseOptions] = process.argv.slice(2);
 const BUMP_TYPES = new Set(["major", "minor", "patch"]);
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+const INITIAL_RELEASE = releaseOptions.includes("--initial");
 
-if (!RELEASE_TARGET || (!BUMP_TYPES.has(RELEASE_TARGET) && !SEMVER_RE.test(RELEASE_TARGET))) {
-	console.error("Usage: node scripts/release.mjs <major|minor|patch|x.y.z>");
+if (
+	!RELEASE_TARGET ||
+	releaseOptions.some((option) => option !== "--initial") ||
+	(!BUMP_TYPES.has(RELEASE_TARGET) && !SEMVER_RE.test(RELEASE_TARGET)) ||
+	(INITIAL_RELEASE && !SEMVER_RE.test(RELEASE_TARGET))
+) {
+	console.error("Usage: node scripts/release.mjs <major|minor|patch|x.y.z> [--initial]");
 	process.exit(1);
 }
 
@@ -52,36 +60,69 @@ function getVersion() {
 	return pkg.version;
 }
 
-function assertPackagesAreRegisteredWithNpm() {
-	const packageNames = getPublicWorkspacePackages().map((pkg) => pkg.name);
-	const unregisteredPackages = [];
+function assertPackagesAreReadyForRelease(version) {
+	const packages = getPublicWorkspacePackages();
+	const unavailablePackages = [];
+	const publishedInitialPackages = [];
 
-	console.log("Checking npm package registration...");
-	for (const packageName of packageNames) {
-		const result = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["view", packageName, "version", "--json"], {
+	console.log(INITIAL_RELEASE ? "Checking initial npm package availability..." : "Checking npm package registration...");
+	for (const pkg of packages) {
+		const packageSpec = INITIAL_RELEASE ? `${pkg.name}@${version}` : pkg.name;
+		const result = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["view", packageSpec, "version", "--json"], {
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 
 		if (result.status === 0 && result.stdout.trim()) {
-			console.log(`  ${packageName}`);
+			if (INITIAL_RELEASE) {
+				publishedInitialPackages.push(packageSpec);
+				continue;
+			}
+			console.log(`  ${pkg.name}`);
 			continue;
 		}
 
 		const output = [result.stdout, result.stderr, result.error?.message].filter(Boolean).join("\n");
 		if (output.includes("E404") || output.includes("404 Not Found")) {
-			unregisteredPackages.push(packageName);
+			unavailablePackages.push(packageSpec);
 			continue;
 		}
 
-		throw new Error(output ? `Failed to query npm registration for ${packageName}\n${output}` : `Failed to query npm registration for ${packageName}`);
+		throw new Error(output ? `Failed to query npm registration for ${packageSpec}\n${output}` : `Failed to query npm registration for ${packageSpec}`);
 	}
 
-	if (unregisteredPackages.length > 0) {
-		throw new Error(`The following public workspace packages are not registered on npm:\n${unregisteredPackages.map((packageName) => `  ${packageName}`).join("\n")}\nRegister them before running a release.`);
+	if (!INITIAL_RELEASE && unavailablePackages.length > 0) {
+		throw new Error(`The following public workspace packages are not registered on npm:\n${unavailablePackages.map((packageName) => `  ${packageName}`).join("\n")}\nRegister them before running a release.`);
 	}
 
-	console.log("  All public workspace packages are registered on npm\n");
+	if (INITIAL_RELEASE) {
+		if (publishedInitialPackages.length > 0 && unavailablePackages.length > 0) {
+			throw new Error(
+				`Initial release package publication is incomplete. Published:\n${publishedInitialPackages
+					.map((packageName) => `  ${packageName}`)
+					.join("\n")}\nAvailable:\n${unavailablePackages.map((packageName) => `  ${packageName}`).join("\n")}`,
+			);
+		}
+		console.log(
+			publishedInitialPackages.length === packages.length
+				? "  All initial Euler package versions are already published\n"
+				: "  All initial Euler package versions are available\n",
+		);
+	} else {
+		console.log("  All public workspace packages are registered on npm\n");
+	}
+}
+
+function assertInitialVersion(version) {
+	const mismatchedPackages = getPublicWorkspacePackages().filter((pkg) => pkg.version !== version);
+	if (mismatchedPackages.length > 0) {
+		throw new Error(
+			`Initial release requires every public package to already be ${version}:\n${mismatchedPackages
+				.map((pkg) => `  ${pkg.name}@${pkg.version}`)
+				.join("\n")}`,
+		);
+	}
+	return version;
 }
 
 function compareVersions(a, b) {
@@ -221,16 +262,18 @@ if (status && status.trim()) {
 }
 console.log("  Working directory clean\n");
 
-// 2. Verify npm package registration before modifying the worktree.
-assertPackagesAreRegisteredWithNpm();
+// 2. Verify npm package readiness before modifying the worktree.
+const version = INITIAL_RELEASE ? assertInitialVersion(RELEASE_TARGET) : getVersion();
+assertPackagesAreReadyForRelease(version);
 
-// 3. Bump or set version
-const version = bumpOrSetVersion(RELEASE_TARGET);
-console.log(`  New version: ${version}\n`);
+// 3. Bump or set version. The first Euler release is already versioned in the
+// fork commit, so it only validates the requested version.
+const releasedVersion = INITIAL_RELEASE ? version : bumpOrSetVersion(RELEASE_TARGET);
+console.log(`  New version: ${releasedVersion}\n`);
 
 // 4. Update changelogs
 console.log("Updating CHANGELOG.md files...");
-updateChangelogsForRelease(version);
+updateChangelogsForRelease(releasedVersion);
 console.log();
 
 // 5. Regenerate release artifacts
@@ -257,8 +300,8 @@ console.log();
 // 7. Commit and tag
 console.log("Committing and tagging...");
 stageChangedFiles();
-run(`git commit -m "Release v${version}"`);
-run(`git tag v${version}`);
+run(`git commit -m "Release v${releasedVersion}"`);
+run(`git tag v${releasedVersion}`);
 console.log();
 
 // 8. Add new [Unreleased] sections
@@ -275,7 +318,7 @@ console.log();
 // 10. Push
 console.log("Pushing to remote...");
 run("git push origin main");
-run(`git push origin v${version}`);
+run(`git push origin v${releasedVersion}`);
 console.log();
 
-console.log(`=== Prepared release v${version}; CI publication starts after the tag push ===`);
+console.log(`=== Prepared release v${releasedVersion}; CI publication starts after the tag push ===`);

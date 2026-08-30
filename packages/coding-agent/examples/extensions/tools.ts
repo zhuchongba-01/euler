@@ -9,7 +9,7 @@
  * 2. Use /tools to open the tool selector
  */
 
-import { Container, type SettingItem, SettingsList } from "@earendil-works/pi-tui";
+import { Container, type SettingItem, SettingsList } from "@zhongchongba/euler-tui";
 import type { ExtensionAPI, ExtensionContext, ToolInfo } from "euler-agent";
 import { getSettingsListTheme } from "euler-agent";
 

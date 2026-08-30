@@ -13,7 +13,7 @@ import {
 	Text,
 	visibleWidth,
 	wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
+} from "@zhongchongba/euler-tui";
 import type { ExtensionAPI } from "euler-agent";
 import { Type } from "typebox";
 

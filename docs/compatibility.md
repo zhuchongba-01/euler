@@ -61,5 +61,6 @@ Euler paths (~/.euler/agent) and EULER_* environment variables.
 ## 已知边界
 
 - 内置扩展（`llama.cpp`、`Euler Web Access`）为 Euler 自有模块，不参与 Package 清单，也无法被 `euler remove` 卸载（见实施计划第 6 阶段）。
-- PI 发布的 npm 包（`@earendil-works/pi-*`）作为依赖引用时行为不变；Euler 不重复发布这些 Workspace 包。
+- Euler 发布自己的 npm Workspace 包；第三方扩展应改用 `euler-agent` 和
+  `@zhongchongba/euler-*` 导入路径。
 - 扩展加载器的 PI 引用扫描仅覆盖扩展入口文件；扩展运行时再动态拼接 `.pi` 路径不在扫描范围内。

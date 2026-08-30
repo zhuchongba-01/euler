@@ -235,7 +235,7 @@ Both `steer()` and `followUp()` expand file-based prompt templates but error on 
 
 ### Agent and AgentState
 
-The `Agent` class (from `@earendil-works/pi-agent-core`) handles the core LLM interaction. Access it via `session.agent`.
+The `Agent` class (from `@zhongchongba/euler-agent-core`) handles the core LLM interaction. Access it via `session.agent`.
 
 ```typescript
 // Access current state
@@ -367,7 +367,7 @@ When you pass a custom `ResourceLoader`, `cwd` and `agentDir` no longer control 
 ### Model
 
 ```typescript
-import { getModel } from "@earendil-works/pi-ai";
+import { getModel } from "@zhongchongba/euler-ai";
 import { ModelRuntime } from "euler-agent";
 
 const modelRuntime = await ModelRuntime.create();
@@ -448,7 +448,7 @@ Authentication resolution priority (handled by `ModelRuntime`):
 4. Fallback resolver (for custom provider keys from `models.json`)
 
 ```typescript
-import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
+import { InMemoryCredentialStore } from "@zhongchongba/euler-ai";
 import { createAgentSession, ModelRuntime } from "euler-agent";
 
 // Default: uses ~/.euler/agent/auth.json and ~/.euler/agent/models.json
@@ -954,7 +954,7 @@ interface LoadExtensionsResult {
 ## Complete Example
 
 ```typescript
-import { getModel } from "@earendil-works/pi-ai";
+import { getModel } from "@zhongchongba/euler-ai";
 import { Type } from "typebox";
 import {
   createAgentSession,

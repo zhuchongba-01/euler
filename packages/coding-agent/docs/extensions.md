@@ -142,8 +142,8 @@ To share extensions via npm or git as euler packages, see [packages.md](packages
 |---------|---------|
 | `euler-agent` | Extension types (`ExtensionAPI`, `ExtensionContext`, events) |
 | `typebox` | Schema definitions for tool parameters |
-| `@earendil-works/pi-ai` | AI utilities (`StringEnum` for Google-compatible enums) |
-| `@earendil-works/pi-tui` | TUI components for custom rendering |
+| `@zhongchongba/euler-ai` | AI utilities (`StringEnum` for Google-compatible enums) |
+| `@zhongchongba/euler-tui` | TUI components for custom rendering |
 
 npm dependencies work too. Add a `package.json` next to your extension (or in a parent directory), run `npm install`, and imports from `node_modules/` are resolved automatically.
 
@@ -1378,7 +1378,7 @@ See [dynamic-tools.ts](../examples/extensions/dynamic-tools.ts) for a full examp
 
 ```typescript
 import { Type } from "typebox";
-import { StringEnum } from "@earendil-works/pi-ai";
+import { StringEnum } from "@zhongchongba/euler-ai";
 
 euler.registerTool({
   name: "my_tool",
@@ -1541,7 +1541,7 @@ euler.registerCommand("stats", {
 Optional: add argument auto-completion for `/command ...`:
 
 ```typescript
-import type { AutocompleteItem } from "@earendil-works/pi-tui";
+import type { AutocompleteItem } from "@zhongchongba/euler-tui";
 
 euler.registerCommand("deploy", {
   description: "Deploy to an environment",
@@ -1620,7 +1620,7 @@ If a transformer throws, Euler keeps the Markdown produced so far and continues 
 Register a custom TUI renderer for custom entries with your `customType`. Custom entries are created with `euler.appendEntry()` and do not participate in LLM context.
 
 ```typescript
-import { Box, Text } from "@earendil-works/pi-tui";
+import { Box, Text } from "@zhongchongba/euler-tui";
 
 euler.registerEntryRenderer("status-card", (entry, { expanded }, theme) => {
   const data = entry.data as { title: string; count: number };
@@ -1743,10 +1743,10 @@ Dynamic providers can implement `refreshModels`. Euler calls it during model ref
 
 `context.signal` is always a concrete signal and provider callbacks must pass it to blocking I/O. Public `ModelRuntime.refresh()` and `ModelRegistry.refresh()` calls accept an optional signal and are unbounded when it is omitted; extensions and applications choose their own deadlines. Cancellation stops the caller waiting even if a provider ignores the signal, but cooperation is still required to stop the underlying work.
 
-Extensions that need native provider auth, filtering, refresh, or stream behavior can register a complete `Provider` from `@earendil-works/pi-ai`. The provider becomes the composition base and `models.json` overrides still apply above it.
+Extensions that need native provider auth, filtering, refresh, or stream behavior can register a complete `Provider` from `@zhongchongba/euler-ai`. The provider becomes the composition base and `models.json` overrides still apply above it.
 
 ```typescript
-import { createProvider, openAICompletionsApi } from "@earendil-works/pi-ai";
+import { createProvider, openAICompletionsApi } from "@zhongchongba/euler-ai";
 
 const provider = createProvider({
   id: "local-server",
@@ -1954,8 +1954,8 @@ async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 
 ```typescript
 import { Type } from "typebox";
-import { StringEnum } from "@earendil-works/pi-ai";
-import { Text } from "@earendil-works/pi-tui";
+import { StringEnum } from "@zhongchongba/euler-ai";
+import { Text } from "@zhongchongba/euler-tui";
 
 euler.registerTool({
   name: "my_tool",
@@ -2026,7 +2026,7 @@ async execute(toolCallId, params) {
 }
 ```
 
-**Important:** Use `StringEnum` from `@earendil-works/pi-ai` for string enums. `Type.Union`/`Type.Literal` doesn't work with Google's API.
+**Important:** Use `StringEnum` from `@zhongchongba/euler-ai` for string enums. `Type.Union`/`Type.Literal` doesn't work with Google's API.
 
 **Argument preparation:** `prepareArguments(args)` is optional. If defined, it runs before schema validation and before `execute()`. Use it to mimic an older accepted input shape when euler resumes an older session whose stored tool call arguments no longer match the current schema. Return the object you want validated against `parameters`. Keep the public schema strict. Do not add deprecated compatibility fields to `parameters` just to keep old resumed sessions working.
 
@@ -2273,7 +2273,7 @@ Use `context.state` for cross-slot shared state. Keep slot-local caches on the r
 Renders the tool call or header:
 
 ```typescript
-import { Text } from "@earendil-works/pi-tui";
+import { Text } from "@zhongchongba/euler-tui";
 
 renderCall(args, theme, context) {
   const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
@@ -2731,7 +2731,7 @@ See [github-issue-autocomplete.ts](../examples/extensions/github-issue-autocompl
 For complex UI, use `ctx.ui.custom()`. This temporarily replaces the editor with your component until `done()` is called:
 
 ```typescript
-import { Text, Component } from "@earendil-works/pi-tui";
+import { Text, Component } from "@zhongchongba/euler-tui";
 
 const result = await ctx.ui.custom<boolean>((tui, theme, keybindings, done) => {
   const text = new Text("Press Enter to confirm, Escape to cancel", 1, 1);
@@ -2797,7 +2797,7 @@ Replace the main input editor with a custom implementation (vim mode, emacs mode
 
 ```typescript
 import { CustomEditor, type ExtensionAPI } from "euler-agent";
-import { matchesKey } from "@earendil-works/pi-tui";
+import { matchesKey } from "@zhongchongba/euler-tui";
 
 class VimEditor extends CustomEditor {
   private mode: "normal" | "insert" = "insert";
@@ -2847,7 +2847,7 @@ See [tui.md](tui.md) Pattern 7 for a complete example with mode indicator.
 Register a custom renderer for messages with your `customType`. Use message renderers for content that should participate in LLM context:
 
 ```typescript
-import { Text } from "@earendil-works/pi-tui";
+import { Text } from "@zhongchongba/euler-tui";
 
 euler.registerMessageRenderer("my-extension", (message, options, theme) => {
   const { expanded, outputPad } = options;

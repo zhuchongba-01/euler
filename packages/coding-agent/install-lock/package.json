@@ -1,10 +1,10 @@
 {
 	"name": "euler-agent-install",
-	"version": "0.84.3",
+	"version": "0.1.0",
 	"private": true,
 	"description": "Lockfile root used by the Euler installer and updater.",
 	"dependencies": {
-		"euler-agent": "0.84.3"
+		"euler-agent": "0.1.0"
 	},
 	"overrides": {
 		"protobufjs": "7.6.5",

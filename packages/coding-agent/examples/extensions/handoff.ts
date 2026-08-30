@@ -12,8 +12,8 @@
  * The generated prompt appears as a draft in the editor for review/editing.
  */
 
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { type Message, uuidv7 } from "@earendil-works/pi-ai";
+import type { AgentMessage } from "@zhongchongba/euler-agent-core";
+import { type Message, uuidv7 } from "@zhongchongba/euler-ai";
 import type { ExtensionAPI, SessionEntry } from "euler-agent";
 import { BorderedLoader, convertToLlm, serializeConversation } from "euler-agent";
 

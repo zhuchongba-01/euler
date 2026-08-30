@@ -9,7 +9,7 @@
  * - ctrl+c, ctrl+d, etc. work in both modes
  */
 
-import { matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { matchesKey, truncateToWidth, visibleWidth } from "@zhongchongba/euler-tui";
 import { CustomEditor, type ExtensionAPI } from "euler-agent";
 
 // Normal mode key mappings: key -> escape sequence (or null for mode switch)

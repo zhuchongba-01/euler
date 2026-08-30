@@ -8,7 +8,7 @@
  * Usage: /status-card [message]
  */
 
-import { Box, Text } from "@earendil-works/pi-tui";
+import { Box, Text } from "@zhongchongba/euler-tui";
 import type { ExtensionAPI } from "euler-agent";
 
 interface StatusCardData {

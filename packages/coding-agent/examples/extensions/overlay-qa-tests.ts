@@ -19,8 +19,8 @@
  *   /overlay-streaming  - Multiple input panels with simulated streaming (Tab to cycle focus)
  */
 
-import type { Component, OverlayAnchor, OverlayHandle, OverlayOptions, TUI } from "@earendil-works/pi-tui";
-import { Input, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import type { Component, OverlayAnchor, OverlayHandle, OverlayOptions, TUI } from "@zhongchongba/euler-tui";
+import { Input, matchesKey, truncateToWidth, visibleWidth } from "@zhongchongba/euler-tui";
 import { spawn } from "child_process";
 import type { ExtensionAPI, ExtensionCommandContext, Theme } from "euler-agent";
 

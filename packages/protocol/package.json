@@ -1,7 +1,7 @@
 {
-	"name": "@earendil-works/pi-protocol",
-	"version": "0.84.3",
-	"description": "Transport-neutral CBOR protocol for remote pi sessions",
+	"name": "@zhongchongba/euler-protocol",
+	"version": "0.1.0",
+	"description": "Transport-neutral CBOR protocol for remote Euler sessions.",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -22,17 +22,17 @@
 		"prepublishOnly": "npm run clean && npm run build"
 	},
 	"keywords": [
-		"pi",
+		"euler",
 		"protocol",
 		"cbor",
 		"binary",
 		"framing"
 	],
-	"author": "Earendil Works",
+	"author": "Euler contributors",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/earendil-works/pi.git",
+		"url": "git+https://github.com/zhuchongba-01/euler.git",
 		"directory": "packages/protocol"
 	},
 	"engines": {
@@ -44,5 +44,9 @@
 	"devDependencies": {
 		"shx": "0.4.0",
 		"vitest": "4.1.9"
+	},
+	"homepage": "https://github.com/zhuchongba-01/euler#readme",
+	"bugs": {
+		"url": "https://github.com/zhuchongba-01/euler/issues"
 	}
 }

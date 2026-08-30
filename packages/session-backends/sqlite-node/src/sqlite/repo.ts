@@ -1,4 +1,4 @@
-import type { FileError, Result } from "@earendil-works/pi-agent-core";
+import type { FileError, Result } from "@zhongchongba/euler-agent-core";
 import {
 	type BranchBounds,
 	type Entry,
@@ -16,8 +16,8 @@ import {
 	type SessionRepo as SessionRepository,
 	type SessionStats,
 	type SessionStorage,
-} from "@earendil-works/pi-agent-core";
-import { uuidv7 } from "@earendil-works/pi-ai";
+} from "@zhongchongba/euler-agent-core";
+import { uuidv7 } from "@zhongchongba/euler-ai";
 import { appendEntryToBranchCache, buildCachedBranch, deleteBranchCache, rebuildBranchCache } from "./branch-cache.ts";
 import { applyMigrations } from "./migrations.ts";
 import { sql } from "./sql.ts";

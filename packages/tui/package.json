@@ -1,7 +1,7 @@
 {
-	"name": "@earendil-works/pi-tui",
-	"version": "0.84.3",
-	"description": "Terminal User Interface library with differential rendering for efficient text-based applications",
+	"name": "@zhongchongba/euler-tui",
+	"version": "0.1.0",
+	"description": "Terminal UI library used by Euler.",
 	"type": "module",
 	"main": "dist/index.js",
 	"scripts": {
@@ -25,6 +25,7 @@
 		"README.md"
 	],
 	"keywords": [
+		"euler",
 		"tui",
 		"terminal",
 		"ui",
@@ -33,11 +34,11 @@
 		"typescript",
 		"cli"
 	],
-	"author": "Mario Zechner",
+	"author": "Euler contributors",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/earendil-works/pi.git",
+		"url": "git+https://github.com/zhuchongba-01/euler.git",
 		"directory": "packages/tui"
 	},
 	"engines": {
@@ -51,5 +52,9 @@
 	"devDependencies": {
 		"@xterm/headless": "5.5.0",
 		"chalk": "5.6.2"
+	},
+	"homepage": "https://github.com/zhuchongba-01/euler#readme",
+	"bugs": {
+		"url": "https://github.com/zhuchongba-01/euler/issues"
 	}
 }

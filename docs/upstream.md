@@ -9,7 +9,7 @@ Euler 是 [earendil-works/pi](https://github.com/earendil-works/pi)（下称 PI�
 | 项 | 值 |
 |------|------|
 | 基线 commit | `56f3f33a9a675ef2a2c30cf2e35a6a385cdf2ed4`（PI 0.84.3） |
-| 上游 remote | `upstream` → `https://github.com/earendil-works/pi.git`（fetch-only，push 已禁用） |
+| 上游 remote | `upstream` → `https://github.com/zhuchongba-01/euler.git`（fetch-only，push 已禁用） |
 | 搜索基线 | `pi-web-access` `0.25.0`（已内嵌为 `src/extensions/web-access/`） |
 | 恢复点 | `design-approved` 分支（批准设计时的文档快照） |
 

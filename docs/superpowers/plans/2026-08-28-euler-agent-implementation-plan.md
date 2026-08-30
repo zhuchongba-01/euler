@@ -30,7 +30,7 @@
 **步骤：**
 
 1. 给当前文档提交保留 `design-approved` 分支。
-2. 添加只读上游 remote：`https://github.com/earendil-works/pi.git`。
+2. 添加只读上游 remote：`https://github.com/zhuchongba-01/euler.git`。
 3. 从固定 commit 创建实施分支，再 cherry-pick 已批准的 Euler 文档提交。
 4. 将实施分支设为本地 `main`；保留 `design-approved` 作为恢复点。
 5. 在 `docs/upstream.md` 记录 PI commit、版本、同步规则和差异边界。

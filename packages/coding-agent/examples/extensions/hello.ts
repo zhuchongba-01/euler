@@ -2,7 +2,7 @@
  * Hello Tool - Minimal custom tool example
  */
 
-import { Type } from "@earendil-works/pi-ai";
+import { Type } from "@zhongchongba/euler-ai";
 import { defineTool, type ExtensionAPI } from "euler-agent";
 
 const helloTool = defineTool({

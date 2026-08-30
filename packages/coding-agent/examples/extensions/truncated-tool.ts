@@ -15,7 +15,7 @@
  */
 
 import { mkdtemp, writeFile } from "node:fs/promises";
-import { Text } from "@earendil-works/pi-tui";
+import { Text } from "@zhongchongba/euler-tui";
 import { execSync } from "child_process";
 import type { ExtensionAPI } from "euler-agent";
 import {

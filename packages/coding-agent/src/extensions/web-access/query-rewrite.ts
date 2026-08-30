@@ -1,4 +1,4 @@
-import type { Api, Model, ProviderHeaders } from "@earendil-works/pi-ai";
+import type { Api, Model, ProviderHeaders } from "@zhongchongba/euler-ai";
 import {
 	findModelWithProviderRouting,
 	loadEnabledModelPatterns,

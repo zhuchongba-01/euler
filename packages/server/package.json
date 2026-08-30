@@ -1,7 +1,7 @@
 {
-	"name": "@earendil-works/pi-server",
-	"version": "0.84.3",
-	"description": "experimental server package for pi",
+	"name": "@zhongchongba/euler-server",
+	"version": "0.1.0",
+	"description": "Experimental server package for Euler.",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -33,25 +33,29 @@
 		"prepublishOnly": "npm run clean && npm run build"
 	},
 	"keywords": [
-		"pi",
+		"euler",
 		"server"
 	],
-	"author": "Earendil Works",
+	"author": "Euler contributors",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/earendil-works/pi.git",
+		"url": "git+https://github.com/zhuchongba-01/euler.git",
 		"directory": "packages/server"
 	},
 	"engines": {
 		"node": ">=22.19.0"
 	},
 	"dependencies": {
-		"@earendil-works/pi-ai": "^0.84.3",
-		"@earendil-works/pi-protocol": "^0.84.3"
+		"@zhongchongba/euler-ai": "^0.1.0",
+		"@zhongchongba/euler-protocol": "^0.1.0"
 	},
 	"devDependencies": {
 		"shx": "0.4.0",
 		"vitest": "4.1.9"
+	},
+	"homepage": "https://github.com/zhuchongba-01/euler#readme",
+	"bugs": {
+		"url": "https://github.com/zhuchongba-01/euler/issues"
 	}
 }

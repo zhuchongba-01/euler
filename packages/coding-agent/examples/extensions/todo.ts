@@ -10,8 +10,8 @@
  * correct for that point in history.
  */
 
-import { StringEnum } from "@earendil-works/pi-ai";
-import { matchesKey, Text, truncateToWidth } from "@earendil-works/pi-tui";
+import { StringEnum } from "@zhongchongba/euler-ai";
+import { matchesKey, Text, truncateToWidth } from "@zhongchongba/euler-tui";
 import type { ExtensionAPI, ExtensionContext, Theme } from "euler-agent";
 import { Type } from "typebox";
 

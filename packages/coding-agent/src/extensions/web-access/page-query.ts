@@ -1,4 +1,4 @@
-import type { Api, Message, Model } from "@earendil-works/pi-ai";
+import type { Api, Message, Model } from "@zhongchongba/euler-ai";
 import type { ExtensionContext } from "../../core/extensions/types.ts";
 import { loadEnabledModelPatterns, modelMatchesEnabledPatterns } from "./summary-model-scope.ts";
 

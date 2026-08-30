@@ -7,9 +7,9 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentMessage, ThinkingLevel } from "@earendil-works/pi-agent-core";
-import type { AuthEvent, AuthPrompt } from "@earendil-works/pi-ai";
-import type { AssistantMessage, ImageContent, Message, Model, Usage } from "@earendil-works/pi-ai/compat";
+import type { AgentMessage, ThinkingLevel } from "@zhongchongba/euler-agent-core";
+import type { AuthEvent, AuthPrompt } from "@zhongchongba/euler-ai";
+import type { AssistantMessage, ImageContent, Message, Model, Usage } from "@zhongchongba/euler-ai/compat";
 import type {
 	AutocompleteItem,
 	AutocompleteProvider,
@@ -22,8 +22,8 @@ import type {
 	SlashCommand,
 	Terminal,
 	TuiMainScreenRenderState,
-} from "@earendil-works/pi-tui";
-import * as TuiLayouts from "@earendil-works/pi-tui";
+} from "@zhongchongba/euler-tui";
+import * as TuiLayouts from "@zhongchongba/euler-tui";
 import {
 	CombinedAutocompleteProvider,
 	type Component,
@@ -43,7 +43,7 @@ import {
 	TuiAltScreen,
 	TuiMainScreen,
 	visibleWidth,
-} from "@earendil-works/pi-tui";
+} from "@zhongchongba/euler-tui";
 import chalk from "chalk";
 import { spawn } from "child_process";
 import {

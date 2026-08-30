@@ -5,7 +5,7 @@
  * without paying for an extra follow-up LLM turn.
  */
 
-import { Text } from "@earendil-works/pi-tui";
+import { Text } from "@zhongchongba/euler-tui";
 import { defineTool, type ExtensionAPI } from "euler-agent";
 import { Type } from "typebox";
 

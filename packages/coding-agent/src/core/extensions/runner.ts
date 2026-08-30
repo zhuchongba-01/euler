@@ -2,9 +2,9 @@
  * Extension runner - executes extensions and manages their lifecycle.
  */
 
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { ImageContent, Model, Provider, ProviderHeaders } from "@earendil-works/pi-ai";
-import type { KeyId } from "@earendil-works/pi-tui";
+import type { AgentMessage } from "@zhongchongba/euler-agent-core";
+import type { ImageContent, Model, Provider, ProviderHeaders } from "@zhongchongba/euler-ai";
+import type { KeyId } from "@zhongchongba/euler-tui";
 import { type Theme, theme } from "../../modes/interactive/theme/theme.ts";
 import type { ResourceDiagnostic } from "../diagnostics.ts";
 import type { KeybindingsConfig } from "../keybindings.ts";

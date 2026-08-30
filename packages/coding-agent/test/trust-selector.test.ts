@@ -1,4 +1,4 @@
-import { setKeybindings } from "@earendil-works/pi-tui";
+import { setKeybindings } from "@zhongchongba/euler-tui";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // Fixtures use synthetic POSIX paths (/project, /parent); Windows path resolution
 // gives them the current drive root, so these rendering tests stay POSIX-only.

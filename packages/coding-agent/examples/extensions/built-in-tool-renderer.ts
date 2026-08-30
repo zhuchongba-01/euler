@@ -25,7 +25,7 @@
  *   pi -e ./built-in-tool-renderer.ts
  */
 
-import { Text } from "@earendil-works/pi-tui";
+import { Text } from "@zhongchongba/euler-tui";
 import type { BashToolDetails, EditToolDetails, ExtensionAPI, ReadToolDetails } from "euler-agent";
 import { createBashTool, createEditTool, createReadTool, createWriteTool } from "euler-agent";
 

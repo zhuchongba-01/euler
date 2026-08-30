@@ -224,22 +224,30 @@ describe("detectInstallMethod", () => {
 	test("self-updates renamed packages from the current install prefix", () => {
 		const { prefix } = createNpmPrefixInstall();
 
-		const command = getSelfUpdateCommand("@mariozechner/pi-coding-agent", undefined, "@new-scope/pi");
+		const command = getSelfUpdateCommand("previous-agent", undefined, "@new-scope/euler");
 
 		expect(command).toEqual({
 			command: "npm",
-			args: ["--prefix", prefix, "install", "-g", "--ignore-scripts", "--min-release-age=0", "@new-scope/pi"],
-			display: `npm --prefix ${prefix} uninstall -g @mariozechner/pi-coding-agent && npm --prefix ${prefix} install -g --ignore-scripts --min-release-age=0 @new-scope/pi`,
+			args: ["--prefix", prefix, "install", "-g", "--ignore-scripts", "--min-release-age=0", "@new-scope/euler"],
+			display: `npm --prefix ${prefix} uninstall -g previous-agent && npm --prefix ${prefix} install -g --ignore-scripts --min-release-age=0 @new-scope/euler`,
 			steps: [
 				{
 					command: "npm",
-					args: ["--prefix", prefix, "uninstall", "-g", "@mariozechner/pi-coding-agent"],
-					display: `npm --prefix ${prefix} uninstall -g @mariozechner/pi-coding-agent`,
+					args: ["--prefix", prefix, "uninstall", "-g", "previous-agent"],
+					display: `npm --prefix ${prefix} uninstall -g previous-agent`,
 				},
 				{
 					command: "npm",
-					args: ["--prefix", prefix, "install", "-g", "--ignore-scripts", "--min-release-age=0", "@new-scope/pi"],
-					display: `npm --prefix ${prefix} install -g --ignore-scripts --min-release-age=0 @new-scope/pi`,
+					args: [
+						"--prefix",
+						prefix,
+						"install",
+						"-g",
+						"--ignore-scripts",
+						"--min-release-age=0",
+						"@new-scope/euler",
+					],
+					display: `npm --prefix ${prefix} install -g --ignore-scripts --min-release-age=0 @new-scope/euler`,
 				},
 			],
 		});
@@ -318,24 +326,24 @@ describe("detectInstallMethod", () => {
 	test("self-updates renamed pnpm global installs by removing the old package first", () => {
 		createPnpmGlobalInstall();
 
-		const command = getSelfUpdateCommand("@mariozechner/pi-coding-agent", undefined, "@new-scope/pi");
+		const command = getSelfUpdateCommand("previous-agent", undefined, "@new-scope/euler");
 
 		expect(detectInstallMethod()).toBe("pnpm");
 		expect(command).toEqual({
 			command: "pnpm",
-			args: ["install", "-g", "--ignore-scripts", "--config.minimumReleaseAge=0", "@new-scope/pi"],
+			args: ["install", "-g", "--ignore-scripts", "--config.minimumReleaseAge=0", "@new-scope/euler"],
 			display:
-				"pnpm remove -g @mariozechner/pi-coding-agent && pnpm install -g --ignore-scripts --config.minimumReleaseAge=0 @new-scope/pi",
+				"pnpm remove -g previous-agent && pnpm install -g --ignore-scripts --config.minimumReleaseAge=0 @new-scope/euler",
 			steps: [
 				{
 					command: "pnpm",
-					args: ["remove", "-g", "@mariozechner/pi-coding-agent"],
-					display: "pnpm remove -g @mariozechner/pi-coding-agent",
+					args: ["remove", "-g", "previous-agent"],
+					display: "pnpm remove -g previous-agent",
 				},
 				{
 					command: "pnpm",
-					args: ["install", "-g", "--ignore-scripts", "--config.minimumReleaseAge=0", "@new-scope/pi"],
-					display: "pnpm install -g --ignore-scripts --config.minimumReleaseAge=0 @new-scope/pi",
+					args: ["install", "-g", "--ignore-scripts", "--config.minimumReleaseAge=0", "@new-scope/euler"],
+					display: "pnpm install -g --ignore-scripts --config.minimumReleaseAge=0 @new-scope/euler",
 				},
 			],
 		});
@@ -385,23 +393,23 @@ describe("detectInstallMethod", () => {
 	test("self-updates renamed yarn global installs by removing the old package first", () => {
 		createYarnGlobalInstall();
 
-		const command = getSelfUpdateCommand("@mariozechner/pi-coding-agent", undefined, "@new-scope/pi");
+		const command = getSelfUpdateCommand("previous-agent", undefined, "@new-scope/euler");
 
 		expect(detectInstallMethod()).toBe("yarn");
 		expect(command).toEqual({
 			command: "yarn",
-			args: ["global", "add", "--ignore-scripts", "@new-scope/pi"],
-			display: "yarn global remove @mariozechner/pi-coding-agent && yarn global add --ignore-scripts @new-scope/pi",
+			args: ["global", "add", "--ignore-scripts", "@new-scope/euler"],
+			display: "yarn global remove previous-agent && yarn global add --ignore-scripts @new-scope/euler",
 			steps: [
 				{
 					command: "yarn",
-					args: ["global", "remove", "@mariozechner/pi-coding-agent"],
-					display: "yarn global remove @mariozechner/pi-coding-agent",
+					args: ["global", "remove", "previous-agent"],
+					display: "yarn global remove previous-agent",
 				},
 				{
 					command: "yarn",
-					args: ["global", "add", "--ignore-scripts", "@new-scope/pi"],
-					display: "yarn global add --ignore-scripts @new-scope/pi",
+					args: ["global", "add", "--ignore-scripts", "@new-scope/euler"],
+					display: "yarn global add --ignore-scripts @new-scope/euler",
 				},
 			],
 		});
@@ -410,24 +418,24 @@ describe("detectInstallMethod", () => {
 	test("self-updates renamed bun global installs by removing the old package first", () => {
 		createBunGlobalInstall();
 
-		const command = getSelfUpdateCommand("@mariozechner/pi-coding-agent", undefined, "@new-scope/pi");
+		const command = getSelfUpdateCommand("previous-agent", undefined, "@new-scope/euler");
 
 		expect(detectInstallMethod()).toBe("bun");
 		expect(command).toEqual({
 			command: "bun",
-			args: ["install", "-g", "--ignore-scripts", "--minimum-release-age=0", "@new-scope/pi"],
+			args: ["install", "-g", "--ignore-scripts", "--minimum-release-age=0", "@new-scope/euler"],
 			display:
-				"bun uninstall -g @mariozechner/pi-coding-agent && bun install -g --ignore-scripts --minimum-release-age=0 @new-scope/pi",
+				"bun uninstall -g previous-agent && bun install -g --ignore-scripts --minimum-release-age=0 @new-scope/euler",
 			steps: [
 				{
 					command: "bun",
-					args: ["uninstall", "-g", "@mariozechner/pi-coding-agent"],
-					display: "bun uninstall -g @mariozechner/pi-coding-agent",
+					args: ["uninstall", "-g", "previous-agent"],
+					display: "bun uninstall -g previous-agent",
 				},
 				{
 					command: "bun",
-					args: ["install", "-g", "--ignore-scripts", "--minimum-release-age=0", "@new-scope/pi"],
-					display: "bun install -g --ignore-scripts --minimum-release-age=0 @new-scope/pi",
+					args: ["install", "-g", "--ignore-scripts", "--minimum-release-age=0", "@new-scope/euler"],
+					display: "bun install -g --ignore-scripts --minimum-release-age=0 @new-scope/euler",
 				},
 			],
 		});

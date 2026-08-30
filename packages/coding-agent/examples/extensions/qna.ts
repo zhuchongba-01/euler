@@ -7,7 +7,7 @@
  * 3. Loads the result into the editor for user to fill in answers
  */
 
-import type { UserMessage } from "@earendil-works/pi-ai";
+import type { UserMessage } from "@zhongchongba/euler-ai";
 import type { ExtensionAPI } from "euler-agent";
 import { BorderedLoader } from "euler-agent";
 

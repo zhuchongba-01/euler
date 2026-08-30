@@ -42,7 +42,7 @@ import {
 	type Tool,
 	type ToolCall,
 	type ToolResultMessage,
-} from "@earendil-works/pi-ai";
+} from "@zhongchongba/euler-ai";
 import type { ExtensionAPI } from "euler-agent";
 
 // =============================================================================

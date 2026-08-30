@@ -1,5 +1,5 @@
-import type { Component, EditorTheme, TUI } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import type { Component, EditorTheme, TUI } from "@zhongchongba/euler-tui";
+import { truncateToWidth, visibleWidth } from "@zhongchongba/euler-tui";
 import { CustomEditor, type ExtensionAPI, type ExtensionContext, type KeybindingsManager } from "euler-agent";
 
 function fitBorder(

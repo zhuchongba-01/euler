@@ -1,7 +1,7 @@
 {
-	"name": "@earendil-works/pi-telemetry",
-	"version": "0.84.3",
-	"description": "Vendor-neutral telemetry contracts and typed schema utilities for pi",
+	"name": "@zhongchongba/euler-telemetry",
+	"version": "0.1.0",
+	"description": "Vendor-neutral telemetry contracts for Euler.",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -26,16 +26,21 @@
 		"prepublishOnly": "npm run clean && npm run build"
 	},
 	"keywords": [
+		"euler",
 		"telemetry",
 		"tracing",
 		"observability"
 	],
-	"author": "Mario Zechner",
+	"author": "Euler contributors",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/earendil-works/pi.git",
+		"url": "git+https://github.com/zhuchongba-01/euler.git",
 		"directory": "packages/telemetry"
+	},
+	"homepage": "https://github.com/zhuchongba-01/euler#readme",
+	"bugs": {
+		"url": "https://github.com/zhuchongba-01/euler/issues"
 	},
 	"engines": {
 		"node": ">=22.19.0"

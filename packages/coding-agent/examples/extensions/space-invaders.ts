@@ -3,7 +3,7 @@
  * Uses Kitty keyboard protocol for smooth movement (press/release detection)
  */
 
-import { isKeyRelease, Key, matchesKey, visibleWidth } from "@earendil-works/pi-tui";
+import { isKeyRelease, Key, matchesKey, visibleWidth } from "@zhongchongba/euler-tui";
 import type { ExtensionAPI } from "euler-agent";
 
 const GAME_WIDTH = 60;

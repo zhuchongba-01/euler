@@ -35,8 +35,8 @@ import {
 	type ProviderRequestOptions,
 	type SimpleStreamOptions,
 	type StreamOptions,
-} from "@earendil-works/pi-ai";
-import * as builtinProviderCatalog from "@earendil-works/pi-ai/providers/all";
+} from "@zhongchongba/euler-ai";
+import * as builtinProviderCatalog from "@zhongchongba/euler-ai/providers/all";
 import { getAgentDir } from "../config.ts";
 import { getEulerEnv } from "../euler-env.ts";
 import { operationSignal, raceWithAbortSignal } from "../utils/abort.ts";

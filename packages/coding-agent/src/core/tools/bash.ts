@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { access as fsAccess } from "node:fs/promises";
-import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { Container, Text, truncateToWidth } from "@earendil-works/pi-tui";
+import type { AgentTool } from "@zhongchongba/euler-agent-core";
+import { Container, Text, truncateToWidth } from "@zhongchongba/euler-tui";
 import { spawn } from "child_process";
 import { type Static, Type } from "typebox";
 import { EULER_ENV, stripLegacySessionEnv } from "../../euler-env.ts";

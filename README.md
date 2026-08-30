@@ -11,13 +11,14 @@ Euler is a terminal coding agent built as a downstream distribution of the [Pi a
 
 | Package | Description |
 |---------|-------------|
-| **[@earendil-works/pi-telemetry](packages/telemetry)** | Vendor-neutral telemetry contracts (NOOP in Euler) |
-| **[@earendil-works/pi-ai](packages/ai)** | Unified multi-provider LLM API (OpenAI, Anthropic, Google, etc.) |
-| **[@earendil-works/pi-agent-core](packages/agent)** | Agent runtime with tool calling and state management |
+| **[@zhongchongba/euler-telemetry](packages/telemetry)** | Vendor-neutral telemetry contracts (NOOP in Euler) |
+| **[@zhongchongba/euler-ai](packages/ai)** | Unified multi-provider LLM API (OpenAI, Anthropic, Google, etc.) |
+| **[@zhongchongba/euler-agent-core](packages/agent)** | Agent runtime with tool calling and state management |
 | **[euler-agent](packages/coding-agent)** | The `euler` interactive coding agent CLI |
-| **[@earendil-works/pi-tui](packages/tui)** | Terminal UI library with differential rendering |
+| **[@zhongchongba/euler-tui](packages/tui)** | Terminal UI library with differential rendering |
 
-Workspace packages keep their upstream `@earendil-works/*` names; the CLI package is published as `euler-agent`.
+Euler publishes the CLI as `euler-agent` and its supporting packages under the
+`@zhongchongba/euler-*` scope.
 
 ## Euler-specific documentation
 

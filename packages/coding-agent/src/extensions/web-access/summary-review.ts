@@ -5,7 +5,7 @@ import {
 	type Model,
 	type ModelThinkingLevel,
 	type ThinkingLevel,
-} from "@earendil-works/pi-ai";
+} from "@zhongchongba/euler-ai";
 import type { ExtensionContext } from "../../core/extensions/types.ts";
 import type { QueryResultData } from "./storage.ts";
 import {

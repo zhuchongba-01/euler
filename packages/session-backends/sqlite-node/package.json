@@ -1,7 +1,7 @@
 {
-	"name": "@earendil-works/pi-session-backend-sqlite-node",
-	"version": "0.84.3",
-	"description": "Node sqlite session backend for @earendil-works/pi-agent-core sessions",
+	"name": "@zhongchongba/euler-session-backend-sqlite-node",
+	"version": "0.1.0",
+	"description": "Node SQLite session backend for Euler agent sessions.",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -23,22 +23,29 @@
 		"coverage": "vitest --run --coverage",
 		"prepublishOnly": "npm run clean && npm run build"
 	},
-	"author": "Earendil Works",
+	"author": "Euler contributors",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/earendil-works/pi.git",
+		"url": "git+https://github.com/zhuchongba-01/euler.git",
 		"directory": "packages/session-backends/sqlite-node"
 	},
 	"engines": {
 		"node": ">=22.19.0"
 	},
 	"dependencies": {
-		"@earendil-works/pi-ai": "^0.84.3",
-		"@earendil-works/pi-agent-core": "^0.84.3"
+		"@zhongchongba/euler-ai": "^0.1.0",
+		"@zhongchongba/euler-agent-core": "^0.1.0"
 	},
 	"devDependencies": {
 		"@vitest/coverage-v8": "4.1.9",
 		"vitest": "4.1.9"
-	}
+	},
+	"homepage": "https://github.com/zhuchongba-01/euler#readme",
+	"bugs": {
+		"url": "https://github.com/zhuchongba-01/euler/issues"
+	},
+	"keywords": [
+		"euler"
+	]
 }

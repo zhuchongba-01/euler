@@ -5,7 +5,7 @@ import {
 	type TUI,
 	truncateToWidth,
 	visibleWidth,
-} from "@earendil-works/pi-tui";
+} from "@zhongchongba/euler-tui";
 import type { AppKeybinding, KeybindingsManager } from "../../../core/keybindings.ts";
 import { stripAnsi } from "../../../utils/ansi.ts";
 import { getLineDrawingCharacters } from "./dynamic-border.ts";

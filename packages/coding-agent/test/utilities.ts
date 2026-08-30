@@ -15,10 +15,10 @@ import {
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { Agent } from "@earendil-works/pi-agent-core";
-import type { OAuthCredentials } from "@earendil-works/pi-ai";
-import { getModel, streamSimple } from "@earendil-works/pi-ai/compat";
-import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
+import { Agent } from "@zhongchongba/euler-agent-core";
+import type { OAuthCredentials } from "@zhongchongba/euler-ai";
+import { getModel, streamSimple } from "@zhongchongba/euler-ai/compat";
+import { builtinProviders } from "@zhongchongba/euler-ai/providers/all";
 import { AgentSession } from "../src/core/agent-session.ts";
 import { AuthStorage } from "../src/core/auth-storage.ts";
 import { createEventBus } from "../src/core/event-bus.ts";

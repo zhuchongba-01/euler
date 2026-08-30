@@ -9,7 +9,7 @@
  *
  * This module is the single source of truth for the error/cancel render PLAN
  * (plain strings, no theme/ANSI), so it is unit-testable without pi's runtime
- * (@mariozechner/pi-tui Text/Box). index.ts.renderResult delegates to it and only
+ * (Euler TUI Text/Box). index.ts.renderResult delegates to it and only
  * applies theme colors + creates Text/Box components.
  *
  * Contract for callers:

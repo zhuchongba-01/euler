@@ -6,7 +6,7 @@ import {
 	type AutocompleteProvider,
 	type AutocompleteSuggestions,
 	fuzzyFilter,
-} from "@earendil-works/pi-tui";
+} from "@zhongchongba/euler-tui";
 import type { ExtensionAPI } from "euler-agent";
 
 type GitHubIssue = {

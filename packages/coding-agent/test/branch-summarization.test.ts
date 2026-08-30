@@ -1,11 +1,11 @@
-import type { StreamFn } from "@earendil-works/pi-agent-core";
+import type { StreamFn } from "@zhongchongba/euler-agent-core";
 import {
 	type AssistantMessage,
 	createAssistantMessageEventStream,
 	fauxAssistantMessage,
 	type Model,
 	type SimpleStreamOptions,
-} from "@earendil-works/pi-ai";
+} from "@zhongchongba/euler-ai";
 import { describe, expect, it } from "vitest";
 import { generateBranchSummary } from "../src/core/compaction/index.ts";
 import type { SessionEntry } from "../src/core/session-manager.ts";

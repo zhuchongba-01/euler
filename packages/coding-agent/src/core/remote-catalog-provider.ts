@@ -1,4 +1,4 @@
-import type { Api, Model, ModelsStoreEntry, Provider } from "@earendil-works/pi-ai";
+import type { Api, Model, ModelsStoreEntry, Provider } from "@zhongchongba/euler-ai";
 import { VERSION } from "../config.ts";
 import { getEulerUserAgent } from "../utils/euler-user-agent.ts";
 import { fetchWithRetry } from "../utils/management-http.ts";

@@ -8,8 +8,8 @@
  * Token stats come from ctx.sessionManager/ctx.model (already accessible).
  */
 
-import type { AssistantMessage } from "@earendil-works/pi-ai";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import type { AssistantMessage } from "@zhongchongba/euler-ai";
+import { truncateToWidth, visibleWidth } from "@zhongchongba/euler-tui";
 import type { ExtensionAPI } from "euler-agent";
 
 export default function (pi: ExtensionAPI) {

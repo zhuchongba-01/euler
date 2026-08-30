@@ -21,7 +21,7 @@ import {
 	openAIResponsesApi,
 	type SimpleStreamOptions,
 	type ThinkingLevelMap,
-} from "@earendil-works/pi-ai/compat";
+} from "@zhongchongba/euler-ai/compat";
 import type { ExtensionAPI } from "euler-agent";
 
 // =============================================================================

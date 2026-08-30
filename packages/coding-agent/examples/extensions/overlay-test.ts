@@ -8,7 +8,7 @@
  * - Edge case tests (wide chars, styled text, emoji)
  */
 
-import { CURSOR_MARKER, type Focusable, matchesKey, visibleWidth } from "@earendil-works/pi-tui";
+import { CURSOR_MARKER, type Focusable, matchesKey, visibleWidth } from "@zhongchongba/euler-tui";
 import type { ExtensionAPI, ExtensionCommandContext, Theme } from "euler-agent";
 
 export default function (pi: ExtensionAPI) {
