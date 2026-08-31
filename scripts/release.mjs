@@ -92,9 +92,10 @@ function assertPackagesAreReadyForRelease(version) {
 	console.log(INITIAL_RELEASE ? "Checking initial npm package availability..." : "Checking npm package registration...");
 	for (const pkg of packages) {
 		const packageSpec = INITIAL_RELEASE ? `${pkg.name}@${version}` : pkg.name;
-		const result = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["view", packageSpec, "version", "--json"], {
+		const result = spawnSync("npm", ["view", packageSpec, "version", "--json"], {
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "pipe"],
+			shell: process.platform === "win32",
 		});
 
 		if (result.status === 0 && result.stdout.trim()) {
