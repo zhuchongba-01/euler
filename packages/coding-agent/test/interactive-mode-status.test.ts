@@ -154,6 +154,7 @@ describe("InteractiveMode.setToolsExpanded", () => {
 			loadedResourcesContainer: { children: [loadedResourcesChild] },
 			chatContainer: { children: [chatChild] },
 			ui: { requestRender: vi.fn() },
+			showLoadedResources: vi.fn(),
 			showStatus: vi.fn(),
 		};
 
@@ -163,6 +164,11 @@ describe("InteractiveMode.setToolsExpanded", () => {
 		expect(header.setExpanded).toHaveBeenCalledWith(true);
 		expect(loadedResourcesChild.setExpanded).toHaveBeenCalledWith(true);
 		expect(chatChild.setExpanded).toHaveBeenCalledWith(true);
+		expect(fakeThis.showLoadedResources).toHaveBeenCalledWith({
+			force: true,
+			hideListing: false,
+			showDiagnosticsWhenQuiet: true,
+		});
 		expect(fakeThis.showStatus).toHaveBeenCalledWith("Tool output: expanded");
 	});
 });

@@ -1682,15 +1682,16 @@ export class InteractiveMode {
 	private showLoadedResources(options?: {
 		extensions?: Array<{ path: string; sourceInfo?: SourceInfo }>;
 		force?: boolean;
+		hideListing?: boolean;
 		showDiagnosticsWhenQuiet?: boolean;
 	}): void {
 		// Resource rendering is idempotent; chat clears no longer clear this separate container.
 		this.loadedResourcesContainer.clear();
 
-		const showListing = shouldShowStartupResources(
-			this.options.verbose === true,
-			this.toolOutputExpanded || options?.force === true,
-		);
+		const showListing =
+			options?.force === true ||
+			shouldShowStartupResources(this.options.verbose === true, this.toolOutputExpanded) ||
+			(!this.settingsManager.getQuietStartup() && options?.hideListing !== true);
 		const showDiagnostics = showListing || options?.showDiagnosticsWhenQuiet === true;
 		if (!showListing && !showDiagnostics) {
 			return;
@@ -1971,7 +1972,11 @@ export class InteractiveMode {
 
 		const extensionRunner = this.session.extensionRunner;
 		this.setupExtensionShortcuts(extensionRunner);
-		this.showLoadedResources({ force: false, showDiagnosticsWhenQuiet: true });
+		this.showLoadedResources({
+			force: false,
+			hideListing: this.options.verbose !== true,
+			showDiagnosticsWhenQuiet: true,
+		});
 		this.showStartupNoticesIfNeeded();
 	}
 
@@ -4186,7 +4191,11 @@ export class InteractiveMode {
 		if (expanded === this.toolOutputExpanded) return;
 
 		this.toolOutputExpanded = expanded;
-		this.showLoadedResources({ force: expanded, showDiagnosticsWhenQuiet: true });
+		this.showLoadedResources({
+			force: expanded,
+			hideListing: !expanded,
+			showDiagnosticsWhenQuiet: true,
+		});
 		const activeHeader = this.customHeader ?? this.builtInHeader;
 		if (isExpandable(activeHeader)) {
 			activeHeader.setExpanded(expanded);
@@ -5976,6 +5985,7 @@ export class InteractiveMode {
 			this.setupExtensionShortcuts(runner);
 			this.showLoadedResources({
 				force: false,
+				hideListing: this.options.verbose !== true,
 				showDiagnosticsWhenQuiet: true,
 			});
 			const savedImplicitProjectTrust = this.maybeSaveImplicitProjectTrustAfterReload();
