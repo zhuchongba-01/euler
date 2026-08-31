@@ -1,5 +1,6 @@
 import path from "node:path";
 import { existsSync, readFileSync } from "fs";
+import { VERSION } from "../config.ts";
 
 export interface ChangelogEntry {
 	major: number;
@@ -188,8 +189,15 @@ export function getNewEntries(entries: ChangelogEntry[], lastVersion: string): C
 		patch: parts[2] || 0,
 		content: "",
 	};
+	const currentParts = VERSION.split(".").map(Number);
+	const current: ChangelogEntry = {
+		major: currentParts[0] || 0,
+		minor: currentParts[1] || 0,
+		patch: currentParts[2] || 0,
+		content: "",
+	};
 
-	return entries.filter((entry) => compareVersions(entry, last) > 0);
+	return entries.filter((entry) => compareVersions(entry, last) > 0 && compareVersions(entry, current) <= 0);
 }
 
 // Re-export getChangelogPath from paths.ts for convenience

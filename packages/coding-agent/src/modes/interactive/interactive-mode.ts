@@ -122,7 +122,12 @@ import { CustomMessageComponent } from "./components/custom-message.ts";
 import { DaxnutsComponent } from "./components/daxnuts.ts";
 import { DynamicBorder } from "./components/dynamic-border.ts";
 import { EarendilAnnouncementComponent } from "./components/earendil-announcement.ts";
-import { createEulerWelcomeHeaderText } from "./components/euler-welcome-header.ts";
+import {
+	EulerWelcomePanel,
+	getEulerSessionLabel,
+	shouldShowEulerWelcome,
+	shouldShowStartupResources,
+} from "./components/euler-welcome-header.ts";
 import { ExtensionEditorComponent } from "./components/extension-editor.ts";
 import { ExtensionInputComponent } from "./components/extension-input.ts";
 import { ExtensionSelectorComponent } from "./components/extension-selector.ts";
@@ -561,6 +566,7 @@ export class InteractiveMode {
 
 	// Built-in header (logo + keybinding hints + changelog)
 	private builtInHeader: Component | undefined = undefined;
+	private eulerWelcomePanel: EulerWelcomePanel | undefined = undefined;
 
 	// Custom header from extension (undefined = use built-in header)
 	private customHeader: (Component & { dispose?(): void }) | undefined = undefined;
@@ -982,23 +988,24 @@ export class InteractiveMode {
 
 		await this.themeController.applyFromSettings();
 
-		// Add header with keybindings from config (unless silenced)
-		if (this.options.verbose || !this.settingsManager.getQuietStartup()) {
-			const welcomeHeader = createEulerWelcomeHeaderText(this.version);
-			this.builtInHeader = new ExpandableText(
-				() => welcomeHeader.compact,
-				() => welcomeHeader.expanded,
-				this.getStartupExpansionState(),
-				1,
-				0,
-			);
-
-			// Setup UI layout
+		const showWelcomePanel = shouldShowEulerWelcome(
+			this.session.state.messages.length === 0,
+			this.settingsManager.getQuietStartup(),
+		);
+		if (showWelcomePanel) {
+			const model = this.session.model;
+			const modelLabel = model ? `${model.provider}/${model.name ?? model.id}` : "No model selected — use /login";
+			this.eulerWelcomePanel = new EulerWelcomePanel({
+				cwd: this.sessionManager.getCwd(),
+				modelLabel,
+				version: this.version,
+			});
+			this.builtInHeader = this.eulerWelcomePanel;
 			this.headerContainer.addChild(new Spacer(1));
 			this.headerContainer.addChild(this.builtInHeader);
 			this.headerContainer.addChild(new Spacer(1));
+			void this.loadRecentEulerSessions(this.eulerWelcomePanel);
 		} else {
-			// Minimal header when silenced
 			this.builtInHeader = new Text("", 0, 0);
 			this.headerContainer.addChild(this.builtInHeader);
 		}
@@ -1266,6 +1273,31 @@ export class InteractiveMode {
 		}
 
 		return undefined;
+	}
+
+	private async loadRecentEulerSessions(panel: EulerWelcomePanel): Promise<void> {
+		try {
+			const sessions = await SessionManager.listAll();
+			if (this.eulerWelcomePanel !== panel) {
+				return;
+			}
+			panel.setRecentSessions(
+				sessions
+					.filter((session) => session.messageCount > 0)
+					.slice(0, 3)
+					.map((session) => ({
+						cwd: session.cwd,
+						label: getEulerSessionLabel(session),
+						modified: session.modified,
+					})),
+			);
+		} catch {
+			if (this.eulerWelcomePanel !== panel) {
+				return;
+			}
+			panel.setRecentSessions([]);
+		}
+		this.ui.requestRender();
 	}
 
 	private getMarkdownThemeWithSettings(): MarkdownTheme {
@@ -1655,7 +1687,10 @@ export class InteractiveMode {
 		// Resource rendering is idempotent; chat clears no longer clear this separate container.
 		this.loadedResourcesContainer.clear();
 
-		const showListing = options?.force || this.options.verbose || !this.settingsManager.getQuietStartup();
+		const showListing = shouldShowStartupResources(
+			this.options.verbose === true,
+			this.toolOutputExpanded || options?.force === true,
+		);
 		const showDiagnostics = showListing || options?.showDiagnosticsWhenQuiet === true;
 		if (!showListing && !showDiagnostics) {
 			return;
@@ -4151,6 +4186,7 @@ export class InteractiveMode {
 		if (expanded === this.toolOutputExpanded) return;
 
 		this.toolOutputExpanded = expanded;
+		this.showLoadedResources({ force: expanded, showDiagnosticsWhenQuiet: true });
 		const activeHeader = this.customHeader ?? this.builtInHeader;
 		if (isExpandable(activeHeader)) {
 			activeHeader.setExpanded(expanded);

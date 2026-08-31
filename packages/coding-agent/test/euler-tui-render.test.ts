@@ -7,7 +7,7 @@ import type { ReadonlyFooterDataProvider } from "../src/core/footer-data-provide
 import { KeybindingsManager } from "../src/core/keybindings.ts";
 import { CustomEditor } from "../src/modes/interactive/components/custom-editor.ts";
 import { DynamicBorder, getLineDrawingCharacters } from "../src/modes/interactive/components/dynamic-border.ts";
-import { createEulerWelcomeHeaderText } from "../src/modes/interactive/components/euler-welcome-header.ts";
+import { EulerWelcomePanel } from "../src/modes/interactive/components/euler-welcome-header.ts";
 import { FooterComponent } from "../src/modes/interactive/components/footer.ts";
 import { ToolExecutionComponent } from "../src/modes/interactive/components/tool-execution.ts";
 import { getThemeByName, initTheme, theme } from "../src/modes/interactive/theme/theme.ts";
@@ -72,16 +72,19 @@ afterEach(() => {
 });
 
 describe("Euler TUI rendering", () => {
-	it("renders a compact Euler welcome header without PI product branding", () => {
-		const header = createEulerWelcomeHeaderText("1.2.3");
-		const compact = stripAnsi(header.compact);
-		const expanded = stripAnsi(header.expanded);
+	it("renders an Euler welcome panel without PI product branding", () => {
+		const header = new EulerWelcomePanel({
+			cwd: "C:/work/euler",
+			modelLabel: "No model selected",
+			version: "1.2.3",
+		});
+		header.setRecentSessions([]);
+		const rendered = header.render(100).map(stripAnsi).join("\n");
 
-		expect(compact).toContain("Euler v1.2.3");
-		expect(compact).toContain("commands");
-		expect(compact).toContain("search");
-		expect(expanded).toContain("to select model");
-		expect(`${compact}\n${expanded}`).not.toMatch(/\bPI\b|\bPi\b|π/);
+		expect(rendered).toContain("Euler v1.2.3");
+		expect(rendered).toContain("commands");
+		expect(rendered).toContain("Recent activity");
+		expect(rendered).not.toMatch(/\bPI\b|\bPi\b|π/);
 	});
 
 	it("wraps the existing editor in one rounded box", () => {

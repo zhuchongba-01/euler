@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type ChangelogEntry, normalizeChangelogLinks } from "../src/utils/changelog.ts";
+import { type ChangelogEntry, getNewEntries, normalizeChangelogLinks } from "../src/utils/changelog.ts";
 
 const entry: ChangelogEntry = {
 	major: 0,
@@ -45,5 +45,16 @@ describe("normalizeChangelogLinks", () => {
 				"[Local anchor](#settings)",
 			].join("\n"),
 		);
+	});
+});
+
+describe("getNewEntries", () => {
+	test("does not show inherited changelog entries newer than Euler itself", () => {
+		const entries: ChangelogEntry[] = [
+			{ major: 0, minor: 1, patch: 1, content: "Euler 0.1.1" },
+			{ major: 0, minor: 84, patch: 3, content: "Inherited Pi 0.84.3" },
+		];
+
+		expect(getNewEntries(entries, "0.1.0")).toEqual([entries[0]]);
 	});
 });
