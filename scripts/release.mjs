@@ -164,10 +164,6 @@ function compareVersions(a, b) {
 	return 0;
 }
 
-function shellQuote(value) {
-	return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
 function removeStaleWorkspaceLockEntries() {
 	const workspaceVersions = new Map(
 		getPublicWorkspacePackages().map((pkg) => [pkg.name, pkg.version]),
@@ -202,7 +198,11 @@ function stageChangedFiles() {
 		return;
 	}
 
-	run(`git add -- ${paths.map(shellQuote).join(" ")}`);
+	console.log(`$ git add -- ${paths.join(" ")}`);
+	const result = spawnSync("git", ["add", "--", ...paths], { stdio: "inherit" });
+	if (result.status !== 0) {
+		throw new Error("Command failed: git add");
+	}
 }
 
 function bumpOrSetVersion(target) {
