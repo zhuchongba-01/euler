@@ -139,7 +139,6 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - ubuntu-24.04-arm
-          - macos-13
           - windows-11-arm
         include:
           - runner: windows-latest
@@ -149,8 +148,6 @@ jobs:
           - runner: macos-latest
             allow_failure: true
           - runner: ubuntu-24.04-arm
-            allow_failure: true
-          - runner: macos-13
             allow_failure: true
           - runner: windows-11-arm
             allow_failure: true
