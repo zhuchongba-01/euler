@@ -55,6 +55,30 @@ function run(cmd, options = {}) {
 	}
 }
 
+function runTestSuite() {
+	if (process.platform !== "win32") {
+		run("./test.sh");
+		return;
+	}
+
+	const bash = [
+		process.env.ProgramFiles ? join(process.env.ProgramFiles, "Git", "bin", "bash.exe") : undefined,
+		process.env["ProgramFiles(x86)"] ? join(process.env["ProgramFiles(x86)"], "Git", "bin", "bash.exe") : undefined,
+		"C:\\Program Files\\Git\\bin\\bash.exe",
+		"C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+	].find((candidate) => candidate && existsSync(candidate));
+
+	if (!bash) {
+		throw new Error("Git Bash is required to run ./test.sh on Windows.");
+	}
+
+	console.log(`$ ${bash} ./test.sh`);
+	const result = spawnSync(bash, ["./test.sh"], { stdio: "inherit" });
+	if (result.status !== 0) {
+		throw new Error("Command failed: ./test.sh");
+	}
+}
+
 function getVersion() {
 	const pkg = JSON.parse(readFileSync("packages/ai/package.json", "utf-8"));
 	return pkg.version;
@@ -294,7 +318,7 @@ run("npm run build:offline");
 console.log();
 
 console.log("Running tests...");
-run("./test.sh");
+runTestSuite();
 console.log();
 
 // 7. Commit and tag
