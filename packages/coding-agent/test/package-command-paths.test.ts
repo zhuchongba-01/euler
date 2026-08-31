@@ -419,7 +419,7 @@ if (process.platform !== "win32") fs.chmodSync(piPath, 0o755);
 	});
 
 	it("allows local package install to initialize fresh project settings", async () => {
-		await main(["install", "-l", packageDir]);
+		await main(["install", "-l", packageDir, "--approve"]);
 
 		const settingsPath = join(projectDir, ".euler", "settings.json");
 		const settings = JSON.parse(readFileSync(settingsPath, "utf-8")) as { packages?: string[] };
