@@ -1,6 +1,6 @@
 {
 	"name": "@zhongchongba/euler-session-backend-sqlite-node",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Node SQLite session backend for Euler agent sessions.",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -34,8 +34,8 @@
 		"node": ">=22.19.0"
 	},
 	"dependencies": {
-		"@zhongchongba/euler-ai": "^0.1.1",
-		"@zhongchongba/euler-agent-core": "^0.1.1"
+		"@zhongchongba/euler-ai": "^0.1.2",
+		"@zhongchongba/euler-agent-core": "^0.1.2"
 	},
 	"devDependencies": {
 		"@vitest/coverage-v8": "4.1.9",

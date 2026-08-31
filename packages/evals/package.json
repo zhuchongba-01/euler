@@ -1,6 +1,6 @@
 {
 	"name": "@zhongchongba/euler-evals",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -9,8 +9,8 @@
 		"test": "vitest run --config vitest.test.config.ts"
 	},
 	"devDependencies": {
-		"@zhongchongba/euler-ai": "^0.1.1",
-		"euler-agent": "^0.1.1",
+		"@zhongchongba/euler-ai": "^0.1.2",
+		"euler-agent": "^0.1.2",
 		"@types/node": "22.19.19",
 		"shx": "0.4.0",
 		"typescript": "5.9.3",
