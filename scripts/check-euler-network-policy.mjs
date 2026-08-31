@@ -4,7 +4,7 @@
  *
  * Static checks over runtime source and release configuration:
  * - No install/usage telemetry call sites or settings.
- * - Version checks only target the configured public GitHub Release API.
+ * - Version checks only target the public npm package metadata endpoint.
  * - The default search route is Exa MCP -> DuckDuckGo with no paid provider.
  * - The provider-catalog overlay is opt-in (no default PI catalog endpoint).
  * - CI release flow has no PI installer announcement or R2 secrets.
@@ -66,14 +66,14 @@ if (!/return false;/.test(telemetry)) {
 	offenders.push("packages/coding-agent/src/core/telemetry.ts: isInstallTelemetryEnabled must return literal false");
 }
 
-// 3. Version checks target only the public Euler Release API without a body.
+// 3. Version checks target only the public Euler npm metadata endpoint without a body.
 const versionCheck = readFileSync(join(repoRoot, "packages/coding-agent/src/utils/version-check.ts"), "utf-8");
 const versionUrl = versionCheck.match(/DEFAULT_RELEASES_API_URL\s*=\s*"([^"]+)"/);
 if (!versionUrl) {
 	offenders.push("version-check.ts: DEFAULT_RELEASES_API_URL is missing");
 } else {
 	const url = new URL(versionUrl[1]);
-	if (url.hostname !== "api.github.com" || !url.pathname.startsWith("/repos/zhuchongba-01/euler/")) {
+	if (url.hostname !== "registry.npmjs.org" || url.pathname !== "/euler-agent/latest") {
 		offenders.push(`version-check.ts: unexpected release API endpoint ${versionUrl[1]}`);
 	}
 }

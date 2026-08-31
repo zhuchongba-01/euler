@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Euler startup update checks to read the published `euler-agent` version from npm instead of relying on a GitHub Release.
+
 ## [0.1.2] - 2026-08-31
 
 ### Added

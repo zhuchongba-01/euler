@@ -2,7 +2,7 @@ import { compare, valid } from "semver";
 import { getEulerEnv } from "../euler-env.ts";
 import { fetchWithRetry } from "./management-http.ts";
 
-const DEFAULT_RELEASES_API_URL = "https://api.github.com/repos/zhuchongba-01/euler/releases/latest";
+const DEFAULT_RELEASES_API_URL = "https://registry.npmjs.org/euler-agent/latest";
 const DEFAULT_VERSION_CHECK_TIMEOUT_MS = 10000;
 
 export interface VersionCheckOptions {
@@ -58,7 +58,7 @@ function resolveReleaseApiUrl(configuredUrl: string | undefined): string | undef
 		const url = new URL(configuredUrl || DEFAULT_RELEASES_API_URL);
 		if (
 			url.protocol !== "https:" ||
-			url.hostname !== "api.github.com" ||
+			url.hostname !== "registry.npmjs.org" ||
 			url.username ||
 			url.password ||
 			url.search ||
@@ -66,7 +66,7 @@ function resolveReleaseApiUrl(configuredUrl: string | undefined): string | undef
 		) {
 			return undefined;
 		}
-		if (!/^\/repos\/[^/]+\/[^/]+\/releases\/latest$/.test(url.pathname)) {
+		if (url.pathname !== "/euler-agent/latest") {
 			return undefined;
 		}
 		return url.href;
@@ -87,10 +87,7 @@ export async function getLatestPiRelease(
 		const response = await fetchWithRetry(
 			releaseApiUrl,
 			{
-				headers: {
-					accept: "application/vnd.github+json",
-					"X-GitHub-Api-Version": "2022-11-28",
-				},
+				headers: { accept: "application/json" },
 			},
 			{
 				maxRetries: options.retry ? 2 : 0,
@@ -99,18 +96,11 @@ export async function getLatestPiRelease(
 		);
 		if (!response.ok) return undefined;
 
-		const data = (await response.json()) as {
-			body?: unknown;
-			tag_name?: unknown;
-		};
-		if (typeof data.tag_name !== "string") return undefined;
-		const version = data.tag_name.trim().replace(/^v/, "");
+		const data = (await response.json()) as { version?: unknown };
+		if (typeof data.version !== "string") return undefined;
+		const version = data.version.trim();
 		if (!valid(version)) return undefined;
-		const note = typeof data.body === "string" && data.body.trim() ? data.body.trim() : undefined;
-		return {
-			version,
-			...(note ? { note } : {}),
-		};
+		return { version };
 	} catch {
 		return undefined;
 	}
